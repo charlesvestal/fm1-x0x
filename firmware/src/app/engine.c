@@ -156,9 +156,8 @@ void engine_sound_defaults(sound_t *s)
      * own voicing (its pot defaults) is left as its original; only these are X0X's. */
     s->v[T_MIX][PART_909][MX_LEVEL] = 75;            /* 9W9's kit is hot (it drives its own glue): -5 dB */
     s->v[T_909][DR_BD][3] = 61;                      /* its kick under the break, its clap and hats over */
-    s->v[T_909][DR_BD][1] = 50;                      /* the kick: more beater click to cut through a break, */
-    s->v[T_909][DR_BD][2] = 80;                      /* a little shorter, and driven */
-    s->v[T_909][DR_BD][6] = 30;
+    s->v[T_909][DR_BD][2] = 80;                      /* the kick: a little shorter, and driven. Its Attack */
+    s->v[T_909][DR_BD][6] = 30;                      /* stays 9W9's 13: at 50 its tick was 12 dB louder, a click on every kick */
     s->v[T_909][DR_OH][1] = 60;
     s->v[T_MIX][PART_808][MX_LEVEL] = 112;
     s->v[T_808][D8_KIT][0] = 127;                    /* kit level */
