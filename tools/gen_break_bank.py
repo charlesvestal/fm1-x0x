@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import sampleio as sio  # noqa: E402
 
 SRC = Path(__file__).resolve().parents[1]
-BUDGET = 150 * 1024
+BUDGET = 128 * 1024              # the app slot's room for a bank (the 909 loops it replaces + headroom)
 
 
 def main():

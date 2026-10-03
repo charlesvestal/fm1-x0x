@@ -8,7 +8,7 @@
  *
  * Script, one command per line (# comments):
  *   wait MS                      run the device for MS milliseconds
- *   press BTN | release BTN | tap BTN     (BTN: FX SCL ENV LFO EDIT GLO HOME SAVE ARP SEQ PLAY REC OCT- OCT+)
+ *   press BTN | release BTN | tap BTN     (BTN: FX SEL ENV LFO EDIT GLO HOME SAVE ARP SEQ PLAY REC OCT- OCT+)
  *   key K down|up | tapkey K     (K: 0..26 = F3..G5, or w0..w15 white keys, b0..b10 black keys)
  *   turn ENC N                   (ENC: SELECT ALGO PRESET K1 K2 K3 K4; N detents, signed)
  *   master N                     MASTER pot 0..4096
@@ -373,7 +373,7 @@ static void run_ms(uint32_t ms)
 }
 
 /* ---------------------------------------------------------- script --- */
-static const char *const BTN_N[NB] = {"FX", "SCL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
+static const char *const BTN_N[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
                                       "PLAY", "REC", "OCT-", "OCT+"};
 static const char *const ENC_N[NE] = {"SELECT", "ALGO", "PRESET", "K1", "K2", "K3", "K4"};
 static const int WHITE_K[16] = {0, 2, 4, 6, 7, 9, 11, 12, 14, 16, 18, 19, 21, 23, 24, 26};

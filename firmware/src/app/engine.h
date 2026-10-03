@@ -54,5 +54,9 @@ void engine_bass_off(int part);
 void engine_brk_live(int key, int down);
 void engine_brk_loops(void);                                /* (re)read the A / B loops of the current pattern */
 int engine_brk_slice(void);                                 /* slice sounding now, -1 none (UI) */
+void engine_brk_state(int *slice, int *bank, int *div, int *running);
+int engine_brk_outline(int which, uint8_t *peaks, int n);   /* the loop's peaks for the screen (main loop) */
+float engine_gr_db(void);                                   /* master compressor gain reduction (UI meter) */
+void engine_master_format(int i, char *buf);                /* a master pot in its unit */
 int engine_brk_nslots(void);                                /* built-in loops + user slots */
 const char *const *engine_brk_slot_names(void);

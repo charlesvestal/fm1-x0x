@@ -79,7 +79,7 @@ def main():
             name = a.pop(0)
         elif o == "--bbgen":
             src = Path(a.pop(0)) if a and not a[0].startswith("--") else Path(__file__).resolve().parents[2] / "schwung-breakbeat" / "samples"
-            files += [(lbl, src / fn) for fn, lbl in ib.BANK]
+            files += [(lbl, src / fn) for fn, lbl in ib.BANK + ib.MORE]
             bars = True
         else:
             files.append((Path(o).stem.upper()[:6], Path(o)))

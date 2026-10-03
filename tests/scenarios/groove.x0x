@@ -74,7 +74,9 @@ tapkey w15
 expect brk15 1
 shot 06_break.png
 # tempo 128, play and record 4 bars
+press HOME
 turn SELECT 3
+release HOME
 expect tempo 128
 wav groove.wav
 tap PLAY

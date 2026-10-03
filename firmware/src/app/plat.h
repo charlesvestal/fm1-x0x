@@ -16,8 +16,9 @@
 #define X0X_POOL __attribute__((section(".pool")))
 #endif
 
-/* panel controls, by printed label (Felucca's panel.c map turns these into matrix ids) */
-enum { B_FX, B_SCL, B_ENV, B_LFO, B_EDIT, B_GLO, B_HOME, B_SAVE, B_ARP, B_SEQ, B_PLAY, B_REC,
+/* panel controls, by printed label (Felucca's panel.c map turns these into matrix ids; Felucca
+ * calls the second button SCL, the panel prints SEL) */
+enum { B_FX, B_SEL, B_ENV, B_LFO, B_EDIT, B_GLO, B_HOME, B_SAVE, B_ARP, B_SEQ, B_PLAY, B_REC,
        B_OCTDN, B_OCTUP, NB };
 enum { EN_SELECT, EN_ALGO, EN_PRESET, EN_K1, EN_K2, EN_K3, EN_K4, NE };
 

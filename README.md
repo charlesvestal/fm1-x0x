@@ -2,7 +2,7 @@
 
 Standalone groovebox firmware for the M-VAVE FM-1: a **TR-909**, a **TR-808**, **two TB-303s**
 with **TB-3PO** acid generators, and a **breakbeat generator**, with 16 patterns, shared
-reverb / tape delay sends on every part and a master section with drive, glue compression, a sweepable
+reverb / tape delay sends on every part, and a master compressor with kick-keyed pump, a sweepable
 filter and a limiter.
 
 X0X is a fork of [Felucca](https://github.com/hugelton/Felucca) by Leo Kuroshita (Hügelton
@@ -30,28 +30,44 @@ waits for the end of the bar, and patterns chain.
 
 ## The panel
 
-The 16 white keys are steps (and on HOME, patterns). The 11 black keys are a drum
-machine's 11 tracks, or the break's slice pads.
+One grammar everywhere (docs/plans/2026-10-03-ui.md): **ALGORITHM** picks the part,
+**PRESETS** cues the pattern, **SELECT** moves (page, list row), **KNOB 1-4** change the four
+values in the knob strip (always on screen), **SEL** opens / runs / says yes, **HOME** goes
+back. Every knob turn shows its value large for a second; anything that loses notes asks first.
+
+The 16 white keys are steps (on HOME, patterns). The 11 black keys are a drum machine's
+tracks, or the break's slice pads (on HOME, part mutes).
 
 | Control | Does |
 |---|---|
-| ALGORITHM | part: 909 / 808 / 303 A / 303 B / BREAK |
+| ALGORITHM | part: 909 / 808 / 303A / 303B / BREAK (in a list: change the value) |
 | PRESETS | cue a pattern (switches at the end of the bar) |
-| SELECT | tempo |
-| KNOB 1-4 | the four values on screen; EDIT (or the view's button again) for the next page |
+| SELECT | next / previous page (in a list: move); HOME held + SELECT: tempo |
+| KNOB 1-4 | the four values on screen, on every screen |
+| SEL | the list of everything on this screen; in a list, run an action; in a question, yes |
+| HOME | home: patterns, the five parts, mutes; back out of a list or a question |
+| EDIT | the part's pages (again: next page) |
+| ARP | TB-3PO (303 parts): OCT+ generates a new line, OCT- mutates it |
+| FX | sends (every part: reverb + delay), reverb, delay (DIGI / TAPE), kit drive |
+| LFO | MIX: levels, the master compressor (+ PUMP), the master filter |
+| GLO | GLOBAL: MIDI, key lights, theme, save, clear, factory reset |
+| SEQ | 303: steps / keyboard |
 | PLAY / REC | transport / record (live drums, live or step-written 303) |
-| HOME | patterns, all five parts at a glance; black keys 1-5 mute parts; two white keys held = chain |
-| SEQ | 303: steps ↔ keyboard |
-| ARP / SCL | TB-3PO (303 parts); OCT+ generates a new line, OCT- mutates it |
-| ENV held | white keys edit the 909/808 accent row; in 303 note entry, an accent |
-| LFO held | in 303 note entry, a slide |
-| FX / LFO / GLO | send FX + master / mixer + groove / MIDI + settings |
+| ENV held | white keys edit the accent row; in 303 note entry, an accent (tapped: a rest) |
+| LFO held | in 303 note entry, a slide (with OCT: a tie) |
 | OCT- / OCT+ | steps 1-16 / 17-32 (303 keyboard: octave) |
-| SAVE | save the project; SAVE held + white key copies this pattern there; SAVE + REC clears the part |
+| SAVE | save; SAVE held + white key: copy this pattern there; SAVE + REC: clear this part |
 | OCT- + OCT+ held 5 s | update mode (Felucca's) |
 
 On a 303 part, tap a white key to toggle a step; hold it and turn KNOB 1-4 for note, gate
 (rest / note / tie), accent and slide.
+
+## Master
+
+After the sends: a bus compressor (threshold, ratio 1:1 to INF, attack, release, makeup,
+parallel mix) with **PUMP**, kick-keyed ducking (the 909's or the 808's BD ducks the whole mix
+by up to 24 dB and the release swells it back), a resonant LP / BP / HP filter (CUTOFF is on
+HOME's PERFORM page), and a limiter. The 909 kit's own drive and glue sit on FX > KIT DRIVE.
 
 ## MIDI (USB)
 

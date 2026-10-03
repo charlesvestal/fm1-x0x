@@ -22,18 +22,21 @@ static int32_t cv_oy;            /* y offset for graph drawing */
 #define RGB(r, g, b) ((uint16_t)((((r) >> 3) << 11) | (((g) >> 2) << 5) | ((b) >> 3)))
 #define C_BLACK 0x0000u
 #define C_WHITE 0xFFFFu              /* accent only: what is being touched / where we are */
-/* The screen is five steps of one colour, darkest to brightest, plus white.
- * Palettes are picked in the HOME-hold menu (COLOR). */
+/* The screen's five steps, darkest to brightest, plus white; picked as THEME in GLOBAL. */
 typedef struct {
     const char *name;
     uint16_t c[5];
 } palette_t;
+/* X0X: the first three steps are neutral greys in every theme (structure: rules, empty cells,
+ * labels); only the two brightest carry the theme's hue (values, highlights). Colour on the
+ * screen then means something: a part, a value, an alarm. */
+#define NEUTRALS RGB(34, 34, 40), RGB(74, 74, 82), RGB(150, 150, 158)
 static const palette_t PALETTES[] = {
-    {"GREEN", {RGB(0, 40, 12), RGB(0, 84, 30), RGB(16, 140, 54), RGB(56, 200, 92), RGB(120, 255, 146)}},
-    {"AMBER", {RGB(60, 26, 0), RGB(110, 50, 0), RGB(170, 82, 0), RGB(225, 120, 8), RGB(255, 166, 40)}},
-    {"CYAN", {RGB(0, 30, 50), RGB(0, 62, 96), RGB(16, 112, 160), RGB(56, 172, 222), RGB(140, 222, 255)}},
-    {"RED", {RGB(52, 8, 8), RGB(100, 18, 14), RGB(170, 36, 26), RGB(226, 64, 48), RGB(255, 112, 92)}},
-    {"MONO", {RGB(40, 40, 40), RGB(80, 80, 80), RGB(130, 130, 130), RGB(186, 186, 186), RGB(226, 226, 226)}},
+    {"GREEN", {NEUTRALS, RGB(80, 220, 120), RGB(150, 255, 175)}},
+    {"AMBER", {NEUTRALS, RGB(232, 136, 30), RGB(255, 184, 70)}},
+    {"CYAN", {NEUTRALS, RGB(60, 180, 235), RGB(150, 225, 255)}},
+    {"RED", {NEUTRALS, RGB(232, 76, 60), RGB(255, 132, 112)}},
+    {"MONO", {NEUTRALS, RGB(196, 196, 202), RGB(236, 236, 240)}},
 };
 #define NPALETTES (sizeof(PALETTES) / sizeof(PALETTES[0]))
 static uint16_t pal[5];

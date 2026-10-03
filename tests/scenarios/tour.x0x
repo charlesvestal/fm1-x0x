@@ -1,0 +1,107 @@
+# A tour of every screen, for looking at (screenshots in build/scenarios/tour/).
+wait 300
+# a little content
+tapkey b0
+tapkey w0
+tapkey w4
+tapkey w8
+tapkey w12
+tapkey b7
+tapkey w2
+tapkey w6
+tapkey w10
+tapkey w14
+tapkey b1
+tapkey w4
+tapkey w12
+press ENV
+tapkey w0
+release ENV
+turn ALGO 2
+tap ARP
+tap OCT+
+turn ALGO 1
+tap ARP
+tap OCT+
+turn ALGO 1
+tapkey w0
+tapkey w2
+tapkey w4
+tapkey w6
+tapkey w8
+tapkey w10
+tapkey w12
+tapkey w14
+turn ALGO -4
+tap PLAY
+wait 600
+shot t01_909.png
+turn K1 6
+shot t02_909_readout.png
+wait 1000
+turn ALGO 1
+tapkey b7
+shot t03_808.png
+turn ALGO 1
+wait 300
+shot t04_303a.png
+key w2 down
+wait 40
+shot t05_303a_held.png
+key w2 up
+tap ARP
+shot t06_tb3po.png
+tap OCT+
+shot t07_new_line_msg.png
+wait 1500
+turn ALGO 2
+wait 300
+shot t08_break.png
+tap EDIT
+tap EDIT
+tap EDIT
+shot t09_break_loops.png
+tap HOME
+wait 200
+shot t10_home.png
+tapkey b1
+shot t11_home_mute.png
+tapkey b1
+tap FX
+shot t12_fx.png
+tap LFO
+tap LFO
+turn K2 4
+shot t13_mix_comp.png
+tap LFO
+turn K3 40
+wait 1200
+shot t14_mix_pump.png
+tap SEL
+shot t15_list.png
+turn SELECT 3
+turn ALGO 2
+shot t16_list_edit.png
+tap HOME
+tap GLO
+shot t17_global.png
+turn SELECT 6
+shot t18_global_reset.png
+tap SEL
+shot t19_ask.png
+tap HOME
+wait 300
+shot t20_cancelled.png
+tap GLO
+turn ALGO -4
+press SAVE
+tap REC
+release SAVE
+shot t21_ask_clear.png
+tap HOME
+press HOME
+turn SELECT 5
+shot t22_tempo.png
+release HOME
+tap PLAY
+wait 300

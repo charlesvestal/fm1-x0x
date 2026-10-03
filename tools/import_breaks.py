@@ -21,8 +21,10 @@ RATE = 22050
 
 # (BB Gen file, name on the device <= 6 chars): the bank order is the SLOT order on the device
 BANK = [("amen01.wav", "AMEN"), ("think.wav", "THINK"), ("funkydrummer.wav", "FUNKY"),
-        ("apache.wav", "APACHE"), ("kool.wav", "KOOL"), ("sesame.wav", "SESAME")]
-# a built-in bank: 7 (with king.wav) came to 161 KB against gen_break_bank.py's 150 KB budget
+        ("apache.wav", "APACHE"), ("kool.wav", "KOOL")]
+MORE = [("sesame.wav", "SESAME"), ("king.wav", "KING"), ("hungup_0.wav", "HUNGUP")]   # uploaded only
+# a built-in bank has to fit gen_break_bank.py's budget (what the app slot leaves): five one-bar
+# breaks; for more, upload them (tools/upload_breaks.py fills ~3 per slot)
 
 
 def bars_of(seconds):

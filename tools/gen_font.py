@@ -2,9 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
 """Render the bitmap fonts to a C header (assets/fonts/):
-  S  labels / units / status   Latin-1 32..255 at 1x
-  L  large values / titles     32..95 (digits, signs, capitals), the same glyphs at 2x
-Terminus 8x16 (BDF, SIL OFL 1.1). TTF fonts also work through render()
+  XS / S / B / M / L: Terminus 12, 16, 16 bold, 24 bold, 32 bold (BDF, SIL OFL 1.1); see SIZES. TTF fonts also work through render()
 (anti-aliased, tabular figures via the OpenType `tnum` feature).
 
 Glyph format: per glyph an advance width, a bitmap width and an offset; the
@@ -20,8 +18,12 @@ from PIL import Image, ImageDraw, ImageFont
 FONTS = Path(__file__).resolve().parents[1] / "assets" / "fonts"
 # (name, file, px, scale, pixel, first, last): pixel fonts are rendered without
 # anti-aliasing at their design size and enlarged by an integer factor
-SIZES = [("S", "ter-u16n.bdf", 16, 1, True, 32, 255),   # Latin-1 (Hügelton needs the umlaut)
-         ("L", "ter-u16n.bdf", 16, 2, True, 32, 95)]   # values / titles: digits, signs, capitals
+# X0X: five real Terminus sizes (no 2x upscaling); ASCII only
+SIZES = [("XS", "ter-u12n.bdf", 12, 1, True, 32, 126),  # grid labels, units, hints (6x12)
+         ("S", "ter-u16n.bdf", 16, 1, True, 32, 126),   # body (8x16)
+         ("B", "ter-u16b.bdf", 16, 1, True, 32, 126),   # headers, names, the selected row (8x16 bold)
+         ("M", "ter-u24b.bdf", 24, 1, True, 32, 95),    # knob values: digits, signs, capitals (12x24 bold)
+         ("L", "ter-u32b.bdf", 32, 1, True, 32, 95)]    # the big readout, titles (16x32 bold)
 PAD = 2
 
 
@@ -71,7 +73,7 @@ def render_bdf(path, scale, first, last):
             glyphs[code] = (dw, cell)
             i = k + bh
         i += 1
-    if 0xDC not in glyphs and ord("U") in glyphs:      # Ü for "HÜGELTON": U with dots on its top row
+    if last >= 0xDC and 0xDC not in glyphs and ord("U") in glyphs:      # Ü for "HÜGELTON": U with dots on its top row
         dw, cell = glyphs[ord("U")]
         cell = cell[:]
         lit = [x for y in range(ch) for x in range(cw) if cell[y * cw + x]]

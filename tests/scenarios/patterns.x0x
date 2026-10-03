@@ -7,6 +7,9 @@ tapkey w8
 press SAVE
 tapkey w1
 release SAVE
+# pattern 2 holds the factory TB-3PO lines: the copy asks first; SEL = yes
+expect view 1
+tap SEL
 tap HOME
 tapkey w1
 expect pattern 2
@@ -15,7 +18,9 @@ tapkey b1
 tapkey w4
 expect hit0.1.4 1
 # play pattern 2, cue 1: it changes on the bar, not before
+press HOME
 turn SELECT -5
+release HOME
 expect tempo 120
 tap PLAY
 wait 1000

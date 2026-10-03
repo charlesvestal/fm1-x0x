@@ -43,7 +43,7 @@ tapkey w14
 tapkey w15
 turn K3 20
 shot 20_break_amen.png
-# sends: FX opens on SENDS; page 1 = 909 / 808, page 2 = the 303s, page 3 = the break + delay
+# sends: FX opens on SENDS; page 1 = 909 / 808, page 2 = the 303s, page 3 = the break
 tap FX
 turn K1 25
 tap FX
@@ -52,12 +52,19 @@ turn K4 30
 shot 21_sends_303.png
 tap FX
 turn K1 30
-turn K3 1
-shot 22_sends_break_tape.png
+shot 22_sends_break.png
+# the delay's TAPE page: FX three more times (REVERB, DELAY, TAPE)
+tap FX
+tap FX
+tap FX
+turn K1 1
+shot 22b_tape.png
 expect sound5.2.2 70
 expect sound5.4.1 30
 # tempo 135, play 8 bars
+press HOME
 turn SELECT 10
+release HOME
 expect tempo 135
 wav jam.wav
 tap PLAY
