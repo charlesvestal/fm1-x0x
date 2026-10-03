@@ -1746,16 +1746,17 @@ static void draw_readout(void)
         nm = pref_name(r);
     }
     pref_value(r, num, unit);
-    box(8, 12, 224, 54, C_BLACK);
-    frame(8, 12, 224, 54, part_col());
-    cv_text(16, vc(&FONT_S, 14, 18), &FONT_S, nm, C_GRAY);
-    w = tw(&FONT_L, num) + (unit[0] ? tw(&FONT_S, unit) + 3 : 0);
-    x = 120 - w / 2;
-    {
-        int32_t ly = vc(&FONT_L, 34, 26);
-        x = cv_text(x, ly, &FONT_L, num, C_WHITE);
+    {   /* one row: the name on the left, the value (+ unit) on the right, both on the box's middle */
+        const int32_t bx = 8, by = 14, bw = 224, bh = 50;
+        int32_t ly = vc(&FONT_L, by, bh), uw = unit[0] ? tw(&FONT_S, unit) + 3 : 0;
+        box(bx, by, bw, bh, C_BLACK);
+        frame(bx, by, bw, bh, part_col());
+        cv_text(bx + 12, vc(&FONT_B, by, bh), &FONT_B, nm, C_GRAY);
+        w = tw(&FONT_L, num);
+        x = bx + bw - 12 - uw - w;
+        cv_text(x, ly, &FONT_L, num, C_WHITE);
         if (unit[0])
-            cv_text(x + 3, base_y(&FONT_L, ly, &FONT_S), &FONT_S, unit, C_GRAY);
+            cv_text(bx + bw - 12 - uw + 3, base_y(&FONT_L, ly, &FONT_S), &FONT_S, unit, C_GRAY);
     }
 }
 
