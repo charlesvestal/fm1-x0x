@@ -1,0 +1,156 @@
+# Showcase: every part running, sends, tape delay, the master compressor with PUMP and a filter
+# sweep, played from the panel at 128 BPM. Audio: build/scenarios/showcase/showcase.wav
+wait 300
+# ---- 909: four on the floor, clap on 2 and 4, closed hats on the off-beats, open hat, accents
+tapkey b0
+tapkey w0
+tapkey w4
+tapkey w8
+tapkey w12
+tapkey b6
+tapkey w4
+tapkey w12
+tapkey b7
+tapkey w2
+tapkey w6
+tapkey w10
+tapkey w14
+tapkey w15
+tapkey b8
+tapkey w7
+press ENV
+tapkey w0
+tapkey w8
+release ENV
+# ---- 808: cowbell, rim
+turn ALGO 1
+tapkey b7
+tapkey w3
+tapkey w10
+tapkey b5
+tapkey w6
+tapkey w13
+# ---- 303 A: a TB-3PO line; filter, envelope, drive, delay send
+turn ALGO 1
+tap ARP
+tap OCT+
+tap EDIT
+turn K1 -12
+turn K2 30
+turn K3 25
+tap EDIT
+tap EDIT
+turn K1 35
+tap EDIT
+turn K2 70
+# ---- 303 B: a second line, quieter, into the reverb
+turn ALGO 1
+tap ARP
+turn K1 -20
+tap OCT+
+tap EDIT
+turn K1 -20
+tap EDIT
+tap EDIT
+tap EDIT
+turn K1 40
+turn K3 -18
+# ---- BREAK: on every step, a little more complexity and roll, some reverb
+turn ALGO 1
+tapkey w0
+tapkey w1
+tapkey w2
+tapkey w3
+tapkey w4
+tapkey w5
+tapkey w6
+tapkey w7
+tapkey w8
+tapkey w9
+tapkey w10
+tapkey w11
+tapkey w12
+tapkey w13
+tapkey w14
+tapkey w15
+turn K1 15
+turn K3 10
+tap EDIT
+tap EDIT
+tap EDIT
+turn K3 -16
+tap EDIT
+turn K1 20
+# ---- FX: 909 reverb; the delay to TAPE with some wear and feedback
+tap FX
+turn K1 18
+tap FX
+tap FX
+tap FX
+tap FX
+turn K2 25
+tap FX
+turn K1 1
+turn K2 45
+# ---- MIX: the compressor (-18 dB, 4:1, 10 ms, ~110 ms), makeup, PUMP from the 909 kick; LP filter
+tap LFO
+tap LFO
+turn K1 -15
+turn K2 4
+turn K3 16
+tap LFO
+turn K1 18
+turn K3 42
+tap LFO
+turn K1 1
+# ---- tempo 128
+press HOME
+turn SELECT 3
+release HOME
+expect tempo 128
+# ---- play 16 bars: 4 as is, a filter sweep down and up, a breakdown, everything back
+wav showcase.wav
+tap PLAY
+wait 3000
+tap HOME
+wait 300
+shot s01_home.png
+wait 4200
+# MIX remembers its page (FILTER): one tap
+tap LFO
+shot s02_mix_comp.png
+expect sound6.0.1 4
+turn K2 -55
+shot s03_filter_sweep.png
+turn K2 55
+tap HOME
+tapkey b2
+tapkey b4
+tapkey b0
+wait 3700
+shot s04_breakdown.png
+tapkey b0
+tapkey b2
+tapkey b4
+wait 2000
+turn ALGO -4
+wait 800
+shot s05_909.png
+turn ALGO 2
+wait 800
+shot s06_303a.png
+turn ALGO 2
+wait 800
+shot s07_break.png
+tap FX
+wait 300
+shot s08_fx.png
+tap LFO
+wait 400
+shot s09_mix.png
+wait 3000
+tap PLAY
+wait 2500
+wavstop
+expect sound6.0.1 4
+expect peak_db_min -24
