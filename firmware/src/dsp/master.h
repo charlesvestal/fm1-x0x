@@ -20,15 +20,19 @@ typedef struct {
     float a_att, a_rel;               /* one-pole coefficients of the gain-reduction smoother */
     float makeup, mix;                /* linear makeup gain, wet share */
     float gr;                         /* smoothed gain reduction, dB (>= 0) */
+    float ms, a_det;                  /* the level it reads: mean square over ~8 ms (not each sample) */
     float pump_db, pump, pump_tgt;    /* PUMP depth; its envelope (dB) and the target it rises to */
-    float a_pump;                     /* PUMP rise: 3 ms */
+    float a_pump;                     /* PUMP rise: MASTER_PUMP_RISE_MS */
     uint8_t comp_on;                  /* ratio > 1:1 or PUMP: else bypassed, sample for sample */
     float gr_view;                    /* gain reduction for the screen, dB, peak-held */
     /* filter */
     float g, g_t, k;
     float ic1, ic2;
-    /* limiter */
+    /* limiter: looks MST_LA samples ahead, so it can lower the gain before a peak arrives */
+#define MST_LA 64
     float env, gain;
+    float la[MST_LA];
+    int la_pos, hold;
 } master_t;
 
 void master_init(master_t *m);

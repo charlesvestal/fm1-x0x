@@ -46,6 +46,13 @@ static float release_ms(int p) { return 10.0f * fm_exp2f((float)p * (7.229f / 12
 static float makeup_db(int p) { return 24.0f * (float)p / 127.0f; }
 static float pump_db(int p) { return 24.0f * (float)p / 127.0f; }
 
+/* PUMP's duck rises over this: 12 ms lets the kick's attack through and then ducks. At 3 ms it
+ * dropped the whole mix 4 dB inside a cycle of the bass: measured, the fast gain movement at the
+ * kick was 6 dB louder than at 10 ms, and it was heard as a click on every kick. */
+#ifndef MASTER_PUMP_RISE_MS
+#define MASTER_PUMP_RISE_MS 12.0f
+#endif
+
 /* one-pole coefficient reaching 1 - 1/e of a step in t milliseconds */
 static float coef_ms(float t) { return fm_expf(-1000.0f / (t * FS)); }
 
@@ -57,10 +64,11 @@ static void comp_coefs(master_t *m)
     m->knee = 6.0f;
     m->a_att = coef_ms(attack_ms(m->pot[MST_ATTACK]));
     m->a_rel = coef_ms(release_ms(m->pot[MST_RELEASE]));
+    m->a_det = coef_ms(8.0f);
     m->makeup = fm_db2lin(makeup_db(m->pot[MST_MAKEUP]));
     m->mix = (float)m->pot[MST_MIX] / 127.0f;
     m->pump_db = pump_db(m->pot[MST_PUMP]);
-    m->a_pump = coef_ms(3.0f);
+    m->a_pump = coef_ms(MASTER_PUMP_RISE_MS);
     m->comp_on = m->pot[MST_RATIO] != 0 || m->pot[MST_PUMP] != 0;
 }
 
@@ -126,8 +134,13 @@ void master_process(master_t *m, float *x, int n, float volume)
     for (i = 0; i < n; i++) {
         float s = x[i];
         if (m->comp_on) {
-            float a = fm_fabsf(s), want, total, wet;
-            want = (a > 1e-6f && m->slope > 0.0f) ? gr_of(m, 6.0206f * fm_log2f(a)) : 0.0f;
+            float lv, want, total, wet;
+            /* the level: mean square over ~8 ms, x2 so a sine reads its peak. Read sample by sample
+             * (|x|), the reduction chased every cycle of a bass note and grabbed each kick within a
+             * millisecond: audio-rate gain movement, heard as clicks */
+            m->ms = fm_flush(m->a_det * m->ms + (1.0f - m->a_det) * s * s);
+            lv = 2.0f * m->ms;
+            want = (lv > 1e-12f && m->slope > 0.0f) ? gr_of(m, 3.0103f * fm_log2f(lv)) : 0.0f;
             m->gr = want > m->gr ? m->a_att * m->gr + (1.0f - m->a_att) * want
                                  : m->a_rel * m->gr + (1.0f - m->a_rel) * want;
             if (m->pump_tgt > m->pump) {                     /* PUMP: rise to the kick's depth ... */
@@ -155,13 +168,26 @@ void master_process(master_t *m, float *x, int n, float volume)
         }
         s *= volume;
         if (m->pot[MST_LIMIT]) {
-            float a = fm_fabsf(s);
-            m->env = a > m->env ? a : m->env * 0.99985f;
+            /* look ahead MST_LA samples: a peak is seen when it enters, the gain eases down over the
+             * MST_LA samples it takes to come out, and is held for them. (It used to halve the
+             * distance every sample: a step in the waveform, a click on every limited kick.) */
+            float a = fm_fabsf(s), d;
+            if (a >= m->env) {
+                m->env = a;
+                m->hold = MST_LA;
+            } else if (m->hold) {
+                m->hold--;
+            } else {
+                m->env *= 0.99985f;
+            }
             {
                 float want = m->env > 0.8f ? 0.8f / m->env : 1.0f;
-                m->gain += (want - m->gain) * (want < m->gain ? 0.5f : 0.002f);
+                m->gain += (want - m->gain) * (want < m->gain ? (5.0f / MST_LA) : 0.002f);
             }
-            s *= m->gain;
+            d = m->la[m->la_pos];
+            m->la[m->la_pos] = s;
+            m->la_pos = (m->la_pos + 1) % MST_LA;
+            s = d * m->gain;
             if (s > 0.89f || s < -0.89f)
                 s = s > 0.0f ? 0.89f + 0.11f * fm_tanhf((s - 0.89f) * 9.0f)
                              : -0.89f - 0.11f * fm_tanhf((-s - 0.89f) * 9.0f);

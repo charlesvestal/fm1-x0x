@@ -182,7 +182,7 @@ void engine_sound_defaults(sound_t *s)
     s->v[T_MST][0][MST_RATIO] = 4;                   /* 4:1 */
     s->v[T_MST][0][MST_THRESH] = 64;                 /* -24 dB */
     s->v[T_MST][0][MST_MAKEUP] = 85;                 /* +16 dB: into the limiter */
-    s->v[T_MST][0][MST_ATTACK] = 60;                 /* 2.6 ms: it grabs the transients too: squash */
+    s->v[T_MST][0][MST_ATTACK] = 85;                 /* 10 ms: faster grabbed each kick hard enough to click */
     s->v[T_MST][0][MST_RELEASE] = 58;                /* 100 ms: it breathes with the beat */
     s->v[T_MST][0][MST_PUMP] = 21;                   /* 4 dB of 909-keyed pump */
 }

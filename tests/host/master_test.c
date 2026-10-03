@@ -120,7 +120,7 @@ int main(void)
         CHECK(half > -12.0f && half < -6.5f, "parallel mix 50%%: %.2f dB, between wet -19.5 and dry -6", half);
     }
 
-    /* 5. PUMP: a kick ducks the mix by its depth within ~5 ms, then swells back */
+    /* 5. PUMP: a kick ducks the mix by its depth, easing in over ~12 ms, then swells back */
     {
         float before, dip, later;
         setup(127, 0, 60, 60);                                           /* ratio 1:1: PUMP alone */
@@ -136,10 +136,34 @@ int main(void)
         master_key(&M, 0, 1.0f);
         sine(buf, N, -6.0f, 4851);
         run(buf, N);
-        dip = peak_db(buf + 330, 110);                                   /* 7.5 - 10 ms after the kick */
+        dip = peak_db(buf + 1940, 110);                                  /* 44 - 46.5 ms after the kick */
         later = peak_db(buf + 40000, 1000);                              /* ~0.9 s later */
-        CHECK(before - dip > 9.0f && before - dip < 14.0f, "a 909 kick ducks %.1f dB (depth 12) within 10 ms", before - dip);
+        CHECK(before - peak_db(buf + 132, 44) < 5.0f,
+              "... it eases in: %.1f dB down 3-4 ms after the kick (a 3 ms rise, 8 dB, was a click)",
+              before - peak_db(buf + 132, 44));
+        CHECK(before - dip > 9.0f && before - dip < 14.0f, "a 909 kick ducks %.1f dB (depth 12) by 45 ms", before - dip);
         CHECK(before - later < 0.5f, "... and the mix has swelled back after the release (%.2f dB down)", before - later);
+    }
+    /* 6. the limiter: a burst 6 dB over its ceiling comes out under it, and the gain eases in over
+     *    the look-ahead (it used to halve the distance each sample: a ~1 dB step, a click) */
+    {
+        float step = 0.0f, prev = 1.0f, pk = 0.0f;
+        setup(127, 0, 60, 60);
+        master_set(&M, MST_LIMIT, 1);
+        for (i = 0; i < N; i++) {
+            float x = i < 4410 ? 0.3f * sinf(2.0f * 3.14159265f * 60.0f * (float)i / 44100.0f)        /* a kick: */
+                               : 1.6f * cosf(2.0f * 3.14159265f * 60.0f * (float)(i - 4410) / 44100.0f);   /* at its peak at once */
+            float d;
+            master_process(&M, &x, 1, 1.0f);
+            d = fabsf(20.0f * log10f(M.gain) - 20.0f * log10f(prev));
+            prev = M.gain;
+            if (d > step)
+                step = d;
+            if (i > 4410 + 2 * MST_LA && fabsf(x) > pk)
+                pk = fabsf(x);
+        }
+        CHECK(pk < 0.9f, "limiter: a 60 Hz burst at 1.6, from its peak, comes out at %.2f (ceiling 0.8, soft above 0.89)", pk);
+        CHECK(step < 0.5f, "limiter: the gain moves at most %.2f dB a sample", step);
     }
     printf("master: %s\n", fails ? "FAIL" : "ok");
     return fails != 0;
