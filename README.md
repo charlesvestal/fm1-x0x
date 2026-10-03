@@ -128,7 +128,7 @@ PNG screenshots out.
 Code: GPL-3.0-only (as Felucca, 9W9, 8W8 and schwung-tb3po). Open303 (Robin Schmidt) is
 MIT. The BB Gen generator is ported from mestela's schwung-breakbeat with the author's
 permission. The 909's hi-hat, ride and crash samples are ER-99's (Matthew Cieplak, GPL-3.0).
-Font: Terminus (SIL OFL 1.1).
+Fonts: Barlow Semi Condensed and Terminus (SIL OFL 1.1).
 
 Felucca's own assets that are not under its GPL (the icon atlas, the panel photo, the
 Hügelton drum pack) are not part of this fork.
