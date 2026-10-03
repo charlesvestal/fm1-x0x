@@ -1,12 +1,12 @@
-# Building Felucca
+# Building X0X
 
 The build makes three files in `build/`:
 
 | File | What |
 | --- | --- |
-| `felucca.bin` | the firmware app |
+| `x0x.bin` | the firmware app |
 | `loader/ota.bin` | the update loader |
-| `felucca.fwsc` | the installable package (app + loader) |
+| `x0x.fwsc` | the installable package (app + loader) |
 
 ## Prerequisites (macOS)
 
@@ -41,24 +41,19 @@ On Linux x86-64 the toolchain runs natively and Docker is not needed.
 `JIELI_TOOLCHAIN` and `AC79_SDK` override the default locations
 (`~/.jieli/toolchain`, `~/fw-AC79_AIoT_SDK`).
 
-`./build.sh --release 0.9-beta` makes a release build: the package identity becomes
-`FM-1_909` and the version string `0.9-BETA`; the package is `build/felucca-0.9-beta.fwsc`.
+`./build.sh --release 0.1-beta` makes a release build; the package is `build/x0x-0.1-beta.fwsc`.
 
-Build options (environment, `0` or `1`; defaults in `firmware/src/felucca.c`):
+On macOS with podman instead of Docker, put a `docker` script that runs `exec podman "$@"` first
+on your PATH. `X0X_JOBS` (default 4) limits parallel compiles: a podman machine drops
+connections when many containers start at once.
 
-| Flag | Default | |
-| --- | --- | --- |
-| `FELUCCA_FLASH` | 1 | settings, presets and projects in flash |
-| `FELUCCA_OTA` | 1 | update entry (needs `FELUCCA_FLASH`) |
-| `FELUCCA_CDC` | 1 | USB serial console |
-| `FELUCCA_UART` | 0 | TRS MIDI IN (not tested on hardware) |
+Build option: `X0X_CDC=1` adds Felucca's USB serial function (off by default: one plain
+MIDI interface).
 
-## Samples
-
-The CC0 instrument samples that the SAMPLE engine uses are in `assets/samples-cc0/`
-(Versilian Studios, see `ATTRIBUTION.txt` there). `tools/fetch_cc0.py` downloads them
-again from the source repositories. Without that folder the build still works and the
-SAMPLE engine has only the generated drum kit.
+The build also generates `build/gen/`: the font, the 909's samples and tables
+(`tools/gen_drum_samples.py`), and the built-in break loop, rendered by the 909 port on the
+host (`tools/gen_builtin_break.sh`, needs a host `cc`). It fails if a soft-double routine is
+linked (a `double` crept in) and checks the image, RAM and pool sizes.
 
 ## Tests
 
@@ -66,16 +61,15 @@ SAMPLE engine has only the generated drum kit.
 tests/run_tests.sh
 ```
 
-Runs the host tests (flash storage, user presets, MIDI parser, update entry, update
-loader, a DSP render, the 4-track mix, project formats, the SLICER, the regression suite,
-the command-line installer) and, with Node.js, the web page tests. Run it after `./build.sh`
-(it uses `build/` and needs `AC79_SDK` set as for the build).
+Runs, on the build machine: the maths library against libm; the sequencer and TB-3PO
+(against schwung-tb3po, from `../schwung-tb3po` or `TB3PO_REF`); each engine against its
+original (9W9, 8W8, schwung-303, BB Gen — the scripts in `tests/host/` say where they look
+for those sources); flash storage; Felucca's update-path tests against `build/x0x.fwsc`
+(the loader test needs `AC79_SDK`); and the whole app in the simulator
+(`tests/scenarios/*.x0x`), with its screenshots and audio in `build/scenarios/`.
 
-The regression suite (`tests/regress.c`) renders every engine and preset and compares a
-hash of each render with `tests/golden.txt`; it also checks levels, voices and the CPU
-cost (`tests/cpu_baseline.txt`, `tests/target_budget.txt`). After an intended change of
-the sound, `GOLDEN_UPDATE=1 sh tests/run_tests.sh` rewrites the hashes; `BUDGET_UPDATE=1`
-does the same for the cost files.
+`host/build_host.sh` builds the simulator alone; `build/host/x0x_host SCRIPT OUTDIR` runs one
+script (the command list is at the top of `host/x0x_host.c`).
 
 ## Install
 
@@ -85,7 +79,7 @@ Use the web installer in Chrome or Edge:
 From the command line (needs `pip3 install mido python-rtmidi`):
 
 ```
-python3 tools/fm1_install.py build/felucca.fwsc
+python3 tools/fm1_install.py build/x0x.fwsc
 python3 tools/fm1_install.py --info          # identity of the connected FM-1
 ```
 
@@ -93,8 +87,8 @@ Or, to install your own build from the web installer, make a local copy of the s
 (Web MIDI needs a secure context):
 
 ```
-python3 web/make_site.py build/felucca.fwsc dev /tmp/felucca-site
-cd /tmp/felucca-site && python3 -m http.server 8000
+python3 web/make_site.py build/x0x.fwsc dev /tmp/x0x-site
+cd /tmp/x0x-site && python3 -m http.server 8000
 # open http://localhost:8000/webapp/installer/
 ```
 
