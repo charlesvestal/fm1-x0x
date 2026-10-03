@@ -150,7 +150,41 @@ void engine_sound_defaults(sound_t *s)
                 const x0x_param_t *p = engine_param(t, v, i);
                 s->v[t][v][i] = p ? p->def : 0;
             }
-    s->v[T_MIX][PART_808][MX_LEVEL] = 70;  /* 8W8's accented kit peaks +4 dBFS at unity: ~-6 dB */
+    /* the factory mix: big beat (Chemical Brothers, Fatboy Slim), balanced by tools/mix_report.py
+     * against a funk break, a 909 kick under it and a 303 line. The break leads, the kick sits
+     * under it, the 303 screams through its RAT; the master squeezes and pumps. Each engine's
+     * own voicing (its pot defaults) is left as its original; only these are X0X's. */
+    s->v[T_MIX][PART_909][MX_LEVEL] = 75;            /* 9W9's kit is hot (it drives its own glue): -5 dB */
+    s->v[T_909][DR_BD][3] = 61;                      /* its kick under the break, its clap and hats over */
+    s->v[T_909][DR_BD][1] = 50;                      /* the kick: more beater click to cut through a break, */
+    s->v[T_909][DR_BD][2] = 80;                      /* a little shorter, and driven */
+    s->v[T_909][DR_BD][6] = 30;
+    s->v[T_909][DR_OH][1] = 60;
+    s->v[T_MIX][PART_808][MX_LEVEL] = 112;
+    s->v[T_808][D8_KIT][0] = 127;                    /* kit level */
+    s->v[T_BRK][0][0] = 127;                         /* the break: full level, part a little over unity */
+    s->v[T_MIX][PART_BRK][MX_LEVEL] = 120;
+    s->v[T_MIX][PART_BRK][MX_REV] = 25;
+    for (v = 0; v < NBASS; v++) {                    /* acid: low cutoff, high resonance, a long sweep, RAT */
+        s->v[T_303][v][BASS303_CUTOFF] = 48;
+        s->v[T_303][v][BASS303_RESO] = 100;
+        s->v[T_303][v][BASS303_ENVMOD] = 85;
+        s->v[T_303][v][BASS303_ACCENT] = 100;
+        s->v[T_303][v][BASS303_VOLUME] = 127;
+        s->v[T_303][v][BASS303_DRIVE] = 45;
+        s->v[T_303][v][BASS303_DRVTYPE] = 2;
+        s->v[T_MIX][PART_303A + v][MX_LEVEL] = 74;   /* the RAT makes it dense: -5 dB (square law) */
+        s->v[T_MIX][PART_303A + v][MX_DLY] = v ? 60 : 80;
+        s->v[T_MIX][PART_303A + v][MX_REV] = 12;
+    }
+    s->v[T_909][DR_CP][5] = 90;                      /* the clap in the room */
+    s->v[T_FX][0][FX_DL_TYPE] = 1;                   /* tape delay, dotted eighths */
+    s->v[T_MST][0][MST_RATIO] = 4;                   /* 4:1 */
+    s->v[T_MST][0][MST_THRESH] = 64;                 /* -24 dB */
+    s->v[T_MST][0][MST_MAKEUP] = 85;                 /* +16 dB: into the limiter */
+    s->v[T_MST][0][MST_ATTACK] = 60;                 /* 2.6 ms: it grabs the transients too: squash */
+    s->v[T_MST][0][MST_RELEASE] = 58;                /* 100 ms: it breathes with the beat */
+    s->v[T_MST][0][MST_PUMP] = 21;                   /* 4 dB of 909-keyed pump */
 }
 
 void engine_apply_sound(const sound_t *s)

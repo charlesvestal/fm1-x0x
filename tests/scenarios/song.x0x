@@ -69,7 +69,7 @@ expect songon 0
 tap HOME
 tap EDIT
 expect part 2
-expect sound2.0.0 64
+expect sound2.0.0 48
 tap REC
 tap PLAY
 wait 60
@@ -89,29 +89,29 @@ spin K1 10
 wait 124
 tap REC
 expect lanes 1
-expect sound2.0.0 84
+expect sound2.0.0 68
 # the first turn lands on step 3 (PLAY's tap takes a moment), one step per turn after it
-expect laneval2.0.0.2 24
-expect laneval2.0.0.5 54
-expect laneval2.0.0.8 84
+expect laneval2.0.0.2 8
+expect laneval2.0.0.5 38
+expect laneval2.0.0.8 68
 expect laneval2.0.0.1 255
 expect laneval2.0.0.9 255
-# the next pass plays it back: step 4 (34 rising to 44), not the knob's 84
+# the next pass plays it back: step 4 (18 rising to 28), not the knob's 68
 wait 1310
-expect motion2.0.0 <45
-expect motion2.0.0 >33
+expect motion2.0.0 <29
+expect motion2.0.0 >17
 shot s05_motion.png
 # turning the knob (not recording): the knob wins for a pass
 spin K1 -4
 wait 200
 expect motion2.0.0 -1
-expect sound2.0.0 80
+expect sound2.0.0 64
 # SAVE held + the knob: its motion is gone; the knob keeps its value
 press SAVE
 spin K1 1
 release SAVE
 expect lanes 0
-expect sound2.0.0 80
+expect sound2.0.0 64
 tap PLAY
 # a touch, saved: the song and the lane survive a reboot
 tap REC

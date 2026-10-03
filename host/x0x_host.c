@@ -13,6 +13,7 @@
  *   turn ENC N                   (ENC: SELECT ALGO PRESET K1 K2 K3 K4; N detents, signed, 80 ms apart)
  *   spin ENC N                   N detents at once (1 ms)
  *   master N                     MASTER pot 0..4096
+ *   param T V I VALUE            a sound pot (engine.h target, voice, index), as its knob would
  *   slot K NAME A.wav [B.wav..]  user sample slot K (0..2): one loop (zone) per WAV, encoded here
  *   slotimg K F.hdr F.bin       slot K from tools/upload_breaks.py --dry-run's image (the device format)
  *   midi B0 B1 B2                incoming USB MIDI message (hex bytes)
@@ -664,9 +665,9 @@ int main(int argc, char **argv)
     midi_log = fopen(out, "w");
     boot();
     while (fgets(line, sizeof line, sc)) {
-        char cmd[32] = {0}, a[256] = {0}, b[64] = {0}, c[64] = {0};
+        char cmd[32] = {0}, a[256] = {0}, b[64] = {0}, c[64] = {0}, line_d[64] = {0};
         lineno++;
-        if (line[0] == '#' || sscanf(line, "%31s %255s %63s %63s", cmd, a, b, c) < 1)
+        if (line[0] == '#' || sscanf(line, "%31s %255s %63s %63s %63s", cmd, a, b, c, line_d) < 1)
             continue;
         if (!strcmp(cmd, "wait"))
             run_ms((uint32_t)atoi(a));
@@ -714,6 +715,15 @@ int main(int argc, char **argv)
                 return 2;
             }
             enc_acc[e] += atoi(b);
+            run_ms(1);
+        } else if (!strcmp(cmd, "param")) {             /* param T V I VALUE: a sound pot, as a knob would set it */
+            int t = atoi(a), v = atoi(b), i = atoi(c), val = atoi(line_d);
+            if (t < 0 || t >= NTARGETS || v < 0 || v >= NVOICES_MAX || i < 0 || i >= NPARAMS_MAX) {
+                printf("line %d: no param %d %d %d\n", lineno, t, v, i);
+                return 2;
+            }
+            proj.sound.v[t][v][i] = (uint8_t)val;
+            engine_set(t, v, i, val);
             run_ms(1);
         } else if (!strcmp(cmd, "master"))
             master = (uint32_t)atoi(a);

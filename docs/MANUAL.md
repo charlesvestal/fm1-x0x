@@ -314,6 +314,11 @@ each part. Drum tracks also have their own sends, on their own pages.
 
 LFO opens MIX: a level and meter for each part, and the compressor's gain reduction in red.
 
+The factory mix is set up for big beat: the break up front with the 909 kick under it, the
+303s through their RAT distortion into a tape delay, the clap in the reverb, and the master
+compressor squeezing hard (4:1 from -24 dB, +16 dB into the limiter) with 4 dB of pump from
+the 909 kick. Turn the ratio to 1:1 and PUMP to 0 for a clean mix.
+
 | Compressor | |
 |---|---|
 | THRESH | -48 to 0 dB |

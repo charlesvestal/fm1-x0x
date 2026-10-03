@@ -47,7 +47,7 @@ shot 20_break_amen.png
 tap FX
 turn K1 25
 tap FX
-turn K2 70
+turn K2 -10
 turn K4 30
 shot 21_sends_303.png
 tap FX
@@ -60,7 +60,7 @@ tap FX
 turn K1 1
 shot 22b_tape.png
 expect sound5.2.2 70
-expect sound5.4.1 30
+expect sound5.4.1 55
 # tempo 135, play 8 bars
 press HOME
 turn SELECT 10
