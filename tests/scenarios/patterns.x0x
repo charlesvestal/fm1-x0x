@@ -1,0 +1,62 @@
+# Patterns: cue on the bar, chain, copy, save, reboot, everything comes back.
+wait 300
+tapkey b0
+tapkey w0
+tapkey w8
+# copy pattern 1 to pattern 2 (SAVE held + white key), then make 2 different
+press SAVE
+tapkey w1
+release SAVE
+tap HOME
+tapkey w1
+expect pattern 2
+tap HOME
+tapkey b1
+tapkey w4
+expect hit0.1.4 1
+# play pattern 2, cue 1: it changes on the bar, not before
+turn SELECT -5
+expect tempo 120
+tap PLAY
+wait 1000
+tap HOME
+tapkey w0
+expect cue 1
+expect pattern 2
+wait 1100
+expect pattern 1
+# chain 1-2 (two white keys held on HOME)
+key w0 down
+key w1 down
+key w1 up
+key w0 up
+# the chain starts on its first pattern at the next bar, then alternates
+wait 2100
+expect pattern 1
+wait 2000
+expect pattern 2
+wait 2000
+expect pattern 1
+shot 11_chain.png
+tap PLAY
+# a 303 step edit: hold a step and turn its note knob
+tap HOME
+tapkey w2
+turn ALGO 2
+expect part 2
+key w0 down
+turn K1 3
+turn K4 1
+key w0 up
+expect gate0.0 1
+# save, scramble, reboot from the simulated flash
+tap SAVE
+expect store_writes 4
+reboot
+wait 300
+expect pattern 1
+expect hit0.0.0 1
+expect hit0.0.8 1
+tap HOME
+tapkey w1
+expect hit0.1.4 1

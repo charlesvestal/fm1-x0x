@@ -28,7 +28,10 @@ static int st_prog(uint32_t off, const void *src, uint32_t n)
         nor[off + i] &= s[i];
     return 0;
 }
+#include "../firmware/src/app/plat.h"     /* X0X: the object map */
 #include "../firmware/src/storage.c"
+#define OBJ_PROJECT0 OBJ_SOUND                 /* the test's three data objects: SOUND, PAT0, PAT1 */
+#define OBJ_SETTINGS OBJ_SET
 
 static int check(const char *what, int ok)
 {
@@ -87,9 +90,20 @@ int main(void)
     nor[st_sector(OBJ_PROJECT0 + 2, 0) + 8] ^= 0x01;    /* both headers broken */
     nor[st_sector(OBJ_PROJECT0 + 2, 1) + 8] ^= 0x01;
     bad += check("both headers broken -> nothing", st_load(OBJ_PROJECT0 + 2, got, sizeof got) < 0);
-    bad += check("data stays in the Felucca regions",
-                 st_sector(OBJ_SETTINGS, 1) + 4096 <= 0xFF000 && st_sector(OBJ_PROJECT0 + 3, 1) + 4096 <= 0xE0000 &&
-                     st_sector(OBJ_UPRESET0, 0) >= 0xDC000 && st_sector(OBJ_COUNT - 1, 1) + 4096 <= 0xE0000);
+    {   /* X0X map: every object in a data region, none in the sample slots (0xA0000..0xDBFFF), no overlaps */
+        uint32_t o, p, ok = 1;
+        for (o = 0; o < OBJ_NOBJ; o++) {
+            uint32_t a0 = st_sector(o, 0), a1 = st_sector(o, 1) + 4096;
+            int in_data = (a0 >= 0x97000 && a1 <= 0xA0000) || (a0 >= 0xDC000 && a1 <= 0xE0000) ||
+                          (a0 >= 0xFC000 && a1 <= 0xFF000);
+            if (!in_data || a1 - a0 != 8192)
+                ok = 0;
+            for (p = 0; p < o; p++)
+                if (a0 < st_sector(p, 1) + 4096 && st_sector(p, 0) < a1)
+                    ok = 0;
+        }
+        bad += check("objects in data regions, clear of the sample slots", (int)ok);
+    }
     printf("%s\n", bad ? "STORAGE TEST FAILED" : "storage test passed");
     return bad != 0;
 }

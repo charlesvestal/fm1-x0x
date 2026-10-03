@@ -1,0 +1,438 @@
+/* SPDX-License-Identifier: GPL-3.0-only */
+/* X0X sequencer; see sequencer.h for the model. */
+#include "sequencer.h"
+#include "tb3po.h"
+
+#define NEVER 0xFFFFFFFFu
+
+static const uint8_t TICKS_PER_STEP[NRATES] = {6, 4, 3, 8};     /* 24 ppqn: 1/16, 1/16T, 1/32, 1/8T */
+static const uint8_t GM_DRUM[NKIT][NDRUM] = {
+    {36, 38, 41, 45, 50, 37, 39, 42, 46, 49, 51},   /* 909: BD SD LT MT HT RS CP CH OH CR RD */
+    {36, 38, 41, 45, 50, 37, 39, 56, 49, 46, 42},   /* 808: BD SD LT MT HT RS CP CB CY OH CH */
+};
+
+void seq_init(seq_t *s, pattern_t *patterns)
+{
+    uint32_t i;
+    uint8_t *p = (uint8_t *)s;
+    for (i = 0; i < sizeof *s; i++)
+        p[i] = 0;
+    s->pat = patterns;
+    s->cue = 0xFF;
+    s->bpm = 125.0f;
+    s->ext_bpm = 125.0f;
+    s->accent_q7 = 88;                /* a 909 non-accented hit sits ~3 dB under an accent */
+    s->send_clock = 1;
+    for (i = 0; i < NTRACKS; i++) {
+        s->t[i].to_next = NEVER;
+        s->t[i].pp_dir = 1;
+        s->t[i].rng = 0x1234567u * (i + 1);
+    }
+    s->clk_to_next = NEVER;
+}
+
+float seq_tempo(const seq_t *s) { return s->ext ? s->ext_bpm : s->bpm; }
+
+uint32_t seq_step_q8(const seq_t *s, int rate)
+{
+    float bpm = seq_tempo(s), q;
+    if (bpm < 20.0f)
+        bpm = 20.0f;
+    if (bpm > 300.0f)
+        bpm = 300.0f;
+    q = (float)FS * 60.0f / bpm;                    /* samples per quarter */
+    return (uint32_t)(q * 256.0f * (float)TICKS_PER_STEP[rate & 3] / 24.0f);
+}
+
+static const dpart_t *dpart(const seq_t *s, int k) { return &s->pat[s->cur].drum[k]; }
+static int is_drum(int t) { return t < NKIT; }
+static int is_bass(int t) { return t >= TRK_BASS0 && t < TRK_BASS0 + NBASS; }
+static bpart_t *bpart(const seq_t *s, int b) { return &s->pat[s->cur].bass[b]; }
+
+static int part_len(const seq_t *s, int t)
+{
+    int n = is_drum(t) ? dpart(s, t)->len : t == TRK_BRK ? 16 : bpart(s, t - TRK_BASS0)->len;
+    return n < 1 ? 1 : n > NSTEPS ? NSTEPS : n;
+}
+
+static int part_rate(const seq_t *s, int t)
+{
+    return (is_drum(t) ? dpart(s, t)->rate : t == TRK_BRK ? RATE_16 : bpart(s, t - TRK_BASS0)->rate) & 3;
+}
+
+/* swing offset of a step, Q8: odd 16ths / 32nds come late; triplets are never swung */
+static uint32_t swing_q8(const seq_t *s, int rate, uint32_t step_q8)
+{
+    uint32_t sw = s->pat[s->cur].swing;
+    if (rate == RATE_16T || rate == RATE_8T || !sw)
+        return 0;
+    if (sw > 100u)
+        sw = 100u;
+    return step_q8 / 200u * sw;                     /* 100 -> half a step late = 75 % (32-bit: no __udivdi3) */
+}
+
+static uint32_t rng_next(uint32_t *r)
+{
+    uint32_t x = *r ? *r : 1;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    return *r = x;
+}
+
+/* the step after p in this part's direction (also used to look ahead for TIEs) */
+static int next_pos(seq_t *s, int t, int p, int commit)
+{
+    seq_track_t *tr = &s->t[t];
+    int len = part_len(s, t), dir = is_bass(t) ? bpart(s, t - TRK_BASS0)->dir : DIR_FWD, n;
+    switch (dir & 3) {
+    case DIR_REV:
+        return (p - 1 + len) % len;
+    case DIR_PINGPONG:
+        if (len == 1)
+            return 0;
+        n = p + tr->pp_dir;
+        if (n >= len || n < 0) {
+            n = p - tr->pp_dir;
+            if (commit)
+                tr->pp_dir = (int8_t)-tr->pp_dir;
+        }
+        return n;
+    case DIR_RANDOM:
+        if (!commit)
+            return (p + 1) % len;                    /* a TIE look-ahead cannot know: assume forward */
+        return (int)(rng_next(&tr->rng) % (uint32_t)len);
+    default:
+        return (p + 1) % len;
+    }
+}
+
+static void midi(const seq_sink_t *o, uint8_t st, uint8_t d1, uint8_t d2)
+{
+    if (o->midi)
+        o->midi(o->ctx, st, d1, d2);
+}
+
+static void bass_release(seq_t *s, int b, const seq_sink_t *o)
+{
+    seq_track_t *tr = &s->t[TRK_BASS0 + b];
+    if (tr->sounding) {
+        o->bass_off(o->ctx, b);
+        tr->sounding = 0;
+        if (s->send_notes && s->bass_notes_out[b]) {
+            midi(o, (uint8_t)(0x80 | (1 + b)), s->bass_notes_out[b], 0);
+            s->bass_notes_out[b] = 0;
+        }
+    }
+    tr->to_off = 0;
+}
+
+static void fire_drum(seq_t *s, int k, int p, const seq_sink_t *o)
+{
+    const dpart_t *d = dpart(s, k);
+    uint32_t bit = 1u << p;
+    float vel = (d->accent & bit) ? 1.0f : (float)s->accent_q7 / 127.0f;
+    int v;
+    for (v = 0; v < NDRUM; v++) {
+        if (!(d->hit[v] & bit) || (s->mute & (1u << (k * NDRUM + v))))
+            continue;
+        o->drum(o->ctx, k, v, vel);
+        if (s->send_notes) {
+            uint8_t mv = (uint8_t)(vel * 127.0f);
+            midi(o, (uint8_t)(0x99 + k), GM_DRUM[k][v], mv);
+            midi(o, (uint8_t)(0x89 + k), GM_DRUM[k][v], 0);
+        }
+    }
+}
+
+static void fire_bass(seq_t *s, int b, int p, uint32_t step_q8, uint32_t carry, const seq_sink_t *o)
+{
+    seq_track_t *tr = &s->t[TRK_BASS0 + b];
+    bpart_t *bp = bpart(s, b);
+    const bstep_t *st = &bp->step[p];
+    int gate = bstep_gate(st), note, hold, nx;
+    uint8_t prev_slide = tr->held_note & 0x80u;     /* bit 7: the step that sounded slides on */
+    if (s->mute & (1u << (MUTE_BASS0 + b)))
+        gate = G_REST;
+    if (gate == G_REST) {
+        bass_release(s, b, o);
+        tr->held_note = 0;
+        return;
+    }
+    note = st->note + (int)bp->transpose - 24;
+    note = note < 0 ? 0 : note > 127 ? 127 : note;
+    if (gate == G_NOTE || !tr->sounding) {
+        int slide = tr->sounding && prev_slide;
+        o->bass_on(o->ctx, b, note, (st->flags & BS_ACCENT) != 0, slide);
+        if (s->send_notes) {
+            uint8_t old = s->bass_notes_out[b];
+            midi(o, (uint8_t)(0x90 | (1 + b)), (uint8_t)note, (st->flags & BS_ACCENT) ? 127 : 90);
+            if (old && old != note)
+                midi(o, (uint8_t)(0x80 | (1 + b)), old, 0);   /* legato: the new note first */
+            s->bass_notes_out[b] = (uint8_t)note;
+        }
+        tr->sounding = 1;
+    }
+    nx = next_pos(s, TRK_BASS0 + b, p, 0);
+    hold = (st->flags & BS_SLIDE) || bstep_gate(&bp->step[nx]) == G_TIE;
+    tr->held_note = (uint8_t)((note & 0x7F) | ((st->flags & BS_SLIDE) ? 0x80 : 0));
+    tr->to_off = hold ? 0 : carry + step_q8 / 2u;
+}
+
+/* the pattern switch at the end of the bar (the 909 part wrapping) */
+static int bar_end(seq_t *s)
+{
+    int next = s->cur;
+    if (s->cue < NPAT) {
+        next = s->cue;
+        s->cue = 0xFF;
+    } else if (s->chain_a != s->chain_b) {
+        int a = s->chain_a < s->chain_b ? s->chain_a : s->chain_b;
+        int b = s->chain_a < s->chain_b ? s->chain_b : s->chain_a;
+        next = (s->cur < a || s->cur >= b) ? a : s->cur + 1;
+    }
+    if (next == s->cur)
+        return 0;
+    s->cur = (uint8_t)next;
+    return 1;
+}
+
+static void auto_mutate(seq_t *s, int b)
+{
+    bpart_t *bp = bpart(s, b);
+    seq_track_t *tr = &s->t[TRK_BASS0 + b];
+    tr->bars++;
+    if (bp->gen.mutate_bars && tr->bars % bp->gen.mutate_bars == 0)
+        tb3po_mutate(bp, &s->mut_rng[b]);
+}
+
+/* fire track t's next step now; returns 1 if the 909 part wrapped and the pattern changed */
+static int fire_step(seq_t *s, int t, const seq_sink_t *o)
+{
+    seq_track_t *tr = &s->t[t];
+    int rate = part_rate(s, t), p, changed = 0, wrapped;
+    uint32_t L = seq_step_q8(s, rate);
+    uint32_t carry = tr->to_next < 256u ? tr->to_next : 0;   /* the step was due this far into the sample: keep it */
+    int bass = is_bass(t);
+    if (!tr->started) {
+        p = (bass && bpart(s, t - TRK_BASS0)->dir == DIR_REV) ? part_len(s, t) - 1 : 0;
+        tr->started = 1;
+        wrapped = 0;
+    } else {
+        p = next_pos(s, t, tr->pos, 1);
+        wrapped = !bass ? p == 0 : p == 0 || (bpart(s, t - TRK_BASS0)->dir == DIR_REV && p == part_len(s, t) - 1);
+    }
+    if (wrapped && t == TRK_DRUM && bar_end(s)) {
+        changed = 1;
+        p = 0;
+    }
+    if (wrapped && bass)
+        auto_mutate(s, t - TRK_BASS0);
+    if (wrapped && t == TRK_BRK)
+        tr->bars++;
+    tr->pos = (uint8_t)p;
+    if (is_drum(t))
+        fire_drum(s, t, p, o);
+    else if (t == TRK_BRK) {
+        if (o->brk)
+            o->brk(o->ctx, p, tr->bars, (float)L / 256.0f,
+                   (s->pat[s->cur].brk.steps >> p & 1u) && !(s->mute & (1u << MUTE_BRK)));
+    } else
+        fire_bass(s, t - TRK_BASS0, p, L, carry, o);
+    if (o->step)
+        o->step(o->ctx, t, p);
+    if (s->ext) {
+        tr->to_next = NEVER;                         /* the clock arms the next one */
+    } else {
+        /* the step that follows p: swung if it is an odd one */
+        int np = next_pos(s, t, p, 0);
+        uint32_t sw = swing_q8(s, rate, L);
+        tr->to_next = carry + ((np & 1) ? L + sw : L - sw);
+        if (!(np & 1) && (p & 1) == 0)               /* even -> even (odd lengths, wraps): no swing */
+            tr->to_next = carry + L;
+    }
+    return changed;
+}
+
+static void restart_others(seq_t *s)          /* every part but the 909's, on a pattern switch */
+{
+    int t;
+    for (t = 1; t < NTRACKS; t++) {
+        s->t[t].started = 0;
+        s->t[t].to_next = s->ext ? NEVER : 0;
+        s->t[t].ext_ticks = (uint8_t)(TICKS_PER_STEP[part_rate(s, t)] - 1);
+        s->t[t].bars = 0;
+        s->t[t].pp_dir = 1;
+    }
+}
+
+static void do_start(seq_t *s, int from_top, const seq_sink_t *o)
+{
+    int t;
+    if (from_top && s->cue < NPAT) {
+        s->cur = s->cue;
+        s->cue = 0xFF;
+    }
+    for (t = 0; t < NTRACKS; t++) {
+        seq_track_t *tr = &s->t[t];
+        if (from_top) {
+            tr->started = 0;
+            tr->bars = 0;
+            tr->pp_dir = 1;
+        }
+        tr->to_off = 0;
+        tr->to_next = s->ext ? NEVER : 0;
+        tr->ext_ticks = (uint8_t)(TICKS_PER_STEP[part_rate(s, t)] - 1);   /* the first clock is the downbeat */
+    }
+    s->clk_to_next = 0;
+    s->playing = 1;
+    if (!s->ext && s->send_clock)
+        midi(o, from_top ? 0xFA : 0xFB, 0, 0);
+}
+
+static void do_stop(seq_t *s, const seq_sink_t *o)
+{
+    int b, t;
+    s->playing = 0;
+    for (b = 0; b < NBASS; b++)
+        bass_release(s, b, o);
+    if (o->brk_stop)
+        o->brk_stop(o->ctx);
+    for (t = 0; t < NTRACKS; t++)
+        s->t[t].to_next = NEVER;
+    if (!s->ext && s->send_clock)
+        midi(o, 0xFC, 0, 0);
+}
+
+/* external clock ticks: arm the steps they complete */
+static void ext_ticks(seq_t *s)
+{
+    int t;
+    uint32_t n = s->ext_pending;
+    s->ext_pending = 0;
+    for (; n; n--) {
+        if (s->ext_since > 0 && s->ext_since < FS) {  /* tempo: smoothed tick period */
+            uint32_t q = s->ext_since << 8;
+            s->ext_period = s->ext_period ? s->ext_period - (s->ext_period >> 3) + (q >> 3) : q;
+            s->ext_bpm = (float)FS * 60.0f * 256.0f / (24.0f * (float)s->ext_period);
+        }
+        s->ext_since = 0;
+        if (!s->playing)
+            continue;
+        for (t = 0; t < NTRACKS; t++) {
+            seq_track_t *tr = &s->t[t];
+            int rate = part_rate(s, t), tps = TICKS_PER_STEP[rate];
+            if (++tr->ext_ticks < tps)
+                continue;
+            tr->ext_ticks = 0;
+            {
+                int np = tr->started ? next_pos(s, t, tr->pos, 0) : 0;
+                uint32_t L = s->ext_period ? s->ext_period * (uint32_t)tps : seq_step_q8(s, rate);
+                tr->to_next = (np & 1) ? swing_q8(s, rate, L) : 0;
+            }
+        }
+    }
+}
+
+uint32_t seq_until_event(seq_t *s, uint32_t n)
+{
+    uint32_t m = n, e;
+    int t;
+    if (!s->playing)
+        return n;
+    for (t = 0; t < NTRACKS; t++) {
+        if (s->t[t].to_next != NEVER && (e = s->t[t].to_next >> 8) < m)
+            m = e;
+        if (s->t[t].to_off && (e = s->t[t].to_off >> 8) < m)
+            m = e;
+    }
+    if (!s->ext && s->send_clock && (e = s->clk_to_next >> 8) < m)
+        m = e;
+    return m ? m : 1;
+}
+
+void seq_advance(seq_t *s, uint32_t k, const seq_sink_t *o)
+{
+    int t, guard;
+    uint32_t dq = k << 8;
+    s->ext_since += k;
+    if (s->ext_pending)
+        s->ext = 1;
+    else if (s->ext && s->ext_since > FS / 2u) {    /* clock gone for 0.5 s: back to internal */
+        s->ext = 0;
+        for (t = 0; t < NTRACKS; t++)
+            if (s->playing && s->t[t].to_next == NEVER)
+                s->t[t].to_next = 0;
+    }
+    if (s->req_stop) {
+        s->req_stop = 0;
+        s->req_start = s->req_cont = 0;
+        if (s->playing)
+            do_stop(s, o);
+    }
+    if (s->req_start) {
+        s->req_start = 0;
+        do_start(s, 1, o);
+    }
+    if (s->req_cont) {
+        s->req_cont = 0;
+        do_start(s, 0, o);
+    }
+    if (s->ext_pending)
+        ext_ticks(s);
+    if (!s->playing) {
+        if (!s->ext)
+            s->clk_to_next = 0;
+        if (s->cue < NPAT) {                         /* stopped: a cue takes effect at once */
+            s->cur = s->cue;
+            s->cue = 0xFF;
+        }
+        return;
+    }
+    for (t = 0; t < NTRACKS; t++) {                 /* move time */
+        seq_track_t *tr = &s->t[t];
+        if (tr->to_next != NEVER)
+            tr->to_next = tr->to_next > dq ? tr->to_next - dq : 0;
+        if (tr->to_off)
+            tr->to_off = tr->to_off > dq ? tr->to_off - dq : 1;   /* 1: due, still "set" */
+    }
+    if (!s->ext && s->send_clock)
+        s->clk_to_next = s->clk_to_next > dq ? s->clk_to_next - dq : 0;
+    /* fire what is due; the drum part first, since its wrap may switch the pattern */
+    for (guard = 0; guard < 8; guard++) {
+        int fired = 0;
+        for (t = 0; t < NTRACKS; t++) {
+            seq_track_t *tr = &s->t[t];
+            if (tr->to_off && tr->to_off < 256u) {    /* gate falls (before a new step at the same time) */
+                bass_release(s, t - TRK_BASS0, o);
+                fired = 1;
+            }
+            if (tr->to_next < 256u) {
+                if (fire_step(s, t, o) && t == TRK_DRUM)
+                    restart_others(s);                /* a new pattern starts every part on step 1 */
+                fired = 1;
+            }
+        }
+        if (!fired)
+            break;
+    }
+    if (!s->ext && s->send_clock && s->clk_to_next < 256u) {
+        midi(o, 0xF8, 0, 0);
+        s->clk_to_next += seq_step_q8(s, RATE_16) / 6u;           /* 24 ppqn */
+    }
+}
+
+void seq_start(seq_t *s) { s->req_start = 1; }
+void seq_stop(seq_t *s) { s->req_stop = 1; }
+void seq_continue(seq_t *s) { s->req_cont = 1; }
+void seq_ext_clock(seq_t *s) { s->ext_pending++; }
+void seq_cue(seq_t *s, int p)
+{
+    if (p >= 0 && p < NPAT)
+        s->cue = (uint8_t)p;
+}
+void seq_chain(seq_t *s, int a, int b)
+{
+    s->chain_a = (uint8_t)a;
+    s->chain_b = (uint8_t)b;
+}

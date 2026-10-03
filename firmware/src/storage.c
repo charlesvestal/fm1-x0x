@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+ * X0X: object map changed (see below). */
 /* Persistent storage on the SPI NOR.
  *
  * Every object has an A/B sector pair. A save goes to the copy that is not
@@ -11,15 +12,14 @@
  * Flash access goes through three hooks (also used by the host test):
  *   st_read(off, dst, n)   st_erase(off)   st_prog(off, src, n)
  */
-#define ST_MAGIC 0x554C4546u                   /* "FELU" */
+#define ST_MAGIC 0x30583058u                   /* "X0X0": never mistaken for a Felucca object */
 #define ST_SECTOR 4096u
 #define ST_PAYLOAD_OFF 256u
 #define ST_PAYLOAD_MAX (ST_SECTOR - ST_PAYLOAD_OFF)
 
-/* flash map (FL_DATA 0x97000..0xDFFFF, FL_GLOB 0xFC000..): settings 0xFC000, projects 0x97000..0x9EFFF,
- * user sample slots 0xA0000..0xDBFFF (eng_sample.c), user preset banks 0xDC000..0xDFFFF (upreset.c) */
-enum { OBJ_SETTINGS, OBJ_PROJECT0, OBJ_UPRESET0 = OBJ_PROJECT0 + 4, OBJ_COUNT = OBJ_UPRESET0 + 2 };
-
+/* flash map, X0X (plat.h OBJ_*): settings 0xFC000 (FL_GLOB); sound, patterns 1-8, patterns 9-16
+ * at 0x97000.. (2 sectors each, below the user sample slots at 0xA0000); the panel calibration
+ * at 0xDC000 (Felucca's user-preset area, unused by X0X). */
 typedef struct {
     uint32_t magic;
     uint16_t type, slot;
@@ -48,11 +48,11 @@ static uint32_t st_crc32(const void *p, uint32_t n)   /* zlib CRC-32, 4 bits per
 
 static uint32_t st_sector(uint32_t obj, uint32_t copy)  /* flash offset of copy A (0) / B (1) */
 {
-    if (obj == OBJ_SETTINGS)
+    if (obj == OBJ_SET)
         return 0xFC000u + copy * ST_SECTOR;
-    if (obj >= OBJ_UPRESET0)
-        return 0xDC000u + (obj - OBJ_UPRESET0) * 2u * ST_SECTOR + copy * ST_SECTOR;
-    return 0x97000u + (obj - OBJ_PROJECT0) * 2u * ST_SECTOR + copy * ST_SECTOR;
+    if (obj == OBJ_PANEL)
+        return 0xDC000u + copy * ST_SECTOR;
+    return 0x97000u + (obj - OBJ_SOUND) * 2u * ST_SECTOR + copy * ST_SECTOR;   /* SOUND, PAT0, PAT1 */
 }
 
 static uint8_t st_buf[ST_PAYLOAD_MAX] __attribute__((aligned(4)));

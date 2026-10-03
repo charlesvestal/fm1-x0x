@@ -1,65 +1,48 @@
-# Felucca licensing
+# X0X licensing
 
-Felucca is free software. Its **code** is licensed under the GNU General Public License,
-version 3 only (`GPL-3.0-only`, full text in `LICENSE`). Its **assets** are not part of
-that licence: the icon atlas `assets/icons.png`, the panel image `docs/panel.jpg` and the drum sounds made by
-`tools/gen_waves.py` (the Hügelton Sample Pack) are Copyright (C) 2026 Hügelton Instruments,
-all rights reserved. Their licence terms will be published later.
+X0X is free software under the GNU General Public License, version 3 only
+(`GPL-3.0-only`, full text in `LICENSE`). It is a fork of Felucca and keeps Felucca's
+licence. If you distribute X0X, or firmware derived from it, you must give your
+recipients its complete corresponding source under the same licence.
 
-Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+## Where the code comes from
 
-## What is code (GPL-3.0-only)
+| What | Origin | Licence |
+| --- | --- | --- |
+| Platform: `firmware/hal/`, `firmware/loader/`, `firmware/src/{libc,lcd,gfx,usb,storage,ota}.c`, `tools/` (build, package, install, upload), `web/` (installer) | [Felucca](https://github.com/hugelton/Felucca), Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments; `usb.c` and `storage.c` changed for X0X | GPL-3.0-only |
+| `firmware/src/app/{slots,editor,panel,main_fm1}.c` | adapted from Felucca's `eng_sample.c`, `editor.c`, `panel.c`, `main.c` / `audio.c` | GPL-3.0-only |
+| 909 (`dsp/drum909*`, `dsp/fxbus*`) | ported from [9W9](https://github.com/athousanddetails/schwung-9W9) (athousanddetails), itself after [ER-99](https://github.com/matthewcieplak/er-99) (Matthew Cieplak) | GPL-3.0 |
+| 909 hi-hat, ride and crash samples (`assets/909/`) | ER-99 via 9W9 | GPL-3.0 |
+| 808 (`dsp/drum808*`) | ported from [8W8](https://github.com/athousanddetails/schwung-8W8) (athousanddetails); circuit models after the TR-808 service notes and Werner / Abel / Smith; rim shot after sc808 (Yoshinosuke Horiuchi / Sam Aaron) | GPL-3.0 |
+| 303 (`dsp/bass303*`) | ported from [schwung-303](https://github.com/charlesvestal/schwung-303): Open303 by Robin Schmidt (MIT), Devilfish extensions after jc303 (midilab), RAT drive after dm-Rat (Dave Mollen) | GPL-3.0 (Open303 parts MIT) |
+| TB-3PO (`seq/tb3po*`) | ported from [schwung-tb3po](https://github.com/charlesvestal/schwung-tb3po), itself a port of the Phazerville Hemisphere Suite `TB_3PO` applet (djphazer and contributors) | GPL-3.0 |
+| Break generator (`dsp/breaks*`) | ported from [schwung-breakbeat](https://github.com/mestela/schwung-breakbeat) (BB Gen) by mestela, **used with the author's permission** (that repository carries no licence file) | GPL-3.0-only here, by permission |
+| Everything else in `firmware/src/{app,dsp,seq}`, `host/`, `tests/` | X0X | GPL-3.0-only |
 
-Every file in this tree that carries an `SPDX-License-Identifier: GPL-3.0-only` header:
+The built-in break loop (`build/gen/x0x_builtin_break.h`) is generated at build time by
+X0X's own 909 code; no recording is distributed.
 
-- the firmware: `firmware/` (app, HAL, update loader)
-- the build script and tools: `build.sh`, `tools/`
-- the web pages (installer, editor) and their tests: `web/` (not the Fukiai font, below)
-- the host tests: `tests/`
+## Felucca Assets
 
-You may use, study, change and share it under the GPL. If you distribute Felucca, or
-firmware derived from it, you must also give your recipients its complete corresponding
-source under the same licence. That includes devices that ship with modified Felucca
-inside.
-
-## Additional permission (GPL-3.0 section 7)
-
-As an additional permission under GPL-3.0 section 7, you may combine Felucca, or a work
-based on it, with the Felucca Assets (above), and convey the combination.
-This is allowed even though the Felucca Assets are not licensed under the GPL, provided
-that:
-
-- you follow the GPL for every part that is not a Felucca Asset; and
-- you follow the terms published for the assets.
-
-The Felucca Assets are data (wavetables, icons, sample data). They are not program
-code. A firmware image built from the GPL sources with replacement assets, or with no
-assets, is entirely governed by the GPL.
+Felucca's non-GPL assets — the icon atlas, the panel photo and the Hügelton drum pack —
+are **not** part of this fork and are not used by it. Felucca's section 7 additional
+permission concerns those assets only, so it is not needed here.
 
 ## Third-party material
 
 | What | Licence | Where |
 | --- | --- | --- |
-| Instrument samples (Versilian Studios VSCO-2 CE, VCSL) | CC0 1.0 | `assets/samples-cc0/`, provenance in `ATTRIBUTION.txt` there |
 | Terminus font 8x16 (ter-u16n) | SIL OFL 1.1 | `assets/fonts/ter-u16n.bdf`, `assets/fonts/Terminus-LICENSE.txt` |
-| Fukiai icon font (Hügelton Instruments), web editor only | MIT | `web/fukiai.ttf`, `web/FUKIAI-LICENSE.txt` |
-| CrispyZebra by Leo Kuroshita (<https://github.com/hugelton/CrispyZebra>): the PHASE engine's waveforms are a C port of its oscillator | GPL-3.0 | `firmware/src/eng_phase.c` |
-| klattsch by Tony Gies (<https://github.com/tgies/klattsch>): design reference for the VOICE (formant) engine; no code copied. Formant data from Klatt (1980) / Hillenbrand et al. (1995) | MIT (klattsch) | credit only |
+| Fukiai icon font (Hügelton Instruments), web pages only | MIT | `web/fukiai.ttf`, `web/FUKIAI-LICENSE.txt` |
 | JieLi AC79 SDK: `uboot.boot`, `cfg_tool.bin`, `eq_cfg_hw.bin` are read from your SDK checkout at build time and placed in the package; no SDK files are in this tree | Apache-2.0 | <https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK> |
-
-## Contributions
-
-Contributions are welcome under GPL-3.0-only. By submitting one, you agree that it may be
-combined with the Felucca Assets under the section 7 permission above.
 
 ## Trademarks
 
-"Felucca" and "Hügelton Instruments" are names of Hügelton Instruments.
-
-"M-VAVE" and "FM-1" are trademarks of their respective owners. Felucca is independent
-firmware that runs on FM-1 hardware. It is not affiliated with, endorsed by or supported
-by those owners.
+"Felucca" and "Hügelton Instruments" are names of Hügelton Instruments. "M-VAVE" and
+"FM-1" are trademarks of their respective owners. TR-808, TR-909 and TB-303 are
+trademarks of Roland Corporation, used only to describe what the parts emulate. X0X is
+independent firmware; it is not affiliated with, endorsed by or supported by any of them.
 
 ## Radio
 
-Felucca never enables the Bluetooth / Wi-Fi radio of the hardware.
+X0X never enables the Bluetooth / Wi-Fi radio of the hardware.

@@ -1,97 +1,95 @@
-# Felucca
+# X0X for the M-VAVE FM-1
 
-[![License: GPL-3.0-only](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
-[![Sponsor](https://img.shields.io/badge/Sponsor-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/hugelton)
+Standalone groovebox firmware for the M-VAVE FM-1: a **TR-909**, a **TR-808**, **two TB-303s**
+with **TB-3PO** acid generators, and a **breakbeat generator**, with 16 patterns, shared
+reverb / tape delay sends and a master section with drive, glue compression, a sweepable
+filter and a limiter.
 
-**TL;DR:** connect your FM-1 to a computer by USB, open the
-[web installer](https://hugelton.github.io/Felucca/) in Chrome or Edge, and press Install.
-No extra hardware is needed. Beta: use at your own risk; M-VAVE's own updater takes you back
-to the official firmware.
+X0X is a fork of [Felucca](https://github.com/hugelton/Felucca) by Leo Kuroshita (Hügelton
+Instruments). It keeps Felucca's platform — the hardware layer, USB MIDI, the update loader,
+the web installer and the flash storage — and replaces the instrument.
 
-Multi-engine synthesizer firmware for the M-VAVE FM-1.
+> **Status: not yet run on hardware.** Everything below is built and tested on a computer
+> (the whole app runs in a simulator), and the firmware package builds with JieLi's
+> toolchain. Boot, CPU headroom, the key lights and USB have to be checked on a device.
+> Installing is at your own risk; M-VAVE's updater returns the FM-1 to its official
+> firmware, and Felucca's recovery tool covers a failed install.
 
-![FM-1 controls with Felucca](docs/panel.jpg)
+## The instrument
 
-## Features
+| Part | Engine | From |
+|---|---|---|
+| 909 | 11 voices: circuit-modelled BD SD toms RS CP, sampled hats and cymbals | [9W9](https://github.com/athousanddetails/schwung-9W9) (ER-99 samples) |
+| 808 | 16 sounds on 11 tracks, the 808's own Tom/Conga, Rim/Claves, Clap/Maracas switches | [8W8](https://github.com/athousanddetails/schwung-8W8) |
+| 303 A, 303 B | Open303 with the Devilfish ranges, each with a TB-3PO generator | [schwung-303](https://github.com/charlesvestal/schwung-303), [schwung-tb3po](https://github.com/charlesvestal/schwung-tb3po) |
+| BREAK | 8-slice break player: Complexity, Anchor, Roll, Fill, Retrig, Phrase, A/B loops | [BB Gen](https://github.com/mestela/schwung-breakbeat) |
 
-- **Nine engines** (below), each with its own factory presets
-- **Four tracks:** three synth parts, each with its own engine and sound, plus a GM drum track;
-  8 voices shared between the parts. ALGORITHM selects the track on every page
-- **Sequencer:** 64 steps per track with chords, ties, accent and slide; live loop recording
-  with overdub and held notes; each track loops on its own length
-- **Arpeggiator**, scales and quantize, glide, MONO / LEGATO / UNISON voice modes
-- **Effects:** distortion and the SLICER per track; chorus, delay and reverb sends; master limiter
-- **Presets:** factory presets with their own patterns, 32 user preset slots, 4 project slots
-- **Web editor:** every parameter of every track, step grid, track mixer, preset library, sample upload
-- **USB:** class-compliant MIDI in and out (channels 1–3 for the parts, 10 for drums);
-  updates over the same USB cable
+All five parts run at once, each with its own step length (polymeter) and rate (1/16,
+1/16T, 1/32, 1/8T); swing is per pattern. A pattern holds all five parts; switching
+waits for the end of the bar, and patterns chain.
 
-## Engines
+## The panel
 
-- **ANALOG**: virtual analog; two oscillators (saw, square, triangle, sine, PWM), noise, drive, resonant low-pass filter
-- **DIGITAL**: 4-operator FM, 8 algorithms, feedback
-- **PHASE**: phase distortion (ported from CrispyZebra)
-- **LOFI**: chiptune; pulse, triangle, saw, noise and a 4-bit wave RAM, stepped envelope, sweep, arpeggio
-- **SAMPLE**: multisampled instruments and 3 user sample slots
-- **VOICE**: formant oscillator, sung vowels
-- **TRIO**: 3 oscillators with ring modulation and sync, multimode filter (LP / BP / HP / notch)
-- **WHEEL**: tonewheel-style organ; drawbar registrations, percussion, key click, drive, rotary speaker
-- **GRAIN**: granular textures from the built-in samples or a user slot
+The 16 white keys are steps (and on HOME, patterns). The 11 black keys are a drum
+machine's 11 tracks, or the break's slice pads.
 
-**SLICER** (FX page, every track including drums): a tempo-synced 16-step gate or stutter, with 16 patterns.
+| Control | Does |
+|---|---|
+| ALGORITHM | part: 909 / 808 / 303 A / 303 B / BREAK |
+| PRESETS | cue a pattern (switches at the end of the bar) |
+| SELECT | tempo |
+| KNOB 1-4 | the four values on screen; EDIT (or the view's button again) for the next page |
+| PLAY / REC | transport / record (live drums, live or step-written 303) |
+| HOME | patterns, all five parts at a glance; black keys 1-5 mute parts; two white keys held = chain |
+| SEQ | 303: steps ↔ keyboard |
+| ARP / SCL | TB-3PO (303 parts); OCT+ generates a new line, OCT- mutates it |
+| ENV held | white keys edit the 909/808 accent row; in 303 note entry, an accent |
+| LFO held | in 303 note entry, a slide |
+| FX / LFO / GLO | send FX + master / mixer + groove / MIDI + settings |
+| OCT- / OCT+ | steps 1-16 / 17-32 (303 keyboard: octave) |
+| SAVE | save the project; SAVE held + white key copies this pattern there; SAVE + REC clears the part |
+| OCT- + OCT+ held 5 s | update mode (Felucca's) |
 
-- Install: [web installer](https://hugelton.github.io/Felucca/) (Chrome or Edge, USB), or `tools/fm1_install.py` from a terminal
-- Editor: [web editor](https://hugelton.github.io/Felucca/webapp/editor/)
-- Build: [BUILDING.md](BUILDING.md)
+On a 303 part, tap a white key to toggle a step; hold it and turn KNOB 1-4 for note, gate
+(rest / note / tie), accent and slide.
 
-## Scale keyboard
+## MIDI (USB)
 
-On the **SCL** page, set **QNT** to WHITE to play the selected scale using only the
-white keys (SNAP keeps every key and rounds it down to the scale). C4 plays **ROOT**; consecutive white keys play consecutive scale notes
-above and below it. Black keys are silent, including during live recording and
-step entry. **TRN** transposes the resulting notes; the octave buttons shift them
-by full octaves. Set QNT to OFF for the normal chromatic keyboard.
+In: ch 10 the 909 and ch 11 the 808 (GM drum notes), ch 2 / 3 the 303s (legato = slide,
+velocity ≥ 100 = accent), ch 4 notes 36-43 the break's slices; MIDI clock and
+start / stop / continue are followed automatically. Out: clock and transport, and
+optionally the sequence (GLO page).
 
-Available scales: chromatic (CHR), major (MAJ), natural minor (MIN), Dorian (DOR),
-Mixolydian (MIX), major pentatonic (PEN), minor pentatonic (MPEN), harmonic minor
-(HARM), Phrygian (PHRY), Lydian (LYD), Locrian (LOC), ascending melodic minor (MEL),
-minor blues (BLUES), whole tone (WHOLE), half-whole diminished (DIMHW), and
-whole-half diminished (DIMWH). Scales with other than seven notes continue across
-the white keys without repeating notes; their roots need not fall on every C key.
-The drum track, GM sample kit and incoming MIDI retain their existing note mapping.
+## Breaks
 
-## Layout
+Break loops are your own samples: `tools/fm1_sample_upload.py load SLOT NAME loop.wav`
+puts a loop in one of the three flash slots (about 7 s each); LOOPS on the BREAK pages
+picks the slot for A and B. The built-in loop is played by X0X's own 909 at build time.
+X0X ships no commercial breaks.
 
-| Path | What |
-| --- | --- |
-| `firmware/` | firmware sources: `src/` app, `hal/` hardware layer, `loader/` update loader |
-| `tools/` | build script, generators, package maker, installer and sample uploader |
-| `assets/` | icon atlas, font, CC0 instrument samples |
-| `web/` | web installer and editor sources |
-| `tests/` | tests that run on the build machine |
+## Building and testing
 
-## Support
+See [BUILDING.md](BUILDING.md) for the toolchain. In short:
 
-If Felucca is useful to you, [sponsoring on GitHub](https://github.com/sponsors/hugelton) or a donation
-on [itch.io](https://hugelton.itch.io/felucca) helps keep its development going.
+```
+tests/run_tests.sh      # maths, sequencer, every engine against its original, the app in the simulator
+./build.sh              # build/x0x.fwsc
+```
 
-Pull requests are welcome, and so are ideas and requests: post them in
-[Discussions](https://github.com/hugelton/Felucca/discussions) or on X ([@kurogedelic](https://x.com/kurogedelic)).
+`host/x0x_host` runs the firmware app on a computer from a script
+(`tests/scenarios/*.x0x`): button presses, key presses, knob turns and MIDI in; WAV and
+PNG screenshots out.
 
-## Credits
+## Licence and credits
 
-- Felucca by Leo Kuroshita ([@kurogedelic](https://github.com/kurogedelic)), [Hügelton Instruments](https://hugelton.com)
-- Font: [Terminus](https://terminus-font.sourceforge.net/) by Dimitar Toshkov Zhekov, [SIL OFL 1.1](assets/fonts/Terminus-LICENSE.txt)
-- Samples: [Versilian Studios](https://versilian-studios.com/) [VSCO-2 Community Edition](https://github.com/sgossner/VSCO-2-CE) and [VCSL](https://github.com/sgossner/VCSL), CC0 1.0 ([attribution](assets/samples-cc0/ATTRIBUTION.txt))
-- PHASE engine: oscillator ported from [CrispyZebra](https://github.com/hugelton/CrispyZebra) by Leo Kuroshita (GPL-3.0)
-- VOICE engine: after [klattsch](https://github.com/tgies/klattsch) by Tony Gies (MIT); formant data from Klatt (1980) and Hillenbrand et al. (1995)
-- Web editor icons: Fukiai by [Hügelton Instruments](https://hugelton.com), [MIT](web/FUKIAI-LICENSE.txt)
-- Package format and boot files: [JieLi AC79 SDK](https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK) (Apache-2.0, not included)
+Code: GPL-3.0-only (as Felucca, 9W9, 8W8 and schwung-tb3po). Open303 (Robin Schmidt) is
+MIT. The BB Gen generator is ported from mestela's schwung-breakbeat with the author's
+permission. The 909's hi-hat, ride and crash samples are ER-99's (Matthew Cieplak, GPL-3.0).
+Font: Terminus (SIL OFL 1.1).
 
-## Licence
+Felucca's own assets that are not under its GPL (the icon atlas, the panel photo, the
+Hügelton drum pack) are not part of this fork.
 
-Code: [GPL-3.0-only](LICENSE). Third-party material: [LICENSING.md](LICENSING.md).
-
-M-VAVE and FM-1 are trademarks of their respective owners. Felucca is not affiliated with or endorsed by them.
-
-Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+M-VAVE and FM-1 are trademarks of their respective owners. TR-808, TR-909 and TB-303 are
+Roland trademarks, used here only to describe what the parts emulate. X0X is not
+affiliated with or endorsed by M-VAVE, Roland or Hügelton Instruments.

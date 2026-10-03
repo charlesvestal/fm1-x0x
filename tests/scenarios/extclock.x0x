@@ -1,0 +1,37 @@
+# External MIDI clock: start, 24 ppqn at 140 BPM (787.5 samples = 17.857 ms per tick), stop.
+wait 300
+tapkey b0
+tapkey w0
+tapkey w4
+tapkey w8
+tapkey w12
+midi FA 00 00
+midi F8 00 00
+wait 18
+midi F8 00 00
+wait 18
+midi F8 00 00
+wait 18
+midi F8 00 00
+wait 18
+midi F8 00 00
+wait 18
+midi F8 00 00
+wait 18
+midi F8 00 00
+wait 18
+midi F8 00 00
+wait 18
+midi F8 00 00
+wait 18
+midi F8 00 00
+wait 18
+midi F8 00 00
+wait 18
+midi F8 00 00
+wait 18
+expect playing 1
+shot 12_extclock.png
+midi FC 00 00
+wait 100
+expect playing 0

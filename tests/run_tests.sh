@@ -1,73 +1,65 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-only
-# Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
-# Host tests (no hardware). Run from the repo root after ./build.sh:
+# X0X host tests: the maths, the sequencer + TB-3PO (against schwung-tb3po), each engine
+# against its reference implementation, and the whole firmware app in the simulator
+# (tests/scenarios/*.x0x: UI, patterns, persistence, MIDI clock), with screenshots and
+# audio in build/scenarios/. Needs the reference sources (see tests/host/run_*.sh).
 #   tests/run_tests.sh
-#
-# Regression suite (tests/regress.c, tests/target_budget.py; details at the top of regress.c):
-#   golden renders  every engine x preset, the drum kit, voice modes, FX sends, a 4-track mix: one hash
-#                   each in tests/golden.txt. A change of the sound fails with the list of renders.
-#   health          clipping, DC, peak level, voices free after the release, silence at the end.
-#   CPU             instructions / sample per preset and mix (tests/cpu_baseline.txt, +25 %), ns printed;
-#                   target: loop instructions of the render functions in build/felucca.dis
-#                   (tests/target_budget.txt, +10 %; exact, static).
-#   voices          the budget of 8, steal fades, MONO / LEGATO / UNISON keep their note, the VOICE cap,
-#                   no hanging notes on any MIDI / key routing.
-# After an intended change of the sound: GOLDEN_UPDATE=1 sh tests/run_tests.sh, review the diff
-# of tests/golden.txt, commit it with the change. After an intended change of the cost (or a new
-# compiler): BUDGET_UPDATE=1 (rewrites cpu_baseline.txt and target_budget.txt). VERBOSE=1: every render.
-set -e
-export AC79_SDK="${AC79_SDK:-$HOME/fw-AC79_AIoT_SDK}"
+set -u
 cd "$(dirname "$0")/.."
+CC="${CC:-cc}"
+FAIL=0
 OUT=build/host
-mkdir -p "$OUT"
-CC="${CC:-cc} -O1 -Wall -Wno-unused-function"
-fail=0
-run() { echo "== $1"; shift; "$@" || fail=1; }
-
-[ -f build/felucca.fwsc ] || { echo "run ./build.sh first"; exit 1; }
-
-$CC -o "$OUT/storage_test" tests/storage_test.c
-run "flash storage (A/B, torn writes)" "$OUT/storage_test"
-
-$CC -o "$OUT/upreset_test" tests/upreset_test.c
-run "user presets (UP_PUT parser, bank round trip, versions)" "$OUT/upreset_test"
-
-$CC -o "$OUT/midi_uart_test" tests/midi_uart_test.c
-run "TRS MIDI parser" "$OUT/midi_uart_test"
-
-$CC -o "$OUT/ota_test" tests/ota_test.c
-run "M-UPGRADE entry" "$OUT/ota_test" build/felucca.fwsc
-
-head -c 200000 build/felucca.bin > "$OUT/old_app.bin"
-python3 tools/fm1pkg_make.py "$OUT/old_app.bin" build/loader/ota.bin "$OUT/old.fwsc" >/dev/null
-$CC -o "$OUT/ldr_test" tests/ldr_test.c
-run "update loader: other app -> this build" "$OUT/ldr_test" "$OUT/old.fwsc" build/felucca.fwsc
-
-$CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/hostsim" tests/hostsim.c -lm
-$CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/scale_test" tests/scale_test.c -lm
-run "scales: white-key mapping and note lifecycle" "$OUT/scale_test"
-run "DSP render (ANALOG preset 0)" "$OUT/hostsim" 0 0 1 "$OUT/render.wav"
-mkdir -p build/tracks_demo
-run "TRACKS: 4-track pattern, live recording (lengths, swing), voice budget, engine switch, cost" env TRACKS=build/tracks_demo "$OUT/hostsim" 0 0 1 "$OUT/tracks.wav"
-$CC -w -Ibuild/gen -Ifirmware/src -o "$OUT/project_test" tests/project_test.c -lm
-run "project formats (FUN2 / FUN1 -> FUN3: the SLICER parameters)" "$OUT/project_test"
-$CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/slicer_test" tests/slicer_test.c -lm
-mkdir -p build/slicer_demo
-run "SLICER: no clicks, timing, sync with the sequencer, STUT, cost, demos" "$OUT/slicer_test" build/slicer_demo
-$CC -O2 -w -Ibuild/gen -Ifirmware/src -o "$OUT/regress" tests/regress.c -lm
-run "regression: golden renders, health, voices, CPU budget" "$OUT/regress" tests/golden.txt tests/cpu_baseline.txt
-# SLICE (tests/slice_test.c) needs a FELUCCA_SLICE=1 build; the engine is not built by default
-
-run "regression: target cost of the render loops" python3 tests/target_budget.py \
-    build/felucca.dis tests/target_budget.txt
-
-run "installer CLI (fm1_install.py) against a simulated FM-1" python3 tests/install_test.py
-
-if command -v node >/dev/null 2>&1; then
-    run "web pages: editor protocol, samples, packages, update protocol" node web/test_web.mjs
+mkdir -p "$OUT" build/scenarios
+run() {
+    name="$1"; shift
+    if "$@" > "$OUT/$name.log" 2>&1; then
+        echo "  ok   $name"
+    else
+        echo "  FAIL $name (see $OUT/$name.log)"
+        tail -15 "$OUT/$name.log" | sed 's/^/       /'
+        FAIL=1
+    fi
+}
+W="-O2 -ffp-contract=off -Wall -Wextra -Wdouble-promotion -Werror"
+run fastmath sh -c "$CC -O2 -ffp-contract=off -Wall -Wextra -Werror -o $OUT/fastmath_test tests/host/fastmath_test.c -lm && $OUT/fastmath_test"   # its reference is double on purpose
+TB3PO_REF="${TB3PO_REF:-../schwung-tb3po/src/dsp/tb3po.c}"
+seq_test() {
+    if [ -f "$TB3PO_REF" ]; then
+        ref="$(cd "$(dirname "$TB3PO_REF")" && pwd)/$(basename "$TB3PO_REF")"
+        $CC -O2 -ffp-contract=off -Wall -Wextra "-DREF_TB3PO=\"$ref\"" -o $OUT/seq_test tests/host/seq_test.c \
+            firmware/src/seq/sequencer.c firmware/src/seq/tb3po.c firmware/src/seq/pattern.c || return 1
+    else
+        echo "(no schwung-tb3po checkout at $TB3PO_REF: the TB-3PO comparison is skipped)"
+        $CC -O2 -ffp-contract=off -Wall -Wextra -o $OUT/seq_test tests/host/seq_test.c \
+            firmware/src/seq/sequencer.c firmware/src/seq/tb3po.c firmware/src/seq/pattern.c || return 1
+    fi
+    $OUT/seq_test
+}
+run sequencer seq_test
+for t in drum909 drum808 bass303 breaks; do
+    [ -f "tests/host/run_$t.sh" ] && run "$t" sh "tests/host/run_$t.sh"
+done
+run storage sh -c "$CC -O2 -o $OUT/storage_test tests/storage_test.c && $OUT/storage_test"
+# the update path, against the firmware package (Felucca's tests; needs ./build.sh)
+if [ -f build/x0x.fwsc ]; then
+    run ota-entry sh -c "$CC -o $OUT/ota_test tests/ota_test.c && $OUT/ota_test build/x0x.fwsc"
+    if [ -z "${AC79_SDK:-}" ]; then
+        echo "  skip update-loader (needs AC79_SDK, as the build)"
+    else
+    run update-loader sh -c "head -c 200000 build/x0x.bin > $OUT/old_app.bin && \
+        python3 tools/fm1pkg_make.py $OUT/old_app.bin build/loader/ota.bin $OUT/old.fwsc >/dev/null && \
+        $CC -o $OUT/ldr_test tests/ldr_test.c && $OUT/ldr_test $OUT/old.fwsc build/x0x.fwsc"
+    fi
+    run installer python3 tests/install_test.py
 else
-    echo "== skip web tests (no node)"
+    echo "  skip update-path tests (no build/x0x.fwsc: run ./build.sh)"
 fi
-
-[ $fail -eq 0 ] && echo "ALL HOST TESTS PASSED" || { echo "HOST TESTS FAILED"; exit 1; }
+run host-build sh host/build_host.sh
+for s in tests/scenarios/*.x0x; do
+    n=$(basename "$s" .x0x)
+    mkdir -p "build/scenarios/$n"
+    run "scenario-$n" build/host/x0x_host "$s" "build/scenarios/$n"
+done
+[ $FAIL -eq 0 ] && echo "all tests passed" || echo "TESTS FAILED"
+exit $FAIL

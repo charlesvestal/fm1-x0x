@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
-"""Build Felucca: the app, the update loader and an installable .fwsc package.
+"""Build X0X (a fork of Felucca): the app, the update loader and an installable .fwsc package.
 
   tools/build.py [--release X.Y[-suffix]]
 
-Outputs in build/: felucca.bin (app), loader/ota.bin (update loader),
-felucca.fwsc (package). See BUILDING.md for the toolchain and the SDK.
+Outputs in build/: x0x.bin (app), loader/ota.bin (update loader, Felucca's, unchanged),
+x0x.fwsc (package). See BUILDING.md for the toolchain and the SDK.
 
 The JieLi toolchain is Linux x86-64 only. JIELI_TOOLCHAIN points at it; on
 macOS (or with JIELI_DOCKER=1) each tool runs in a linux/amd64 container.
@@ -16,7 +16,6 @@ import hashlib
 import os
 import platform
 import re
-import shutil
 import struct
 import subprocess
 import sys
@@ -38,6 +37,12 @@ LOADER_LOAD = 0x01C0A800
 LOADER_NAME = b"usb_hid_ota.bin"    # the file name the SPL looks for
 DOCKER_IMAGE = os.environ.get("JIELI_DOCKER_IMAGE", "debian:bookworm-slim")
 CFLAGS = ["-Os", "-ffunction-sections", "-fno-builtin", "-Wall", "-Wno-unused-function"]
+# X0X: the AC79's single-precision FPU (the SDK's own flags); no fused multiply-add, so the host
+# build (-ffp-contract=off) computes the same samples
+FPU = ["-mcpu=r3", "-mfprev1", "-ffp-contract=off"]
+# the DSP, the sequencer and the audio engine: separate units at -O2
+O2_UNITS = ["dsp/drum909.c", "dsp/drum808.c", "dsp/bass303.c", "dsp/breaks.c", "dsp/fxbus.c", "dsp/master.c",
+            "seq/sequencer.c", "seq/tb3po.c", "seq/pattern.c", "app/engine.c"]
 LINE = re.compile(r"^\s*([0-9a-f]+):\s+((?:[0-9a-f]{2} )+)\s*\t(.*)$")
 
 # SDK files of AC79NN_SDK_V1.2.1_2023-12-13 (the tested version)
@@ -84,18 +89,17 @@ def tc(tool, *args):
 
 
 def tc_all(*cmds):
-    with ThreadPoolExecutor(len(cmds)) as ex:
+    # at most 4 at once: a podman machine drops concurrent container connections (ssh EOF)
+    with ThreadPoolExecutor(min(len(cmds), int(os.environ.get("X0X_JOBS", "4")))) as ex:
         return list(ex.map(lambda c: tc(*c), cmds))
 
 
 def generate():
-    """generated headers (fonts, icons, tables, samples)"""
+    """generated headers: the font (Felucca's), the 909's samples and tables, the built-in break"""
     GEN.mkdir(parents=True, exist_ok=True)
     tools = SRC / "tools"
     cmds = [[tools / "gen_font.py", GEN / "felucca_font.h"],
-            [tools / "gen_icons.py", GEN / "felucca_icons.h"],
-            [tools / "gen_tables.py", GEN / "felucca_tables.h"],
-            [tools / "gen_samples.py", GEN / "felucca_samples.h"]]
+            [tools / "gen_drum_samples.py", GEN / "x0x_drum_samples.h"]]
     procs = [subprocess.Popen([sys.executable, *map(str, c)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                               text=True) for c in cmds]
     failed = []
@@ -105,6 +109,13 @@ def generate():
             failed.append(c[0].name)
     if failed:
         raise SystemExit(f"build: {', '.join(failed)} failed")
+    gb = SRC / "tools" / "gen_builtin_break.sh"
+    if gb.exists():                                 # renders a loop with the 909 port on the host
+        r = subprocess.run(["sh", str(gb), str(GEN)], capture_output=True, text=True)
+        sys.stdout.write(r.stdout)
+        if r.returncode:
+            sys.stderr.write(r.stderr)
+            raise SystemExit("build: gen_builtin_break failed")
 
 
 # ---- update loader
@@ -170,22 +181,28 @@ def build_loader():
 # ---- app
 
 def build_app():
-    flags = [*CFLAGS, "-Ifirmware/hal", "-Ifirmware/src", "-Ibuild/gen"]
-    for flag in ("FELUCCA_FLASH", "FELUCCA_OTA", "FELUCCA_OTA_DRYRUN", "FELUCCA_CDC", "FELUCCA_UART",
-                 "FELUCCA_ICONS", "FELUCCA_SLICE"):
-        v = os.environ.get(flag)    # unset: the default in firmware/src/felucca.c
+    flags = [*CFLAGS, *FPU, "-Ifirmware/hal", "-Ifirmware/src", "-Ibuild/gen"]
+    for flag in ("X0X_CDC",):
+        v = os.environ.get(flag)    # unset: the default in firmware/src/x0x.c
         if v in ("0", "1"):
             flags.append(f"-D{flag}={v}")
     flags.append(f'-DFELUCCA_ID="{PRODUCT}"')
     if VERSION:
-        flags.append(f'-DFELUCCA_VERSION="{VERSION}"')
-    tc_all(("cc", "-c", FW / "crt0.S", "-o", OUT / "crt0.o"),
-           ("cc", "-c", FW / "hal" / "fm1_vec.S", "-o", OUT / "fm1_vec.o"),
-           ("cc", "-c", FW / "hal" / "fm1_isr.S", "-o", OUT / "fm1_isr.o"),
-           ("cc", *flags, "-c", FW / "src" / "felucca.c", "-o", OUT / "felucca.o"))
-    elf = OUT / "felucca.elf"
-    tc("pi32v2/bin/ld", "-T", FW / "app.ld", OUT / "crt0.o", OUT / "fm1_vec.o", OUT / "fm1_isr.o",
-       OUT / "felucca.o", "-o", elf)
+        flags.append(f'-DX0X_VERSION="{VERSION}"')
+    o2 = [f if f != "-Os" else "-O2" for f in flags]
+    units = [("cc", "-c", FW / "crt0.S", "-o", OUT / "crt0.o"),
+             ("cc", "-c", FW / "hal" / "fm1_vec.S", "-o", OUT / "fm1_vec.o"),
+             ("cc", "-c", FW / "hal" / "fm1_isr.S", "-o", OUT / "fm1_isr.o"),
+             ("cc", *flags, "-c", FW / "src" / "x0x.c", "-o", OUT / "x0x.o")]
+    objs = [OUT / "crt0.o", OUT / "fm1_vec.o", OUT / "fm1_isr.o", OUT / "x0x.o"]
+    (OUT / "o2").mkdir(parents=True, exist_ok=True)
+    for u in O2_UNITS:
+        o = OUT / "o2" / (u.replace("/", "_")[:-2] + ".o")
+        units.append(("cc", *o2, "-c", FW / "src" / u, "-o", o))
+        objs.append(o)
+    tc_all(*units)
+    elf = OUT / "x0x.elf"
+    tc("pi32v2/bin/ld", "-T", FW / "app.ld", *objs, "-o", elf)
     for sect in ("text.bin", "data.bin", "ramtext.bin"):
         (OUT / sect).unlink(missing_ok=True)
     *_, syms, dis, rt = tc_all(("common/bin/objcopy", "-O", "binary", "-j", ".text", elf, OUT / "text.bin"),
@@ -194,7 +211,7 @@ def build_app():
                                ("common/bin/objdump", "-t", elf),
                                ("common/bin/objdump", "-d", elf),
                                ("common/bin/objdump", "-d", "-j", ".ram_text", elf))
-    (OUT / "felucca.dis").write_text(dis)
+    (OUT / "x0x.dis").write_text(dis)
 
     def symv(name):
         return int(re.search(r"^([0-9a-f]+) .*\s" + name + r"$", syms, re.M).group(1), 16)
@@ -211,7 +228,7 @@ def build_app():
             img += b"\xff" * (load - APP_XIP - len(img))
             img += blob
     img += b"\xff" * (-len(img) % 4)
-    (OUT / "felucca.bin").write_bytes(img)
+    (OUT / "x0x.bin").write_bytes(img)
     return bytes(img), syms, dis, rt
 
 
@@ -237,6 +254,12 @@ def check(img, syms, dis, rt):
                 errors.append(f"reference to ROM address {val:#010x}")
     if len(img) > APP_SLOT:
         errors.append(f"image {len(img)} B exceeds the app slot")
+    # X0X: the FPU is single precision; a soft-double routine in the image means a double crept in
+    soft = sorted(set(re.findall(r"\s(__(?:add|sub|mul|div|neg|cmp|eq|ne|lt|le|gt|ge|un|extendsf|truncdf|fixdf|fixunsdf|floatsidf|floatunsidf|floatdidf)\w*df\w*)$", syms, re.M)))
+    if soft:
+        errors.append(f"soft-double routines linked: {soft[:6]} (a double in the code)")
+    else:
+        notes.append("no soft-double routines (single-precision FPU only)")
 
     def sym(name):
         mm = re.search(r"^([0-9a-f]+) .*\s" + name + r"$", syms, re.M)
@@ -281,7 +304,7 @@ def mmio_check():
             break
         regs |= more
     errors = []
-    for f in sorted([*(FW / "src").glob("*.[ch]"), *(FW / "loader").glob("*.c")]):
+    for f in sorted([*(FW / "src").rglob("*.[ch]"), *(FW / "loader").glob("*.c")]):
         for no, ln in enumerate(strip(f.read_text()).splitlines(), 1):
             where = f"{f.relative_to(FW)}:{no}"
             for rx, what in ((MMIO_LIT, "register/window address"), (MMIO_CAST, "volatile pointer cast"),
@@ -301,14 +324,14 @@ def main():
     ap.add_argument("--release", metavar="X.Y", help="release build: identity FM-1_9XY, version string X.Y")
     ap.add_argument("--sdk", type=Path, help="JieLi AC79 SDK checkout (default: $AC79_SDK)")
     a = ap.parse_args()
-    name = "felucca.fwsc"
+    name = "x0x.fwsc"
     if a.release:                   # one digit each: the identity has room for two
         m = re.fullmatch(r"(\d)\.(\d)(-[A-Za-z0-9]+)?", a.release)
         if not m:
             raise SystemExit(f"--release {a.release}: use X.Y or X.Y-suffix, one digit each")
         PRODUCT = "FM-1_9" + m[1] + m[2]
         VERSION = a.release.upper() if "BETA" in a.release.upper() else a.release.upper() + " BETA"
-        name = f"felucca-{a.release}.fwsc"
+        name = f"x0x-{a.release}.fwsc"
     fm1pkg_make.SDK = a.sdk
     for rel, sha in SDK_SHA256.items():          # fail early without the SDK
         if hashlib.sha256(fm1pkg_make.sdk_file(rel)).hexdigest() != sha:
@@ -332,10 +355,7 @@ def main():
         raise SystemExit("build: checks failed")
     pkg = fm1pkg_make.ufw(fm1pkg_make.flash_image(img, fm1pkg_make.KEY), ota, PRODUCT)
     (OUT / name).write_bytes(pkg)
-    att = SRC / "assets" / "samples-cc0" / "ATTRIBUTION.txt"
-    if att.exists():
-        shutil.copy(att, OUT / "ATTRIBUTION.txt")
-    print(f"app      {OUT / 'felucca.bin'}  {len(img)} B")
+    print(f"app      {OUT / 'x0x.bin'}  {len(img)} B")
     print(f"loader   {LDR / 'ota.bin'}  {len(ota)} B")
     print(f"package  {OUT / name}  {len(pkg)} B, identity {PRODUCT}")
     return 0

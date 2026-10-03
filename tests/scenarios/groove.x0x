@@ -1,0 +1,95 @@
+# Build a groove from the panel, as a player would, and record it.
+wait 500
+expect part 0
+shot 01_boot_909.png
+# 909: BD on the quarters (black key 1 = BD, white keys = steps)
+tapkey b0
+tapkey w0
+tapkey w4
+tapkey w8
+tapkey w12
+expect hit0.0.0 1
+expect hit0.0.4 1
+# SD on 5 and 13, CH on the off-beats, OH on the last 16th
+tapkey b1
+tapkey w4
+tapkey w12
+tapkey b7
+tapkey w2
+tapkey w6
+tapkey w10
+tapkey w14
+tapkey b8
+tapkey w15
+# accent row: hold ENV, white keys
+press ENV
+tapkey w0
+tapkey w8
+release ENV
+shot 02_909_grid.png
+leds
+# 808 part: cowbell and clap
+turn ALGO 1
+expect part 1
+tapkey b7
+tapkey w3
+tapkey w11
+tapkey b6
+tapkey w12
+shot 03_808_grid.png
+# 303 A: TB-3PO page, generate a line
+turn ALGO 1
+expect part 2
+tap ARP
+expect view 2
+tap OCT+
+shot 04_tb3po_a.png
+# 303 B: generate, then sound page: open the filter
+turn ALGO 1
+tap ARP
+tap OCT+
+tap EDIT
+turn K1 20
+turn K2 30
+shot 05_303b_sound.png
+# BREAK: all 16 steps on
+turn ALGO 1
+expect part 4
+tapkey w0
+tapkey w1
+tapkey w2
+tapkey w3
+tapkey w4
+tapkey w5
+tapkey w6
+tapkey w7
+tapkey w8
+tapkey w9
+tapkey w10
+tapkey w11
+tapkey w12
+tapkey w13
+tapkey w14
+tapkey w15
+expect brk15 1
+shot 06_break.png
+# tempo 128, play and record 4 bars
+turn SELECT 3
+expect tempo 128
+wav groove.wav
+tap PLAY
+expect playing 1
+wait 7500
+shot 07_playing_break.png
+tap HOME
+wait 200
+shot 08_home.png
+tap FX
+shot 09_fx.png
+tap LFO
+shot 10_mix.png
+tap PLAY
+wait 300
+wavstop
+expect playing 0
+expect peak_db_min -30
