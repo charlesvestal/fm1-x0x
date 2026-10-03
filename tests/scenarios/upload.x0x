@@ -1,0 +1,28 @@
+# Uploaded loops: tools/upload_breaks.py's slot image (synthetic test loops, built by
+# tests/run_tests.sh into build/test_upload/) parsed by the firmware's own slots.c.
+wait 200
+expect loops 2
+slotimg 0 build/test_upload/slot1.hdr build/test_upload/slot1.bin
+expect loops 5
+slotimg 1 build/test_upload/slot2.hdr build/test_upload/slot2.bin
+expect loops 6
+# BREAK part, LOOPS page: loop A = the first uploaded loop (index 2, after the 2 built-in)
+turn ALGO 4
+expect part 4
+tap EDIT
+tap EDIT
+tap EDIT
+turn K1 2
+expect loop_a 2
+shot 30_loops_uploaded.png
+tapkey w0
+tapkey w4
+tapkey w8
+tapkey w12
+wav upload.wav
+tap PLAY
+wait 4500
+tap PLAY
+wait 300
+wavstop
+expect peak_db_min -40

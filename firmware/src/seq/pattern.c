@@ -36,6 +36,6 @@ void pattern_init(pattern_t *p, uint32_t seed_a, uint32_t seed_b)
     p->brk.steps = 0;                 /* the break is silent until switched on */
     for (i = 0; i < BRK_NSET; i++)
         p->brk.set[i] = BRK_DEFAULTS[i];
-    p->brk.slot_a = 0;
-    p->brk.slot_b = 0;
+    p->brk.slot_a = 0;                /* the built-in bank's first two: the groove, and the fill for B */
+    p->brk.slot_b = 1;
 }

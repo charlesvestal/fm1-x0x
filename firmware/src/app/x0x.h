@@ -9,6 +9,7 @@
 #include "../seq/sequencer.h"
 #include "../seq/tb3po.h"
 #include "../dsp/breaks.h"
+#include "../dsp/fxbus.h"            /* FX_* param indices (the send pages) */
 
 #define X0X_VERSION "0.1"
 #define PROJ_MAGIC 0x50305830u           /* "0X0P" */

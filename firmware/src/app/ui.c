@@ -95,7 +95,6 @@ typedef struct { uint8_t kind, a, b, c; } pref_t;
 
 static const char *const RATE_N[] = {"1/16", "1/16T", "1/32", "1/8T"};
 static const char *const DIR_N[] = {"FWD", "REV", "PING", "RND"};
-static const char *const SLOT_N[] = {"BUILT", "USR1", "USR2", "USR3"};
 static const char *const ONOFF_N[] = {"OFF", "ON"};
 static const char *const ROOT_N[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 static const char *const PAL_N[] = {"GREEN", "AMBER", "CYAN", "RED", "MONO"};
@@ -107,7 +106,7 @@ static const x0x_param_t GEN_P[NGEN] = {
 };
 static const x0x_param_t SEQ_P[] = {
     {"SWING", 100, 0, 0}, {"LENGTH", 31, 15, 0}, {"RATE", 3, 0, RATE_N}, {"LENGTH", 31, 15, 0},
-    {"RATE", 3, 0, RATE_N}, {"DIR", 3, 0, DIR_N}, {"TRANSP", 48, 24, 0}, {"SLOT", 3, 0, SLOT_N},
+    {"RATE", 3, 0, RATE_N}, {"DIR", 3, 0, DIR_N}, {"TRANSP", 48, 24, 0}, {"SLOT", 0, 0, 0},
     {"TEMPO", 255, 0, 0}, {"ACCENT", 127, 88, 0}, {"CLK OUT", 1, 1, ONOFF_N}, {"NOTES", 1, 0, ONOFF_N},
     {"COLOUR", 4, 0, PAL_N}, {"KEYLED", 1, 1, ONOFF_N},
 };
@@ -125,7 +124,12 @@ static const x0x_param_t *pref_desc(pref_t r)
     case R_BRATE: return &SEQ_P[4];
     case R_BDIR: return &SEQ_P[5];
     case R_BTRANS: return &SEQ_P[6];
-    case R_BRKSLOT: return &SEQ_P[7];
+    case R_BRKSLOT: {                                  /* the bank's size is the build's */
+        static x0x_param_t d = {"LOOP", 0, 0, 0};
+        d.max = (uint8_t)(engine_brk_nslots() - 1);
+        d.names = engine_brk_slot_names();
+        return &d;
+    }
     case R_TEMPO: return &SEQ_P[8];
     case R_ACCENT: return &SEQ_P[9];
     case R_CLKOUT: return &SEQ_P[10];
@@ -232,11 +236,14 @@ static void pref_set(pref_t r, int v)
 /* the knob's label: a mixer ref names its part ("303 A", "A REV"), anything else its param */
 static const char *pref_name(pref_t r)
 {
-    static const char *const MIXN[NPARTS][3] = {{"909", "", ""}, {"808", "", ""}, {"303 A", "A REV", "A DLY"},
-                                                {"303 B", "B REV", "B DLY"}, {"BREAK", "", ""}};
+    static const char *const MIXN[NPARTS][3] = {{"909", "909 RV", "909 DL"}, {"808", "808 RV", "808 DL"},
+                                                {"303 A", "A REV", "A DLY"}, {"303 B", "B REV", "B DLY"},
+                                                {"BREAK", "BRK RV", "BRK DL"}};
     const x0x_param_t *d = pref_desc(r);
     if (r.kind == R_ENG && r.a == T_MIX && r.b < NPARTS && r.c < 3)
         return MIXN[r.b][r.c];
+    if (r.kind == R_BRKSLOT)
+        return r.a ? "LOOP B" : "LOOP A";
     return d ? d->name : "";
 }
 
@@ -328,6 +335,7 @@ static void build_pages(void)
             int t = p == PART_909 ? T_909 : T_808, k = p;
             add_eng_pages(t, ui.sel[k], engine_voice_name(t, ui.sel[k]));
             add_page("PART", PR(R_DLEN, k, 0, 0), PR(R_DRATE, k, 0, 0), PR(R_ENG, T_MIX, p, 0), PR(R_SWING, 0, 0, 0));
+            add_page("SENDS", PR(R_ENG, T_MIX, p, 1), PR(R_ENG, T_MIX, p, 2), NONE, NONE);
             add_eng_pages(t, NDRUM, "KIT");
         } else if (p == PART_303A || p == PART_303B) {
             int b = p - PART_303A;
@@ -342,6 +350,7 @@ static void build_pages(void)
             add_page("PHRASE", PR(R_BRKSET, 0, 0, BRK_PHRASE), PR(R_BRKSET, 0, 0, BRK_BCHANCE),
                      PR(R_BRKSET, 0, 0, BRK_ALEN), PR(R_BRKSET, 0, 0, BRK_BLEN));
             add_page("LOOPS", PR(R_BRKSLOT, 0, 0, 0), PR(R_BRKSLOT, 1, 0, 0), PR(R_ENG, T_MIX, PART_BRK, 0), NONE);
+            add_page("SENDS", PR(R_ENG, T_MIX, PART_BRK, 1), PR(R_ENG, T_MIX, PART_BRK, 2), NONE, NONE);
             add_eng_pages(T_BRK, 0, "BREAK");
         }
         break;
@@ -355,15 +364,19 @@ static void build_pages(void)
         break;
     }
     case V_FX:
+        add_page("SENDS", PR(R_ENG, T_MIX, PART_909, 1), PR(R_ENG, T_MIX, PART_909, 2), PR(R_ENG, T_MIX, PART_808, 1),
+                 PR(R_ENG, T_MIX, PART_808, 2));
+        add_page("SENDS", PR(R_ENG, T_MIX, PART_303A, 1), PR(R_ENG, T_MIX, PART_303A, 2),
+                 PR(R_ENG, T_MIX, PART_303B, 1), PR(R_ENG, T_MIX, PART_303B, 2));
+        add_page("SENDS", PR(R_ENG, T_MIX, PART_BRK, 1), PR(R_ENG, T_MIX, PART_BRK, 2), PR(R_ENG, T_FX, 0, FX_DL_TYPE),
+                 PR(R_ENG, T_FX, 0, FX_DL_TIME));
         add_eng_pages(T_FX, 0, "FX");
         add_eng_pages(T_MST, 0, "MASTER");
         break;
     case V_MIX:
         add_page("LEVELS", PR(R_ENG, T_MIX, PART_909, 0), PR(R_ENG, T_MIX, PART_808, 0), PR(R_ENG, T_MIX, PART_303A, 0),
                  PR(R_ENG, T_MIX, PART_303B, 0));
-        add_page("SENDS A", PR(R_ENG, T_MIX, PART_BRK, 0), PR(R_ENG, T_MIX, PART_303A, 1), PR(R_ENG, T_MIX, PART_303A, 2),
-                 NONE);
-        add_page("SENDS B", PR(R_ENG, T_MIX, PART_303B, 1), PR(R_ENG, T_MIX, PART_303B, 2), NONE, NONE);
+        add_page("LEVELS", PR(R_ENG, T_MIX, PART_BRK, 0), NONE, NONE, NONE);
         add_page("GROOVE", PR(R_TEMPO, 0, 0, 0), PR(R_SWING, 0, 0, 0), PR(R_ACCENT, 0, 0, 0), NONE);
         break;
     case V_GLO:
@@ -991,7 +1004,9 @@ static void draw_break(int band)
         }
     } else {
         char t[24], *q = t;
-        const char *a = SLOT_N[bp->slot_a % 4], *bb = SLOT_N[bp->slot_b % 4];
+        const char *const *sn = engine_brk_slot_names();
+        int ns = engine_brk_nslots();
+        const char *a = sn[bp->slot_a % ns], *bb = sn[bp->slot_b % ns];
         *q++ = 'A';
         *q++ = ' ';
         while (*a)

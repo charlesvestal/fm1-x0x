@@ -1,0 +1,71 @@
+# Sends and the break bank: a breakbeat / acid jam built from the panel, 8 bars.
+wait 300
+# 909: kick on the quarters, closed hat on the off-beats, clap on 2 and 4
+tapkey b0
+tapkey w0
+tapkey w4
+tapkey w8
+tapkey w12
+tapkey b7
+tapkey w2
+tapkey w6
+tapkey w10
+tapkey w14
+tapkey b6
+tapkey w4
+tapkey w12
+# 303 A and B: TB-3PO lines
+turn ALGO 2
+tap ARP
+tap OCT+
+turn ALGO 1
+tap ARP
+tap OCT+
+# BREAK: every step on, loop A = AMEN (the bank's first), a little more roll
+turn ALGO 1
+expect part 4
+tap EDIT
+tapkey w0
+tapkey w1
+tapkey w2
+tapkey w3
+tapkey w4
+tapkey w5
+tapkey w6
+tapkey w7
+tapkey w8
+tapkey w9
+tapkey w10
+tapkey w11
+tapkey w12
+tapkey w13
+tapkey w14
+tapkey w15
+turn K3 20
+shot 20_break_amen.png
+# sends: FX opens on SENDS; page 1 = 909 / 808, page 2 = the 303s, page 3 = the break + delay
+tap FX
+turn K1 25
+tap FX
+turn K2 70
+turn K4 30
+shot 21_sends_303.png
+tap FX
+turn K1 30
+turn K3 1
+shot 22_sends_break_tape.png
+expect sound5.2.2 70
+expect sound5.4.1 30
+# tempo 135, play 8 bars
+turn SELECT 10
+expect tempo 135
+wav jam.wav
+tap PLAY
+wait 14300
+tap HOME
+wait 200
+shot 23_home_jam.png
+tap PLAY
+wait 1500
+wavstop
+expect peak_db_min -30

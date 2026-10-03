@@ -68,19 +68,21 @@ void plat_midi_out(uint32_t pkt) { midi_out_event(pkt); }
 int plat_store_load(uint32_t obj, void *dst, uint32_t max) { return flash_ok ? st_load(obj, dst, max) : -1; }
 int plat_store_save(uint32_t obj, const void *src, uint32_t len) { return flash_ok ? st_save(obj, src, len) : -9; }
 
-const uint8_t *plat_slot(int k, uint32_t *nsamples, uint32_t *rate, char name[9])
+int plat_slot_zones(int k) { return (k >= 0 && k < SMP_USER_SLOTS) ? usr_nz[k] : 0; }
+
+const uint8_t *plat_slot(int k, int z, uint32_t *nsamples, uint32_t *rate, char name[9])
 {
     const smp_user_hdr_t *h;
     uint32_t i;
-    if (k < 0 || k >= SMP_USER_SLOTS || !usr_nz[k])
+    if (k < 0 || k >= SMP_USER_SLOTS || z < 0 || z >= usr_nz[k])
         return 0;
     h = (const smp_user_hdr_t *)smp_user_xip((uint32_t)k);
     for (i = 0; i < 8u; i++)
         name[i] = h->name[i] >= 32 && h->name[i] < 127 ? h->name[i] : 0;
     name[8] = 0;
-    *nsamples = h->zone[0].n;
-    *rate = (h->zone[0].rate * 44100u + 32768u) >> 16;
-    return smp_user_xip((uint32_t)k) + SMP_USER_DATA + h->zone[0].off;
+    *nsamples = h->zone[z].n;
+    *rate = (h->zone[z].rate * 44100u + 32768u) >> 16;
+    return smp_user_xip((uint32_t)k) + SMP_USER_DATA + h->zone[z].off;
 }
 
 static volatile uint32_t audio_cpu_pct, audio_xruns;

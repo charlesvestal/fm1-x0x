@@ -19,8 +19,10 @@ recipients its complete corresponding source under the same licence.
 | Break generator (`dsp/breaks*`) | ported from [schwung-breakbeat](https://github.com/mestela/schwung-breakbeat) (BB Gen) by mestela, **used with the author's permission** (that repository carries no licence file) | GPL-3.0-only here, by permission |
 | Everything else in `firmware/src/{app,dsp,seq}`, `host/`, `tests/` | X0X | GPL-3.0-only |
 
-The built-in break loop (`build/gen/x0x_builtin_break.h`) is generated at build time by
-X0X's own 909 code; no recording is distributed.
+No recorded breaks are in this tree or in the default firmware: the built-in break loops are
+generated at build time by X0X's own 909 code. `tools/import_breaks.py`,
+`tools/gen_break_bank.py` (`X0X_BREAK_BANK`) and `tools/upload_breaks.py` can put recordings
+of your choosing into a build or onto a device; those recordings keep their own copyright.
 
 ## Felucca Assets
 

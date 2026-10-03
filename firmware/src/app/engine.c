@@ -29,7 +29,7 @@ static master_t mst;
 static int16_t dly_buf[DLY_LEN] POOL;
 static volatile uint8_t brk_hold;      /* main loop is rewriting the break loops: ISR leaves it alone */
 
-/* mixer: per part Level (+ Rev, Dly for the parts that are one voice) */
+/* mixer: per part Level, Rev send, Dly send (a drum machine's add to its voices' own sends) */
 enum { MX_LEVEL, MX_REV, MX_DLY, MX_NPARAMS };
 static const x0x_param_t MIX_P[MX_NPARAMS] = {{"LEVEL", 127, 100, 0}, {"REV", 127, 0, 0}, {"DLY", 127, 0, 0}};
 static const char *const PART_NAMES[NPARTS] = {"909", "808", "303 A", "303 B", "BREAK"};
@@ -71,9 +71,9 @@ int engine_nparams(int t, int v)
     case T_909: return drum909_nparams(v);
     case T_808: return drum808_nparams(v);
     case T_303: return bass303_nparams();
-    case T_BRK: return breaks_nparams() - BRK_NSET;      /* the per-pattern ones live in the pattern */
+    case T_BRK: return 2;                                /* Level, Pitch (sends: the mixer's; the rest: the pattern's) */
     case T_FX: return fxbus_nparams();
-    case T_MIX: return (v == PART_909 || v == PART_808) ? 1 : MX_NPARAMS;
+    case T_MIX: return MX_NPARAMS;                       /* every part: Level, Rev send, Dly send */
     case T_MST: return master_nparams();
     default: return 0;
     }
@@ -312,6 +312,8 @@ static void render_sub(float *out, uint32_t n)
         add_scaled(dry, t0, g, n);
         add_scaled(rev, t1, g, n);
         add_scaled(dly, t2, g, n);
+        add_scaled(rev, t0, g * mix_rev[b], n);        /* the kit send: the whole machine */
+        add_scaled(dly, t0, g * mix_dly[b], n);
         meter(b, t0, g, n);
     }
     for (b = 0; b < NBASS; b++) {
@@ -326,8 +328,8 @@ static void render_sub(float *out, uint32_t n)
         float g = mix_level[PART_BRK];
         breaks_render(&brk, t0, (int)n);
         add_scaled(dry, t0, g, n);
-        add_scaled(rev, t0, g * breaks_send(&brk, 0), n);
-        add_scaled(dly, t0, g * breaks_send(&brk, 1), n);
+        add_scaled(rev, t0, g * mix_rev[PART_BRK], n);
+        add_scaled(dly, t0, g * mix_dly[PART_BRK], n);
         meter(PART_BRK, t0, g, n);
     }
     fxbus_process(&fx, dry, rev, dly, out, (int)n);
@@ -383,24 +385,74 @@ static uint8_t loop_bars(uint32_t ns, uint32_t rate)
     return bars;
 }
 
-#if defined(__has_include)
-#if __has_include("x0x_builtin_break.h")
-#include "x0x_builtin_break.h"            /* tools/gen_builtin_break: a loop played by this firmware's 909 */
-#define HAVE_BUILTIN_BREAK 1
-#endif
-#endif
-static const brk_loop_t *brk_builtin(int which)
+#include "x0x_break_bank.h"              /* tools/gen_break_bank.py: the built-in loops */
+
+static const brk_loop_t *brk_builtin(int k)
 {
-#ifdef HAVE_BUILTIN_BREAK
-    static const brk_loop_t L[2] = {
-        {X0X_BREAK_A, X0X_BREAK_A_N, X0X_BREAK_RATE, X0X_BREAK_A_BARS},
-        {X0X_BREAK_B, X0X_BREAK_B_N, X0X_BREAK_RATE, X0X_BREAK_B_BARS},
-    };
-    return &L[which & 1];
-#else
-    (void)which;
-    return 0;
-#endif
+    static brk_loop_t L[2];
+    static int which;
+    brk_loop_t *l = &L[which ^= 1];      /* two: A and B are set one after the other */
+    if (k < 0 || k >= X0X_NBREAKS)
+        return 0;
+    l->adpcm = X0X_BREAKS[k].adpcm;
+    l->nsamples = X0X_BREAKS[k].n;
+    l->rate = X0X_BREAK_RATE;
+    l->bars = X0X_BREAKS[k].bars;
+    return l;
+}
+
+/* the LOOP choices: the built-in bank, then every loop (zone) of the user slots, in order.
+ * The list follows uploads: engine_brk_loops() rescans it. */
+#define NLOOPS_MAX (X0X_NBREAKS + PLAT_NSLOTS * PLAT_SLOT_ZONES)
+static const char *loop_names[NLOOPS_MAX];
+static char user_names[PLAT_NSLOTS * PLAT_SLOT_ZONES][8];
+static uint8_t loop_slot[NLOOPS_MAX], loop_zone[NLOOPS_MAX];
+static int nloops;
+
+static void scan_loops(void)
+{
+    int i, k, z;
+    nloops = 0;
+    for (i = 0; i < X0X_NBREAKS; i++)
+        loop_names[nloops++] = X0X_BREAKS[i].name;
+    for (k = 0; k < PLAT_NSLOTS; k++) {
+        int nz = plat_slot_zones(k);
+        for (z = 0; z < nz && z < PLAT_SLOT_ZONES; z++) {
+            char *n = user_names[k * PLAT_SLOT_ZONES + z], nm[9];
+            uint32_t ns, rate;
+            int j = 0;
+            plat_slot(k, z, &ns, &rate, nm);
+            while (nm[j] && j < (nz > 1 ? 3 : 6)) {   /* "AMEN", or "BRK.3" for a slot of several */
+                n[j] = nm[j];
+                j++;
+            }
+            if (!j)
+                n[j++] = 'U';
+            if (nz > 1) {
+                n[j++] = '.';
+                if (z + 1 >= 10)
+                    n[j++] = (char)('0' + (z + 1) / 10);
+                n[j++] = (char)('0' + (z + 1) % 10);
+            }
+            n[j] = 0;
+            loop_slot[nloops] = (uint8_t)k;
+            loop_zone[nloops] = (uint8_t)z;
+            loop_names[nloops++] = n;
+        }
+    }
+}
+
+int engine_brk_nslots(void)
+{
+    if (!nloops)
+        scan_loops();
+    return nloops;
+}
+const char *const *engine_brk_slot_names(void)
+{
+    if (!nloops)
+        scan_loops();
+    return loop_names;
 }
 
 int engine_brk_slice(void) { return brk.running ? brk.st_slice : -1; }
@@ -410,12 +462,14 @@ void engine_brk_loops(void)
     const brkpart_t *bp = &seq.pat[seq.cur].brk;
     brk_loop_t L[2];
     int w;
+    scan_loops();                                       /* an upload may have changed the user loops */
     brk_hold = 1;                                       /* the ISR skips the break while we rewrite it */
     for (w = 0; w < 2; w++) {
         int slot = w ? bp->slot_b : bp->slot_a;
         uint32_t ns = 0, rate = 0;
         char name[9];
-        const uint8_t *d = slot ? plat_slot(slot - 1, &ns, &rate, name) : 0;
+        const uint8_t *d = (slot >= X0X_NBREAKS && slot < nloops)
+                               ? plat_slot(loop_slot[slot], loop_zone[slot], &ns, &rate, name) : 0;
         if (d) {
             L[w].adpcm = d;
             L[w].nsamples = ns;
@@ -423,7 +477,7 @@ void engine_brk_loops(void)
             L[w].bars = loop_bars(ns, rate);
             breaks_set_loop(&brk, w, &L[w]);
         } else {
-            breaks_set_loop(&brk, w, brk_builtin(w));   /* the loop rendered at build time from the 909 */
+            breaks_set_loop(&brk, w, brk_builtin(slot < X0X_NBREAKS ? slot : 0));   /* built-in (or an empty user slot: the first) */
         }
     }
     brk_hold = 0;

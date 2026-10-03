@@ -12,7 +12,8 @@
  *   key K down|up | tapkey K     (K: 0..26 = F3..G5, or w0..w15 white keys, b0..b10 black keys)
  *   turn ENC N                   (ENC: SELECT ALGO PRESET K1 K2 K3 K4; N detents, signed)
  *   master N                     MASTER pot 0..4096
- *   slot K FILE.wav BARS         load a WAV into user sample slot K (0..2) as a break loop
+ *   slot K NAME A.wav [B.wav..]  user sample slot K (0..2): one loop (zone) per WAV, encoded here
+ *   slotimg K F.hdr F.bin       slot K from tools/upload_breaks.py --dry-run's image (the device format)
  *   midi B0 B1 B2                incoming USB MIDI message (hex bytes)
  *   wav FILE | wavstop           start / stop recording the output
  *   shot FILE.png                save the screen
@@ -118,18 +119,58 @@ int plat_store_save(uint32_t obj, const void *src, uint32_t len)
     return 0;
 }
 
-/* sample slots: IMA ADPCM made here from a WAV (the same encoder as tools/sampleio.py) */
-static uint8_t *slot_data[PLAT_NSLOTS];
-static uint32_t slot_n[PLAT_NSLOTS], slot_rate[PLAT_NSLOTS];
-static char slot_name[PLAT_NSLOTS][9];
-const uint8_t *plat_slot(int k, uint32_t *ns, uint32_t *rate, char name[9])
+/* sample slots, two ways in:
+ *  - slotimg: a slot image exactly as tools/upload_breaks.py writes it, read by the firmware's own
+ *    slots.c (the device path: what the upload tool writes is what the firmware parses);
+ *  - slot: WAVs encoded here, one zone each (quick, for scenarios that do not test the format). */
+static uint8_t slot_img[3][0x14000];
+static int slot_is_img[3];
+#define SMP_USER_XIP(k) ((const uint8_t *)slot_img[k])
+static uint32_t st_crc32(const void *p, uint32_t n)
 {
-    if (k < 0 || k >= PLAT_NSLOTS || !slot_data[k])
+    const uint8_t *b = p;
+    uint32_t c = 0xFFFFFFFFu, k;
+    while (n--) {
+        c ^= *b++;
+        for (k = 0; k < 8; k++)
+            c = c & 1 ? 0xEDB88320u ^ (c >> 1) : c >> 1;
+    }
+    return ~c;
+}
+#include "../firmware/src/app/slots.c"
+
+/* WAV slots */
+static uint8_t *slot_data[PLAT_NSLOTS][PLAT_SLOT_ZONES];
+static uint32_t slot_n[PLAT_NSLOTS][PLAT_SLOT_ZONES], slot_rate[PLAT_NSLOTS][PLAT_SLOT_ZONES];
+static int slot_nz[PLAT_NSLOTS];
+static char slot_name[PLAT_NSLOTS][9];
+int plat_slot_zones(int k)
+{
+    if (k < 0 || k >= PLAT_NSLOTS)
         return 0;
-    *ns = slot_n[k];
-    *rate = slot_rate[k];
+    return slot_is_img[k] ? usr_nz[k] : slot_nz[k];
+}
+const uint8_t *plat_slot(int k, int z, uint32_t *ns, uint32_t *rate, char name[9])
+{
+    if (k >= 0 && k < PLAT_NSLOTS && slot_is_img[k]) {    /* plat_fm1.c's plat_slot, verbatim */
+        const smp_user_hdr_t *h;
+        uint32_t i;
+        if (z < 0 || z >= usr_nz[k])
+            return 0;
+        h = (const smp_user_hdr_t *)smp_user_xip((uint32_t)k);
+        for (i = 0; i < 8u; i++)
+            name[i] = h->name[i] >= 32 && h->name[i] < 127 ? h->name[i] : 0;
+        name[8] = 0;
+        *ns = h->zone[z].n;
+        *rate = (h->zone[z].rate * 44100u + 32768u) >> 16;
+        return smp_user_xip((uint32_t)k) + SMP_USER_DATA + h->zone[z].off;
+    }
+    if (k < 0 || k >= PLAT_NSLOTS || z < 0 || z >= slot_nz[k])
+        return 0;
+    *ns = slot_n[k][z];
+    *rate = slot_rate[k][z];
     memcpy(name, slot_name[k], 9);
-    return slot_data[k];
+    return slot_data[k][z];
 }
 
 static uint32_t cpu_pct;
@@ -399,11 +440,11 @@ static void ima_encode(const int16_t *x, uint32_t n, uint8_t *out)
     }
 }
 
-static int load_slot(int k, const char *path)
+static int load_slot(int k, int z, const char *path)
 {
     FILE *f = fopen(path, "rb");
     uint8_t h[12];
-    uint32_t rate = 44100, n = 0, i;
+    uint32_t rate = 44100, n = 0;
     uint16_t ch = 1, bits = 16;
     int16_t *x = 0;
     if (!f)
@@ -461,20 +502,14 @@ static int load_slot(int k, const char *path)
         return -1;
     if (n > 2u * (0x14000u - 512u))
         n = 2u * (0x14000u - 512u);                  /* an 80 KiB slot */
-    free(slot_data[k]);
-    slot_data[k] = calloc(1, (n + 1) / 2 + 1);
-    ima_encode(x, n, slot_data[k]);
-    slot_n[k] = n;
-    slot_rate[k] = rate;
-    {
-        const char *b = strrchr(path, '/');
-        b = b ? b + 1 : path;
-        for (i = 0; i < 8 && b[i] && b[i] != '.'; i++)
-            slot_name[k][i] = b[i];
-        slot_name[k][i] = 0;
-    }
+    free(slot_data[k][z]);
+    slot_data[k][z] = calloc(1, (n + 1) / 2 + 1);
+    ima_encode(x, n, slot_data[k][z]);
+    slot_n[k][z] = n;
+    slot_rate[k][z] = rate;
+    if (z + 1 > slot_nz[k])
+        slot_nz[k] = z + 1;
     free(x);
-    engine_brk_loops();
     return 0;
 }
 
@@ -527,6 +562,10 @@ static int expect(const char *what, const char *val)
         got = proj.sound.v[t][v][i];
     } else if (!strcmp(what, "mute"))
         got = (int)seq.mute;
+    else if (!strcmp(what, "loops"))
+        got = engine_brk_nslots();
+    else if (!strcmp(what, "loop_a"))
+        got = proj.pat[seq.cur].brk.slot_a;
     else {
         printf("FAIL unknown expect %s\n", what);
         return 1;
@@ -603,12 +642,46 @@ int main(int argc, char **argv)
             }
         } else if (!strcmp(cmd, "master"))
             master = (uint32_t)atoi(a);
-        else if (!strcmp(cmd, "slot")) {
-            if (load_slot(atoi(a), b)) {
-                printf("line %d: cannot load %s\n", lineno, b);
+        else if (!strcmp(cmd, "slot")) {                /* slot K NAME a.wav [b.wav ...]: one zone each */
+            char *tok, *rest = line + 4;
+            int k, z = 0;
+            strtok(rest, " \t\n");                          /* K */
+            k = atoi(a);
+            tok = strtok(0, " \t\n");                      /* NAME */
+            snprintf(slot_name[k], sizeof slot_name[k], "%s", tok ? tok : "");
+            slot_nz[k] = 0;
+            while ((tok = strtok(0, " \t\n")) && z < PLAT_SLOT_ZONES) {
+                if (load_slot(k, z++, tok)) {
+                    printf("line %d: cannot load %s\n", lineno, tok);
+                    return 2;
+                }
+            }
+            engine_brk_loops();
+        } else if (!strcmp(cmd, "slotimg")) {          /* slotimg K FILE.hdr FILE.bin: as uploaded */
+            int k = atoi(a);
+            FILE *fh = fopen(b, "rb"), *fd = fopen(c, "rb");
+            size_t nh, nd;
+            if (!fh || !fd || k < 0 || k > 2) {
+                printf("line %d: cannot read the slot image\n", lineno);
                 return 2;
             }
-            proj.pat[seq.cur].brk.set[BRK_ALEN] = (uint8_t)(c[0] ? atoi(c) : 2);
+            memset(slot_img[k], 0xFF, sizeof slot_img[k]);       /* erased flash */
+            nh = fread(slot_img[k], 1, sizeof(smp_user_hdr_t), fh);   /* SMP_END writes the header, */
+            nd = fread(slot_img[k] + SMP_USER_DATA, 1, sizeof slot_img[k] - SMP_USER_DATA, fd);   /* SMP_WRITE the data */
+            fclose(fh);
+            fclose(fd);
+            (void)nh;
+            {
+                const smp_user_hdr_t *h = (const smp_user_hdr_t *)slot_img[k];
+                if (st_crc32(slot_img[k] + SMP_USER_DATA, h->data_len) != h->crc || nd < h->data_len) {
+                    printf("line %d: slot image CRC mismatch (the device would refuse it)\n", lineno);
+                    return 2;
+                }
+            }
+            slot_is_img[k] = 1;
+            smp_user_scan((uint32_t)k);
+            printf("  slot %d: %d zone(s) from the image\n", k, usr_nz[k]);
+            engine_brk_loops();
         } else if (!strcmp(cmd, "midi")) {
             uint32_t s = (uint32_t)strtoul(a, 0, 16), d1 = (uint32_t)strtoul(b, 0, 16), d2 = (uint32_t)strtoul(c, 0, 16);
             uint32_t cin = s >= 0xF0 ? 0x0F : s >> 4;

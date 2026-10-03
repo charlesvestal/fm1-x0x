@@ -61,7 +61,7 @@ enum { BRK_COMPLEX, BRK_ANCHOR, BRK_ROLL, BRK_FILL, BRK_R2, BRK_R3, BRK_R4, BRK_
 typedef struct {
     uint32_t steps;                   /* bit s = the break may sound on 16th s of the bar */
     uint8_t set[BRK_NSET];            /* breaks.h param values, in BRK_* order */
-    uint8_t slot_a, slot_b;           /* sample slot of loop A / B (0 = built-in) */
+    uint8_t slot_a, slot_b;           /* loop A / B: the built-in bank, then the user slots (engine_brk_slot_names) */
     uint8_t rsv[2];
 } brkpart_t;
 

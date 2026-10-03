@@ -55,6 +55,8 @@ if [ -f build/x0x.fwsc ]; then
 else
     echo "  skip update-path tests (no build/x0x.fwsc: run ./build.sh)"
 fi
+run upload-images sh -c "python3 tests/host/make_test_loops.py build/test_loops && \
+    python3 tools/upload_breaks.py --dry-run build/test_upload build/test_loops/loop*.wav"
 run host-build sh host/build_host.sh
 for s in tests/scenarios/*.x0x; do
     n=$(basename "$s" .x0x)

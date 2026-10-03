@@ -2,7 +2,7 @@
 
 Standalone groovebox firmware for the M-VAVE FM-1: a **TR-909**, a **TR-808**, **two TB-303s**
 with **TB-3PO** acid generators, and a **breakbeat generator**, with 16 patterns, shared
-reverb / tape delay sends and a master section with drive, glue compression, a sweepable
+reverb / tape delay sends on every part and a master section with drive, glue compression, a sweepable
 filter and a limiter.
 
 X0X is a fork of [Felucca](https://github.com/hugelton/Felucca) by Leo Kuroshita (Hügelton
@@ -62,10 +62,37 @@ optionally the sequence (GLO page).
 
 ## Breaks
 
-Break loops are your own samples: `tools/fm1_sample_upload.py load SLOT NAME loop.wav`
-puts a loop in one of the three flash slots (about 7 s each); LOOPS on the BREAK pages
-picks the slot for A and B. The built-in loop is played by X0X's own 909 at build time.
-X0X ships no commercial breaks.
+The firmware ships **no recorded breaks**. Its two built-in loops (909 GR, 909 FL) are played
+by X0X's own 909 when the firmware is built.
+
+Your breaks go in the FM-1's three sample slots, about 7 s of audio each, packed several to a
+slot (one bar of a break is ~20 KB):
+
+```
+tools/upload_breaks.py --bars amen.wav think.wav ...    # cut one bar of each, pack, upload
+tools/upload_breaks.py --bbgen                          # BB Gen's classic breaks, from ../schwung-breakbeat
+tools/upload_breaks.py --dry-run OUTDIR ...             # build the slot images, no device
+```
+
+They appear after the built-in loops in LOOP A / LOOP B as BR1.1, BR1.2, ... BR2.1 (the tool
+prints which is which).
+
+Opt-in at build time, a bank of one-bar WAVs can replace the 909 loops inside the firmware:
+
+```
+tools/import_breaks.py            # one bar of each of BB Gen's classics -> build/breaks/
+X0X_BREAK_BANK=build/breaks ./build.sh
+```
+
+Recorded breaks are other people's recordings, not covered by this project's licence; whether
+a firmware built with them may be passed on is up to whoever builds it.
+
+## Effect sends
+
+One reverb and one delay (9W9's digital delay, or TAPE: wow, flutter, saturation in the
+feedback loop), shared by every part. Each part has a reverb send and a delay send. FX opens
+on the send pages (909 / 808, the two 303s, the break with the delay type and time). The
+drum machines also keep 9W9's and 8W8's per-voice sends on each voice's own pages.
 
 ## Building and testing
 

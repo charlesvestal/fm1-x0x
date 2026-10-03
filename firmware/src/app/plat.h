@@ -43,8 +43,11 @@ enum { OBJ_SET, OBJ_SOUND, OBJ_PAT0, OBJ_PAT1, OBJ_PANEL, OBJ_NOBJ };
 
 /* user sample slots (break loops), read in place; 0 = empty slot */
 #define PLAT_NSLOTS 3
-/* slot k's first zone: IMA ADPCM from predictor 0 / index 0, *nsamples, *rate in Hz */
-const uint8_t *plat_slot(int k, uint32_t *nsamples, uint32_t *rate, char name[9]);
+/* every zone of a slot is one loop (tools/upload_breaks.py packs several bars per slot) */
+#define PLAT_SLOT_ZONES 16
+int plat_slot_zones(int k);            /* loops in slot k, 0 = empty */
+/* slot k, zone z: IMA ADPCM from predictor 0 / index 0, *nsamples, *rate in Hz; name = the slot's */
+const uint8_t *plat_slot(int k, int z, uint32_t *nsamples, uint32_t *rate, char name[9]);
 
 /* audio load in % of the render budget, and xruns since boot (device: from the ISR) */
 uint32_t plat_cpu_pct(void);

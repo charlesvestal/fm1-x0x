@@ -10,7 +10,7 @@
  *   T_303           voice = 0 / 1 (303 A / B)
  *   T_BRK           voice 0: breaks.h params (the per-pattern ones live in the pattern)
  *   T_FX            voice 0: fxbus.h params (reverb, delay, master drive / comp)
- *   T_MIX           voice = part 0..4: Level, Rev, Dly (drums: Level only — their sends are per voice)
+ *   T_MIX           voice = part 0..4: Level, Rev send, Dly send (drums: on top of the per-voice sends)
  *   T_MST           voice 0: master filter + limiter
  */
 #pragma once
@@ -54,3 +54,5 @@ void engine_bass_off(int part);
 void engine_brk_live(int key, int down);
 void engine_brk_loops(void);                                /* (re)read the A / B loops of the current pattern */
 int engine_brk_slice(void);                                 /* slice sounding now, -1 none (UI) */
+int engine_brk_nslots(void);                                /* built-in loops + user slots */
+const char *const *engine_brk_slot_names(void);

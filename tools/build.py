@@ -95,7 +95,7 @@ def tc_all(*cmds):
 
 
 def generate():
-    """generated headers: the font (Felucca's), the 909's samples and tables, the built-in break"""
+    """generated headers: the font (Felucca's), the 909's samples and tables, the break bank"""
     GEN.mkdir(parents=True, exist_ok=True)
     tools = SRC / "tools"
     cmds = [[tools / "gen_font.py", GEN / "felucca_font.h"],
@@ -109,13 +109,16 @@ def generate():
             failed.append(c[0].name)
     if failed:
         raise SystemExit(f"build: {', '.join(failed)} failed")
-    gb = SRC / "tools" / "gen_builtin_break.sh"
-    if gb.exists():                                 # renders a loop with the 909 port on the host
-        r = subprocess.run(["sh", str(gb), str(GEN)], capture_output=True, text=True)
-        sys.stdout.write(r.stdout)
-        if r.returncode:
-            sys.stderr.write(r.stderr)
-            raise SystemExit("build: gen_builtin_break failed")
+    # the BREAK part's built-in bank: the 909-rendered loops (no recordings), or, opt-in,
+    # one-bar WAVs from X0X_BREAK_BANK (made by tools/import_breaks.py; not in this tree)
+    bank = os.environ.get("X0X_BREAK_BANK")
+    cmd = ([sys.executable, str(tools / "gen_break_bank.py"), bank, str(GEN / "x0x_break_bank.h")] if bank
+           else ["sh", str(tools / "gen_builtin_break.sh"), str(GEN)])
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    sys.stdout.write(r.stdout)
+    if r.returncode:
+        sys.stderr.write(r.stderr)
+        raise SystemExit("build: break bank failed")
 
 
 # ---- update loader
