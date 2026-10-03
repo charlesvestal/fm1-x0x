@@ -29,6 +29,10 @@
 #include <string.h>
 #include <stdint.h>
 #include <math.h>
+#ifdef __APPLE__
+#include <libproc.h>
+#include <unistd.h>
+#endif
 #define __attribute__(x)
 
 /* ------------------------------------------------------------ screen --- */
@@ -309,6 +313,18 @@ static void wav_close(void)
 static double audio_due_ms;
 static uint32_t ui_due;
 static double render_ns_total, render_budget_ns_total;
+/* instructions the kernel counted in engine_render (Felucca's tests/regress.c measure: the same
+ * on every run, unlike wall time): per sample overall, and the worst block */
+static uint64_t ins_total, ins_frames, ins_block_max;
+static uint64_t instr_now(void)
+{
+#ifdef __APPLE__
+    struct rusage_info_v4 ri;
+    if (!proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t *)&ri))
+        return ri.ri_instructions;
+#endif
+    return 0;
+}
 
 #include <time.h>
 static double now_ns(void)
@@ -343,8 +359,16 @@ static void run_ms(uint32_t ms)
         while (audio_due_ms <= (double)now_ms) {      /* 256-frame half buffers, as the I2S DMA */
             double t0 = now_ns(), dt;
             uint32_t k;
+            uint64_t i0 = instr_now(), di;
             engine_render(blk, 256);
+            di = instr_now() - i0;
             dt = now_ns() - t0;
+            if (seq.playing) {                           /* the cost that matters: while it plays */
+                ins_total += di;
+                ins_frames += 256;
+                if (di > ins_block_max)
+                    ins_block_max = di;
+            }
             render_ns_total += dt;
             render_budget_ns_total += 256.0 * 1e9 / 44100.0;
             cpu_pct = (uint32_t)(100.0 * dt / (256.0 * 1e9 / 44100.0));
@@ -776,5 +800,8 @@ int main(int argc, char **argv)
     printf("host: %u ms simulated, %u blits, render %.1f%% of real time (host CPU)%s\n", now_ms, blits,
            render_budget_ns_total > 0 ? 100.0 * render_ns_total / render_budget_ns_total : 0.0,
            fails ? ", EXPECTATIONS FAILED" : "");
+    if (ins_frames && ins_total)
+        printf("host: playing, %.0f instructions / sample (mean), %.0f in the worst block\n",
+               (double)ins_total / (double)ins_frames, (double)ins_block_max / 256.0);
     return fails ? 1 : 0;
 }
