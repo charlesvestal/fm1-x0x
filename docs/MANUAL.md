@@ -1,7 +1,8 @@
 # X0X for the M-VAVE FM-1 — Manual
 
 Firmware version 0.1. This manual covers everything on the instrument. Commands you type on
-a computer are shown `like this`.
+a computer are shown `like this`. The panel pictures are drawings; the screens are the
+firmware's own, captured in the simulator.
 
 **Status.** X0X has been built and tested on a computer, in a simulator that runs the same
 code as the instrument. It has not yet been run on an FM-1. Read "Installing" before you
@@ -70,13 +71,9 @@ Installing any third-party firmware is at your own risk.
 
 ## 3. The panel
 
-```
- MASTER  SELECT            screen            KNOB1  KNOB2  KNOB3  KNOB4
- PRESETS ALGORITHM                           FX  SEL  ENV  LFO  EDIT  GLO
- OCT-  OCT+                                  HOME SAVE ARP SEQ  PLAY  REC
-               [ 11 black keys ]
-               [ 16 white keys ]
-```
+![The FM-1's front panel (a drawing), with X0X on the screen](img/fm1-panel.svg)
+
+![The keys in X0X: the 11 black keys and the 16 white keys](img/fm1-keys.svg)
 
 | Control | Use |
 |---|---|
@@ -131,6 +128,9 @@ small squares instead of a ring.
 When you turn a knob, its cell lights up and the value is shown large across the middle of
 the screen for about a second.
 
+![The 909 screen: the top line, the step grid, the four knobs](img/screen-909.png)
+![Turning a knob: the value, large](img/screen-readout.png)
+
 ---
 
 ## 5. Getting around
@@ -153,6 +153,9 @@ list.
 
 **Questions.** Anything that would lose notes asks first, across the screen. SEL answers
 yes, HOME answers no.
+
+![A list (SEL)](img/screen-list.png)
+![A question](img/screen-ask.png)
 
 ---
 
@@ -213,6 +216,8 @@ The screen shows the line: each step's note as a bar, higher notes higher, with 
 the octaves of the root. Below it, the accent row (AC) and the slide row (SL), then the
 scale and the TB-3PO seed.
 
+![303A: the line, the accents and slides](img/screen-303.png)
+
 **Steps.** With the keys on steps (the normal state), the white keys are the 16 steps.
 
 - Tap a white key to turn its step on or off.
@@ -239,6 +244,8 @@ another is held slides between them. Press SEQ again to go back to steps.
 ## 8. TB-3PO
 
 TB-3PO writes 303 lines for you. Choose 303A or 303B and press ARP.
+
+![TB-3PO](img/screen-tb3po.png)
 
 - **OCT+** writes a new line from a new seed. The top line shows the seed.
 - **OCT-** mutates the line: about a quarter of the steps change.
@@ -267,6 +274,8 @@ Turn ALGORITHM to BREAK.
 The screen shows loop A's waveform, cut into its eight slices. The slice that is playing is
 lit. Below: the steps the break plays on, the loops in use, and what the generator is doing
 (PLAYING A or B, RETRIG).
+
+![The break: loop A in eight slices, slice 5 playing](img/screen-break.png)
 
 **Steps.** The white keys turn the break on or off on each of the 16 steps of the bar. With
 all of them on, the break plays all the time.
@@ -320,6 +329,8 @@ comes round.
 
 **Swing** delays every second 16th note. 50% is straight, 75% is the most.
 
+![HOME](img/screen-home.png)
+
 **HOME** shows the 16 patterns along the top (the playing one white, patterns with notes
 grey), the five parts with their steps, and the playheads. The knobs are TEMPO, SWING,
 PUMP and CUTOFF, the four you most often reach for while playing. Black keys 1 to 5 mute
@@ -371,12 +382,16 @@ whole mix.
 The FX screen shows every part's sends, the delay time and type, the feedback and the
 reverb decay.
 
+![FX](img/screen-fx.png)
+
 ---
 
 ## 13. Master
 
 Press LFO for the MIX screen: a level strip and meter for each part, and the compressor's
 gain reduction (GR, in red).
+
+![MIX, with the compressor and PUMP working](img/screen-mix.png)
 
 **Levels.** LEVEL for each part. 0 dB is unity.
 
@@ -408,6 +423,8 @@ CUTOFF is also on HOME.
 
 Press GLO. Turn SELECT to move, ALGORITHM to change, SEL to run an action, HOME or GLO to
 leave.
+
+![GLOBAL](img/screen-global.png)
 
 | Setting | |
 |---|---|

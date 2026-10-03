@@ -59,6 +59,14 @@ td:first-child { white-space: nowrap; }
 .status p { margin: 0; }
 .swatch { display: inline-block; width: .7em; height: .7em; border-radius: 3px; margin-right: .4em; vertical-align: .02em; box-shadow: 0 0 0 1px var(--swatch-ring); }
 nav.contents ol { columns: 2 14rem; column-gap: 2rem; padding-left: 1.3rem; }
+.figs { display: flex; flex-wrap: wrap; gap: 20px; margin: .4rem 0 1.6rem; }
+figure { margin: 0; flex: 0 1 auto; }
+figure img { display: block; max-width: 100%; height: auto; border-radius: 10px; }
+figure.shot img { width: 300px; image-rendering: pixelated; box-shadow: 0 0 0 1px var(--rule); }
+figure.wide { flex-basis: 100%; }
+figure.wide img { width: 100%; }
+figcaption { color: var(--muted); font-size: .88rem; margin-top: .4rem; max-width: 300px; }
+figure.wide figcaption { max-width: none; }
 nav.contents li { break-inside: avoid; }
 @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
 </style>
@@ -66,7 +74,7 @@ nav.contents li { break-inside: avoid; }
 <body>
 <main>
 <h1>X0X for the M-VAVE FM-1 — Manual</h1>
-<p class="lede">Firmware version 0.1. This manual covers everything on the instrument. Commands you type on a computer are shown <code>like this</code>.</p>
+<p class="lede">Firmware version 0.1. This manual covers everything on the instrument. Commands you type on a computer are shown <code>like this</code>. The panel pictures are drawings; the screens are the firmware's own, captured in the simulator.</p>
 <div class="status"><p><strong>Status.</strong> X0X has been built and tested on a computer, in a simulator that runs the same code as the instrument. It has not yet been run on an FM-1. Read "Installing" before you install it.</p></div>
 <hr>
 <nav class="contents" aria-label="Contents"><h2 id="contents">Contents</h2>
@@ -86,11 +94,7 @@ nav.contents li { break-inside: avoid; }
 <p>Installing any third-party firmware is at your own risk.</p>
 <hr>
 <h2 id="s3"><span class="num">3</span>The panel</h2>
-<pre><code> MASTER  SELECT            screen            KNOB1  KNOB2  KNOB3  KNOB4
- PRESETS ALGORITHM                           FX  SEL  ENV  LFO  EDIT  GLO
- OCT-  OCT+                                  HOME SAVE ARP SEQ  PLAY  REC
-               [ 11 black keys ]
-               [ 16 white keys ]</code></pre>
+<div class="figs"><figure class="wide"><img src="img/fm1-panel.svg" alt="The FM-1&#x27;s front panel (a drawing), with X0X on the screen" loading="lazy"><figcaption>The FM-1's front panel (a drawing), with X0X on the screen</figcaption></figure><figure class="wide"><img src="img/fm1-keys.svg" alt="The keys in X0X: the 11 black keys and the 16 white keys" loading="lazy"><figcaption>The keys in X0X: the 11 black keys and the 16 white keys</figcaption></figure></div>
 <div class="table"><table><thead><tr><th>Control</th><th>Use</th></tr></thead><tbody><tr><td>MASTER</td><td>Volume.</td></tr><tr><td>SELECT</td><td>Move: to the next or previous page of knobs, or up and down a list. Hold HOME and turn SELECT to change the tempo.</td></tr><tr><td>ALGORITHM</td><td>Choose the part: 909, 808, 303A, 303B, BREAK. In a list, it changes the highlighted value.</td></tr><tr><td>PRESETS</td><td>Choose the next pattern. It starts at the end of the bar.</td></tr><tr><td>KNOB 1 to 4</td><td>Change the four values shown at the bottom of the screen.</td></tr><tr><td>SEL</td><td>Open the list of everything on the current screen. In a list, run the highlighted action. In a question, answer yes.</td></tr><tr><td>HOME</td><td>The HOME screen. From a list or a question, go back.</td></tr><tr><td>EDIT</td><td>The part's own screen. Press again for its next page of knobs.</td></tr><tr><td>ARP</td><td>TB-3PO, the bass line generator (303A and 303B only).</td></tr><tr><td>FX</td><td>Effects: sends, reverb, delay.</td></tr><tr><td>LFO</td><td>MIX: levels, the compressor, the filter.</td></tr><tr><td>GLO</td><td>Global settings.</td></tr><tr><td>SEQ</td><td>On a 303: switch the keys between steps and keyboard.</td></tr><tr><td>PLAY</td><td>Start and stop.</td></tr><tr><td>REC</td><td>Record on and off.</td></tr><tr><td>SAVE</td><td>Save everything.</td></tr><tr><td>ENV, LFO</td><td>Held, they change what the keys do (accent, slide).</td></tr><tr><td>OCT-, OCT+</td><td>Steps 1 to 16 or 17 to 32. On a 303 keyboard: octave. In TB-3PO: mutate and new line.</td></tr><tr><td>White keys</td><td>Steps. On HOME: patterns.</td></tr><tr><td>Black keys</td><td>The drum machine's 11 tracks, or the break's slice pads. On HOME: mutes.</td></tr></tbody></table></div>
 <p>The second button is printed SEL. (Felucca calls it SCL.)</p>
 <hr>
@@ -102,6 +106,7 @@ nav.contents li { break-inside: avoid; }
 <p><strong>The middle</strong> shows the part or screen you are on.</p>
 <p><strong>The bottom</strong> shows four knobs: the name of each value, a ring showing its position, and the value. They always match KNOB 1 to 4. A value with a fixed set of choices shows a row of small squares instead of a ring.</p>
 <p>When you turn a knob, its cell lights up and the value is shown large across the middle of the screen for about a second.</p>
+<div class="figs"><figure class="shot"><img src="img/screen-909.png" alt="The 909 screen: the top line, the step grid, the four knobs" loading="lazy"><figcaption>The 909 screen: the top line, the step grid, the four knobs</figcaption></figure><figure class="shot"><img src="img/screen-readout.png" alt="Turning a knob: the value, large" loading="lazy"><figcaption>Turning a knob: the value, large</figcaption></figure></div>
 <hr>
 <h2 id="s5"><span class="num">5</span>Getting around</h2>
 <p>The same controls do the same things on every screen:</p>
@@ -109,6 +114,7 @@ nav.contents li { break-inside: avoid; }
 <p><strong>Pages.</strong> Each screen has a few pages of four values. Turn SELECT, or press the screen's button again (EDIT, FX, LFO, ARP), to go to the next page.</p>
 <p><strong>Lists.</strong> Press SEL to see every value of the current screen as a list. Turn SELECT to move, turn ALGORITHM to change the highlighted value. Values with a bar under them are continuous; a return arrow on the right marks an action, which SEL runs. HOME closes the list.</p>
 <p><strong>Questions.</strong> Anything that would lose notes asks first, across the screen. SEL answers yes, HOME answers no.</p>
+<div class="figs"><figure class="shot"><img src="img/screen-list.png" alt="A list (SEL)" loading="lazy"><figcaption>A list (SEL)</figcaption></figure><figure class="shot"><img src="img/screen-ask.png" alt="A question" loading="lazy"><figcaption>A question</figcaption></figure></div>
 <hr>
 <h2 id="s6"><span class="num">6</span>The 909 and the 808</h2>
 <p>Turn ALGORITHM to 909 or 808.</p>
@@ -126,6 +132,7 @@ nav.contents li { break-inside: avoid; }
 <h2 id="s7"><span class="num">7</span>The two 303s</h2>
 <p>Turn ALGORITHM to 303A or 303B. The two are the same; each has its own sound and line.</p>
 <p>The screen shows the line: each step's note as a bar, higher notes higher, with lines at the octaves of the root. Below it, the accent row (AC) and the slide row (SL), then the scale and the TB-3PO seed.</p>
+<div class="figs"><figure class="shot"><img src="img/screen-303.png" alt="303A: the line, the accents and slides" loading="lazy"><figcaption>303A: the line, the accents and slides</figcaption></figure></div>
 <p><strong>Steps.</strong> With the keys on steps (the normal state), the white keys are the 16 steps.</p>
 <ul><li>Tap a white key to turn its step on or off.</li><li>Hold a white key and turn the knobs to edit that step: KNOB 1 note, KNOB 2 gate (REST, NOTE or TIE), KNOB 3 accent, KNOB 4 slide. You hear the note as you hold it.</li></ul>
 <p>A <strong>tie</strong> holds the previous note through the step. A <strong>slide</strong> glides from this step's note into the next one. An <strong>accent</strong> plays the note louder and brighter.</p>
@@ -135,6 +142,7 @@ nav.contents li { break-inside: avoid; }
 <hr>
 <h2 id="s8"><span class="num">8</span>TB-3PO</h2>
 <p>TB-3PO writes 303 lines for you. Choose 303A or 303B and press ARP.</p>
+<div class="figs"><figure class="shot"><img src="img/screen-tb3po.png" alt="TB-3PO" loading="lazy"><figcaption>TB-3PO</figcaption></figure></div>
 <ul><li><strong>OCT+</strong> writes a new line from a new seed. The top line shows the seed.</li><li><strong>OCT-</strong> mutates the line: about a quarter of the steps change.</li></ul>
 <p>Pages:</p>
 <ul><li>GENERATE: DENS (how many steps play), ACCENT (how many are accented), SLIDE (how many slide), OCTS (1 to 3 octaves).</li><li>SCALE: ROOT, SCALE (minor, Phrygian, harmonic minor, minor pentatonic, Dorian, major), OCTAVE (where the line sits), MUTATE (mutate on its own every 1 to 16 bars, or OFF).</li><li>LINE: the same as the 303's LINE page.</li></ul>
@@ -144,6 +152,7 @@ nav.contents li { break-inside: avoid; }
 <h2 id="s9"><span class="num">9</span>The break</h2>
 <p>Turn ALGORITHM to BREAK.</p>
 <p>The screen shows loop A's waveform, cut into its eight slices. The slice that is playing is lit. Below: the steps the break plays on, the loops in use, and what the generator is doing (PLAYING A or B, RETRIG).</p>
+<div class="figs"><figure class="shot"><img src="img/screen-break.png" alt="The break: loop A in eight slices, slice 5 playing" loading="lazy"><figcaption>The break: loop A in eight slices, slice 5 playing</figcaption></figure></div>
 <p><strong>Steps.</strong> The white keys turn the break on or off on each of the 16 steps of the bar. With all of them on, the break plays all the time.</p>
 <p><strong>Playing.</strong> Hold black keys 1 to 8 to play slices 1 to 8 yourself; the generator takes over again when you let go. Hold 9 to play backwards, 10 at half speed, 11 to stutter.</p>
 <p><strong>How it plays.</strong> Each time a slice is due, the generator chooses which one:</p>
@@ -160,6 +169,7 @@ nav.contents li { break-inside: avoid; }
 <p><strong>Clearing.</strong> Hold SAVE and press REC: the current part is cleared in this pattern (you are asked first). GLO &gt; CLEAR PATTERN clears all five parts.</p>
 <p><strong>Lengths.</strong> Each part has its own length, so parts of different lengths go in and out of step with each other. The 909's length sets the bar: a new pattern starts when the 909 comes round.</p>
 <p><strong>Swing</strong> delays every second 16th note. 50% is straight, 75% is the most.</p>
+<div class="figs"><figure class="shot"><img src="img/screen-home.png" alt="HOME" loading="lazy"><figcaption>HOME</figcaption></figure></div>
 <p><strong>HOME</strong> shows the 16 patterns along the top (the playing one white, patterns with notes grey), the five parts with their steps, and the playheads. The knobs are TEMPO, SWING, PUMP and CUTOFF, the four you most often reach for while playing. Black keys 1 to 5 mute and unmute the five parts; the lit ones are playing. Mutes are not saved.</p>
 <hr>
 <h2 id="s11"><span class="num">11</span>Recording</h2>
@@ -178,9 +188,11 @@ nav.contents li { break-inside: avoid; }
 <p><strong>Tape.</strong> TYPE switches the delay between DIGI, a clean digital delay with 12-bit grain, and TAPE, which wobbles and saturates its repeats and can run into self-oscillation at high feedback. WEAR sets how worn the tape is. HPF keeps low end out of the delay.</p>
 <p><strong>Kit drive.</strong> VOLUME, DIST, DRIVE and COMP: the 909's own drive and glue compressor, on the whole mix.</p>
 <p>The FX screen shows every part's sends, the delay time and type, the feedback and the reverb decay.</p>
+<div class="figs"><figure class="shot"><img src="img/screen-fx.png" alt="FX" loading="lazy"><figcaption>FX</figcaption></figure></div>
 <hr>
 <h2 id="s13"><span class="num">13</span>Master</h2>
 <p>Press LFO for the MIX screen: a level strip and meter for each part, and the compressor's gain reduction (GR, in red).</p>
+<div class="figs"><figure class="shot"><img src="img/screen-mix.png" alt="MIX, with the compressor and PUMP working" loading="lazy"><figcaption>MIX, with the compressor and PUMP working</figcaption></figure></div>
 <p><strong>Levels.</strong> LEVEL for each part. 0 dB is unity.</p>
 <p><strong>Compressor.</strong></p>
 <div class="table"><table><thead><tr><th>Value</th><th>Range</th></tr></thead><tbody><tr><td>THRESH</td><td>-48 to 0 dB</td></tr><tr><td>RATIO</td><td>1:1 (off) to 20:1, and INF</td></tr><tr><td>ATTACK</td><td>0.1 to 100 ms</td></tr><tr><td>RELEASE</td><td>10 to 1500 ms</td></tr><tr><td>MAKEUP</td><td>0 to 24 dB</td></tr><tr><td>MIX</td><td>dry to compressed (for parallel compression)</td></tr></tbody></table></div>
@@ -191,6 +203,7 @@ nav.contents li { break-inside: avoid; }
 <hr>
 <h2 id="s14"><span class="num">14</span>Global settings and saving</h2>
 <p>Press GLO. Turn SELECT to move, ALGORITHM to change, SEL to run an action, HOME or GLO to leave.</p>
+<div class="figs"><figure class="shot"><img src="img/screen-global.png" alt="GLOBAL" loading="lazy"><figcaption>GLOBAL</figcaption></figure></div>
 <div class="table"><table><thead><tr><th>Setting</th><th></th></tr></thead><tbody><tr><td>CLOCK OUT</td><td>Send MIDI clock and start/stop when X0X runs on its own tempo.</td></tr><tr><td>NOTES OUT</td><td>Send the patterns as MIDI notes.</td></tr><tr><td>KEY LIGHTS</td><td>Show steps on the key lights.</td></tr><tr><td>THEME</td><td>The colour of values and highlights: green, amber, cyan, red, mono.</td></tr><tr><td>ACCENT</td><td>How loud an unaccented drum hit is, compared with an accented one.</td></tr><tr><td>SAVE PROJECT</td><td>Save.</td></tr><tr><td>CLEAR PATTERN</td><td>Clear the current pattern (asks first).</td></tr><tr><td>FACTORY RESET</td><td>Put back the factory sounds and patterns (asks first; your saved project stays saved until you save again).</td></tr><tr><td>ABOUT X0X</td><td>The version and the audio load.</td></tr></tbody></table></div>
 <p><strong>Saving.</strong> Press SAVE (or GLO &gt; SAVE PROJECT) to save the sounds, the 16 patterns, the tempo and the settings. They come back at power on. Changes that are not saved are lost when the FM-1 is switched off; the grey dot on the top line reminds you.</p>
 <hr>

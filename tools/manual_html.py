@@ -9,6 +9,7 @@ add their own); the default is a complete document that opens in any browser.
 
 Handles what the manual uses: headings, paragraphs, **bold**, `code`, lists, tables, fenced
 code, rules, and the contents list (linked to the sections by number)."""
+import base64
 import html
 import re
 import sys
@@ -68,6 +69,14 @@ td:first-child { white-space: nowrap; }
 .status p { margin: 0; }
 .swatch { display: inline-block; width: .7em; height: .7em; border-radius: 3px; margin-right: .4em; vertical-align: .02em; box-shadow: 0 0 0 1px var(--swatch-ring); }
 nav.contents ol { columns: 2 14rem; column-gap: 2rem; padding-left: 1.3rem; }
+.figs { display: flex; flex-wrap: wrap; gap: 20px; margin: .4rem 0 1.6rem; }
+figure { margin: 0; flex: 0 1 auto; }
+figure img { display: block; max-width: 100%; height: auto; border-radius: 10px; }
+figure.shot img { width: 300px; image-rendering: pixelated; box-shadow: 0 0 0 1px var(--rule); }
+figure.wide { flex-basis: 100%; }
+figure.wide img { width: 100%; }
+figcaption { color: var(--muted); font-size: .88rem; margin-top: .4rem; max-width: 300px; }
+figure.wide figcaption { max-width: none; }
 nav.contents li { break-inside: avoid; }
 @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
 """
@@ -87,6 +96,22 @@ def slug(title):
     return f"s{m.group(1)}" if m else re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")
 
 
+IMG_BASE = SRC / "docs"
+EMBED = False                                         # --fragment: images as data URIs
+
+
+def figure(caption, src):
+    path = IMG_BASE / src
+    if EMBED:
+        mime = "image/svg+xml" if src.endswith(".svg") else "image/png"
+        url = f"data:{mime};base64," + base64.b64encode(path.read_bytes()).decode()
+    else:
+        url = src
+    cls = "wide" if src.endswith(".svg") else "shot"
+    return (f'<figure class="{cls}"><img src="{url}" alt="{html.escape(caption)}" loading="lazy">'
+            f"<figcaption>{inline(caption)}</figcaption></figure>")
+
+
 def convert(md):
     lines = md.splitlines()
     out, i, contents, sections = [], 0, None, {}
@@ -102,6 +127,16 @@ def convert(md):
                 j += 1
             out.append("<pre><code>" + html.escape("\n".join(lines[i + 1:j]), quote=False) + "</code></pre>")
             i = j + 1
+            continue
+        if ln.startswith("!["):                      # consecutive image lines: one row of figures
+            figs = []
+            while i < len(lines) and (lines[i].startswith("![") or (not lines[i].strip() and i + 1 < len(lines)
+                                                                    and lines[i + 1].startswith("!["))):
+                m = re.match(r"!\[(.*)\]\((.*)\)", lines[i])
+                if m:
+                    figs.append(figure(m.group(1), m.group(2)))
+                i += 1
+            out.append('<div class="figs">' + "".join(figs) + "</div>")
             continue
         if ln.startswith("# "):
             out.append(f"<h1>{inline(ln[2:])}</h1>")
@@ -150,7 +185,7 @@ def convert(md):
             continue
         elif ln.strip():
             para = [ln]
-            while i + 1 < len(lines) and lines[i + 1].strip() and not re.match(r"(#|\||```|---|\d+\. |- )", lines[i + 1]):
+            while i + 1 < len(lines) and lines[i + 1].strip() and not re.match(r"(#|\||```|---|\d+\. |- |!\[)", lines[i + 1]):
                 i += 1
                 para.append(lines[i])
             text = inline(" ".join(p.strip() for p in para))
@@ -166,7 +201,9 @@ def convert(md):
 
 def main():
     args = [a for a in sys.argv[1:] if a != "--fragment"]
+    global EMBED
     fragment = "--fragment" in sys.argv
+    EMBED = fragment
     src = Path(args[0]) if args else SRC / "docs" / "MANUAL.md"
     dst = Path(args[1]) if len(args) > 1 else SRC / "docs" / "manual.html"
     body = convert(src.read_text())
