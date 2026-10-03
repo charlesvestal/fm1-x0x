@@ -1118,6 +1118,64 @@ static uint16_t part_col(void) { return PART_COL[ui.part]; }
 static uint16_t dim(uint16_t c, int t) { return blend(C_BLACK, c, t); }
 
 static int32_t tw(const felucca_font_t *f, const char *s) { return text_w(f, s); }
+
+/* a font's capital line: the first and last rows of 'H' (rounded half coverage), measured
+ * once from the glyph bitmap, so text is centred on what the eye sees rather than on the
+ * font's cell (which differs per face and size) */
+typedef struct { const felucca_font_t *f; int8_t top, bot; } capm_t;
+static capm_t capm[6];
+static const capm_t *caps(const felucca_font_t *f)
+{
+    int i;
+    for (i = 0; i < 6 && capm[i].f; i++)
+        if (capm[i].f == f)
+            return &capm[i];
+    if (i == 6)
+        i = 5;
+    {
+        uint32_t gi = 'H' - f->first, w = f->bw[gi], bpr = (w + 1u) / 2u, x, y;
+        const uint8_t *gd = f->data + f->off[gi];
+        int top = -1, bot = 0;
+        for (y = 0; y < f->h; y++)
+            for (x = 0; x < w; x++) {
+                uint32_t a = gd[y * bpr + x / 2u];
+                a = (x & 1u) ? (a & 15u) : (a >> 4);
+                if (a >= 8u) {
+                    if (top < 0)
+                        top = (int)y;
+                    bot = (int)y;
+                }
+            }
+        capm[i].f = f;
+        capm[i].top = (int8_t)(top < 0 ? 0 : top);
+        capm[i].bot = (int8_t)bot;
+    }
+    return &capm[i];
+}
+/* parts of a line ("A 909 GR", "B 909 FL") with a real gap between them: a proportional face's
+ * space is too narrow to separate them. A NULL ends the list. */
+static int32_t segs(int32_t x, int32_t y, const felucca_font_t *f, uint16_t c, int32_t gap, const char *a,
+                    const char *b, const char *d, const char *e)
+{
+    const char *p[4] = {a, b, d, e};
+    int i;
+    for (i = 0; i < 4 && p[i]; i++)
+        x = cv_text(x, y, f, p[i], c) + gap;
+    return x;
+}
+
+/* the y to draw f at so its capitals sit centred in [y0, y0 + h) */
+static int32_t vc(const felucca_font_t *f, int32_t y0, int32_t h)
+{
+    const capm_t *m = caps(f);
+    int32_t ch = m->bot - m->top + 1;
+    return y0 + (h - ch + 1) / 2 - m->top;
+}
+/* the y to draw g at so its baseline matches f drawn at y */
+static int32_t base_y(const felucca_font_t *f, int32_t y, const felucca_font_t *g)
+{
+    return y + caps(f)->bot - caps(g)->bot;
+}
 static void text_c(int32_t cx, int32_t y, const felucca_font_t *f, const char *s, uint16_t c)
 {
     cv_text(cx - tw(f, s) / 2, y, f, s, c);
@@ -1127,56 +1185,185 @@ static void text_r(int32_t rx, int32_t y, const felucca_font_t *f, const char *s
     cv_text(rx - tw(f, s), y, f, s, c);
 }
 
-/* the house shape: a box with its corner pixels cut */
-static void box(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t c)
+/* ---- anti-aliased shapes. Coverage is 0..16; a pixel is blended over what is there. ---- */
+static void px_blend(int32_t x, int32_t y, uint16_t c, uint32_t a)
 {
-    cv_rect(x + 1, y, w - 2, h, c);
-    cv_rect(x, y + 1, 1, h - 2, c);
-    cv_rect(x + w - 1, y + 1, 1, h - 2, c);
-}
-static void frame(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t c)
-{
-    cv_rect(x + 1, y, w - 2, 1, c);
-    cv_rect(x + 1, y + h - 1, w - 2, 1, c);
-    cv_rect(x, y + 1, 1, h - 2, c);
-    cv_rect(x + w - 1, y + 1, 1, h - 2, c);
+    uint16_t *q;
+    uint32_t bg;
+    y += cv_oy;
+    if ((uint32_t)x >= cv_w || (uint32_t)y >= cv_h || !a)
+        return;
+    q = &cv_px[(uint32_t)y * cv_w + (uint32_t)x];
+    if (a >= 16u) {
+        *q = swap16(c);
+        return;
+    }
+    bg = swap16(*q);
+    *q = swap16((uint32_t)(((((c >> 11) * a + (bg >> 11) * (16u - a)) >> 4) << 11) |
+                           (((((c >> 5) & 63u) * a + ((bg >> 5) & 63u) * (16u - a)) >> 4) << 5) |
+                           (((c & 31u) * a + (bg & 31u) * (16u - a)) >> 4)));
 }
 
-/* an arc gauge: 270 degrees from 7:30 to 4:30, 3 px thick, filled up to v (or from the
- * middle, for a bipolar value), and a white spoke at v */
+/* corner coverage of a radius-r quarter circle, pixel (x, y) of the r x r corner square,
+ * 4 x 4 supersampled; and of its 1-px ring (for outlines). Built once. */
+#define RMAX 8
+static uint8_t corner_fill[RMAX + 1][RMAX][RMAX], corner_ring[RMAX + 1][RMAX][RMAX];
+static void corners_init(void)
+{
+    int r, x, y, sx, sy;
+    for (r = 1; r <= RMAX; r++)
+        for (y = 0; y < r; y++)
+            for (x = 0; x < r; x++) {
+                int in = 0, ring = 0;
+                for (sy = 0; sy < 4; sy++)
+                    for (sx = 0; sx < 4; sx++) {
+                        float dx = (float)r - ((float)x + (sx + 0.5f) / 4.0f);
+                        float dy = (float)r - ((float)y + (sy + 0.5f) / 4.0f);
+                        float d2 = dx * dx + dy * dy;
+                        if (d2 <= (float)(r * r)) {
+                            in++;
+                            if (d2 >= (float)((r - 1) * (r - 1)))
+                                ring++;
+                        }
+                    }
+                corner_fill[r][y][x] = (uint8_t)in;
+                corner_ring[r][y][x] = (uint8_t)ring;
+            }
+}
+
+/* a filled rounded rectangle; r is clamped to fit */
+static void rbox(int32_t x, int32_t y, int32_t w, int32_t h, int32_t r, uint16_t c)
+{
+    int32_t i, j;
+    if (w <= 0 || h <= 0)
+        return;
+    if (r > w / 2)
+        r = w / 2;
+    if (r > h / 2)
+        r = h / 2;
+    if (r > RMAX)
+        r = RMAX;
+    if (r < 1) {
+        cv_rect(x, y, w, h, c);
+        return;
+    }
+    cv_rect(x + r, y, w - 2 * r, h, c);
+    cv_rect(x, y + r, r, h - 2 * r, c);
+    cv_rect(x + w - r, y + r, r, h - 2 * r, c);
+    for (j = 0; j < r; j++)
+        for (i = 0; i < r; i++) {
+            uint32_t a = corner_fill[r][j][i];
+            px_blend(x + i, y + j, c, a);
+            px_blend(x + w - 1 - i, y + j, c, a);
+            px_blend(x + i, y + h - 1 - j, c, a);
+            px_blend(x + w - 1 - i, y + h - 1 - j, c, a);
+        }
+}
+
+/* a 1-px rounded outline */
+static void rframe(int32_t x, int32_t y, int32_t w, int32_t h, int32_t r, uint16_t c)
+{
+    int32_t i, j;
+    if (r > w / 2)
+        r = w / 2;
+    if (r > h / 2)
+        r = h / 2;
+    if (r > RMAX)
+        r = RMAX;
+    if (r < 1)
+        r = 1;
+    cv_rect(x + r, y, w - 2 * r, 1, c);
+    cv_rect(x + r, y + h - 1, w - 2 * r, 1, c);
+    cv_rect(x, y + r, 1, h - 2 * r, c);
+    cv_rect(x + w - 1, y + r, 1, h - 2 * r, c);
+    for (j = 0; j < r; j++)
+        for (i = 0; i < r; i++) {
+            uint32_t a = corner_ring[r][j][i];
+            px_blend(x + i, y + j, c, a);
+            px_blend(x + w - 1 - i, y + j, c, a);
+            px_blend(x + i, y + h - 1 - j, c, a);
+            px_blend(x + w - 1 - i, y + h - 1 - j, c, a);
+        }
+}
+
+/* the radius that suits a box of height h: soft, never round */
+static int32_t rad_of(int32_t h) { return h >= 30 ? 6 : h >= 18 ? 4 : h >= 9 ? 3 : 2; }
+static void box(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t c) { rbox(x, y, w, h, rad_of(h < w ? h : w), c); }
+static void frame(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t c) { rframe(x, y, w, h, rad_of(h < w ? h : w), c); }
+
+/* an anti-aliased disc of radius r (float) at (cx, cy) */
+static void disc(float cx, float cy, float r, uint16_t c)
+{
+    int32_t x0 = (int32_t)fm_floorf(cx - r - 1.0f), x1 = (int32_t)(cx + r + 1.0f);
+    int32_t y0 = (int32_t)fm_floorf(cy - r - 1.0f), y1 = (int32_t)(cy + r + 1.0f), x, y;
+    for (y = y0; y <= y1; y++)
+        for (x = x0; x <= x1; x++) {
+            float dx = (float)x + 0.5f - cx, dy = (float)y + 0.5f - cy, d = fm_sqrtf(dx * dx + dy * dy);
+            float a = fm_clampf(r - d + 0.5f, 0.0f, 1.0f);
+            px_blend(x, y, c, (uint32_t)(a * 16.0f + 0.5f));
+        }
+}
+static void dot(int32_t x, int32_t y, int32_t r, uint16_t c) { disc((float)x + 0.5f, (float)y + 0.5f, (float)r + 0.3f, c); }
+
+/* atan2 in turns, 0..1 from +x going clockwise on screen (y down) */
+static float turns(float y, float x)
+{
+    float ax = fm_fabsf(x), ay = fm_fabsf(y), a = ax < ay ? ax / (ay + 1e-9f) : ay / (ax + 1e-9f), s = a * a, r;
+    r = ((-0.0464964749f * s + 0.15931422f) * s - 0.327622764f) * s * a + a;   /* atan on [0, 1] */
+    if (ay > ax)
+        r = 1.57079637f - r;
+    if (x < 0.0f)
+        r = FM_PI - r;
+    if (y < 0.0f)
+        r = FM_TWO_PI - r;
+    return r * (1.0f / FM_TWO_PI);
+}
+
+/* a knob: a 270-degree track from 7:30 to 4:30, thickness th, anti-aliased, round ends; the
+ * value filled from the start (or from the top, for a bipolar value) and a round handle */
 static void arc(int32_t cx, int32_t cy, int32_t r, float v, uint16_t track, uint16_t fill, int bipolar)
 {
-    int i, n = 4 * r;
-    float a0 = 0.75f * FM_PI, sweep = 1.5f * FM_PI;
-    for (i = 0; i <= n; i++) {
-        float t = (float)i / (float)n, a = a0 + sweep * t, c = fm_cosf(a), s = fm_sinf(a);
-        int on = bipolar ? ((v >= 0.5f) ? (t >= 0.5f && t <= v) : (t <= 0.5f && t >= v)) : t <= v;
-        int k;
-        for (k = 0; k < 3; k++)
-            cv_pset(cx + (int32_t)(c * (float)(r - k) + 0.5f), cy + (int32_t)(s * (float)(r - k) + 0.5f),
-                    on ? fill : track);
-    }
-    {
-        float a = a0 + sweep * v, c = fm_cosf(a), s = fm_sinf(a);
-        int k;
-        for (k = r - 9; k <= r; k++)
-            cv_pset(cx + (int32_t)(c * (float)k + 0.5f), cy + (int32_t)(s * (float)k + 0.5f), C_WHITE);
+    const float th = 3.4f, a0 = 0.375f, sweep = 0.75f;  /* start at 135 degrees, in turns */
+    float ro = (float)r, ri = ro - th, rm = ro - th * 0.5f, fx = (float)cx + 0.5f, fy = (float)cy + 0.5f;
+    float lo = bipolar ? (v < 0.5f ? v : 0.5f) : 0.0f, hi = bipolar ? (v < 0.5f ? 0.5f : v) : v;
+    int32_t x, y;
+    v = fm_clampf(v, 0.0f, 1.0f);
+    for (y = -r - 1; y <= r + 1; y++)
+        for (x = -r - 1; x <= r + 1; x++) {
+            float dx = (float)x + 0.5f - 0.5f, dy = (float)y + 0.5f - 0.5f, d = fm_sqrtf(dx * dx + dy * dy), t, a;
+            a = fm_clampf(ro + 0.5f - d, 0.0f, 1.0f) * fm_clampf(d - ri + 0.5f, 0.0f, 1.0f);
+            if (a <= 0.0f)
+                continue;
+            t = turns(dy, dx) - a0;
+            if (t < 0.0f)
+                t += 1.0f;
+            t /= sweep;
+            if (t > 1.0f)
+                continue;                              /* the gap at the bottom; the caps close it */
+            px_blend(cx + x, cy + y, (t >= lo && t <= hi) ? fill : track, (uint32_t)(a * 16.0f + 0.5f));
+        }
+    {   /* round ends: the track's, then the fill's, then the handle */
+        float e0 = (a0) * FM_TWO_PI, e1 = (a0 + sweep) * FM_TWO_PI, ev = (a0 + sweep * v) * FM_TWO_PI;
+        float el = (a0 + sweep * lo) * FM_TWO_PI;
+        disc(fx + fm_cosf(e0) * rm - 0.5f, fy + fm_sinf(e0) * rm - 0.5f, th * 0.5f, lo <= 0.0f && hi > 0.0f ? fill : track);
+        disc(fx + fm_cosf(e1) * rm - 0.5f, fy + fm_sinf(e1) * rm - 0.5f, th * 0.5f, hi >= 1.0f ? fill : track);
+        if (hi > lo)
+            disc(fx + fm_cosf(el) * rm - 0.5f, fy + fm_sinf(el) * rm - 0.5f, th * 0.5f, fill);
+        disc(fx + fm_cosf(ev) * rm - 0.5f, fy + fm_sinf(ev) * rm - 0.5f, th * 0.5f + 1.3f, C_BLACK);
+        disc(fx + fm_cosf(ev) * rm - 0.5f, fy + fm_sinf(ev) * rm - 0.5f, th * 0.5f + 0.6f, C_WHITE);
     }
 }
 
 static void play_icon(int32_t x, int32_t y, uint16_t c)
 {
-    int i;
-    for (i = 0; i < 6; i++)
-        cv_rect(x + i, y + i, 1, 11 - 2 * i, c);
-}
-static void dot(int32_t x, int32_t y, int32_t r, uint16_t c)
-{
-    int i, j;
-    for (j = -r; j <= r; j++)
-        for (i = -r; i <= r; i++)
-            if (i * i + j * j <= r * r + r)
-                cv_pset(x + i, y + j, c);
+    int32_t i, j;
+    for (j = 0; j < 11; j++)                           /* a triangle, edges anti-aliased */
+        for (i = 0; i < 9; i++) {
+            float fy = (float)j + 0.5f - 5.5f, fx = (float)i + 0.5f;
+            float edge = 8.0f - fx - fm_fabsf(fy) * 1.3f;
+            float a = fm_clampf(edge * 0.7f + 0.5f, 0.0f, 1.0f) * fm_clampf(fx + 0.5f, 0.0f, 1.0f);
+            px_blend(x + i, y + j, c, (uint32_t)(a * 16.0f + 0.5f));
+        }
 }
 
 /* -------------------------------------------------------------- header --- */
@@ -1188,24 +1375,24 @@ static void draw_header(void)
     cv_rect(0, HDR_H - 1, 240, 1, C_LINE);
     if (ui.msg_until && (int32_t)(ui.msg_until - plat_ms()) > 0) {   /* what a button just did */
         box(0, 0, 240, HDR_H - 1, part_col());
-        text_c(120, 1, &FONT_B, ui.msg, C_BLACK);
+        text_c(120, vc(&FONT_B, 0, HDR_H - 1), &FONT_B, ui.msg, C_BLACK);
         cv_commit(0, 0, 0);
         return;
     }
     ui.msg_until = 0;
     if (ui.view == V_PART || ui.view == V_GEN) {      /* the part chip, then where we are */
-        int32_t w = tw(&FONT_B, PART_N[ui.part]) + 10;
+        int32_t w = tw(&FONT_B, PART_N[ui.part]) + 12;
         box(0, 1, w, 17, part_col());
-        cv_text(5, 2, &FONT_B, PART_N[ui.part], C_BLACK);
+        cv_text(6, vc(&FONT_B, 1, 17), &FONT_B, PART_N[ui.part], C_BLACK);
         x = w + 6;
         if (ui.view == V_GEN)
-            x = cv_text(x, 2, &FONT_S, "TB-3PO", C_HI) + 6;
+            x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, "TB-3PO", C_HI) + 6;
         else if (is_drum())
-            x = cv_text(x, 2, &FONT_S, engine_voice_name(ui.part == PART_909 ? T_909 : T_808, ui.sel[ui.part]), C_HI) + 6;
+            x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, engine_voice_name(ui.part == PART_909 ? T_909 : T_808, ui.sel[ui.part]), C_HI) + 6;
         else if (is_303() && ui.kbd[bidx()])
-            x = cv_text(x, 2, &FONT_S, "KEYS", C_AMB) + 6;
+            x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, "KEYS", C_AMB) + 6;
     } else {
-        x = cv_text(4, 2, &FONT_B, VIEW_N[ui.view], C_HI) + 6;
+        x = cv_text(4, vc(&FONT_B, 1, 17), &FONT_B, VIEW_N[ui.view], C_HI) + 6;
     }
     if (pg.n > 1 && ui.overlay == O_NONE && ui.view != V_GLO) {   /* page dots */
         int i, p = cur_page();
@@ -1214,16 +1401,16 @@ static void draw_header(void)
     }
     b[0] = 'P';
     put_i(b + 1, seq.cur + 1);
-    x = cv_text(132, 2, &FONT_B, b, C_WHITE);
+    x = cv_text(132, vc(&FONT_B, 1, 17), &FONT_B, b, C_WHITE);
     if (seq.cue < NPAT && seq.cue != seq.cur) {
         b[0] = '>';
         put_i(b + 1, seq.cue + 1);
-        cv_text(x + 2, 2, &FONT_S, b, (ui.frame & 16u) ? C_WHITE : C_GRAY);
+        cv_text(x + 2, vc(&FONT_S, 1, 17), &FONT_S, b, (ui.frame & 16u) ? C_WHITE : C_GRAY);
     } else if (seq.chain_a != seq.chain_b) {
-        cv_text(x + 3, 4, &FONT_XS, "CHN", C_AMB);
+        cv_text(x + 3, vc(&FONT_XS, 1, 17), &FONT_XS, "CHN", C_AMB);
     }
     put_i(b, (int)(seq_tempo(&seq) + 0.5f));
-    text_r(212, 2, &FONT_S, b, seq.ext ? C_AMB : C_HI);
+    text_r(212, vc(&FONT_S, 1, 17), &FONT_S, b, seq.ext ? C_AMB : C_HI);
     if (seq.playing)
         play_icon(217, 4, (eng_step[TRK_DRUM] & 3) == 0 ? C_WHITE : C_HI);
     if (ui.rec)
@@ -1251,7 +1438,7 @@ static void draw_drum(int band)
         int muted = v < NDRUM && (seq.mute & (1u << (k * NDRUM + v)));
         if (sel)
             box(0, y - 1, 24, 12, col);
-        cv_text(5, y - 1, &FONT_XS, nm, sel ? C_BLACK : muted ? C_LINE : v < NDRUM ? C_GRAY : C_WHITE);
+        cv_text(5, vc(&FONT_XS, y - 1, 12), &FONT_XS, nm, sel ? C_BLACK : muted ? C_LINE : v < NDRUM ? C_GRAY : C_WHITE);
         for (c = 0; c < 16; c++) {
             int s = step_of(c), x = col_x(c), hit = (bits >> s) & 1u;
             if (s >= len) {
@@ -1262,7 +1449,7 @@ static void draw_drum(int band)
                 if (hit)
                     box(x + 2, y + 2, 8, 6, C_WHITE);
                 else
-                    cv_rect(x + 2, y + 4, 8, 2, C_LINE);
+                    rbox(x + 2, y + 4, 8, 2, 1, C_LINE);
                 continue;
             }
             box(x, y, 12, 10, hit ? (sel ? col : on_dim) : (s == ph ? C_DIM : C_LINE));
@@ -1335,11 +1522,11 @@ static void draw_303(int band, int gen)
             if (s >= bp->len)
                 continue;
             g = bstep_gate(st);
-            cv_rect(x + 1, 3, 10, 3, g && (st->flags & BS_ACCENT) ? C_WHITE : C_LINE);
-            cv_rect(x + 1, 11, 10, 3, g && (st->flags & BS_SLIDE) ? col : C_LINE);
+            rbox(x + 1, 2, 10, 4, 2, g && (st->flags & BS_ACCENT) ? C_WHITE : C_LINE);
+            rbox(x + 1, 12, 10, 4, 2, g && (st->flags & BS_SLIDE) ? col : C_LINE);
         }
-        cv_text(3, -1, &FONT_XS, "AC", C_GRAY);
-        cv_text(3, 7, &FONT_XS, "SL", C_GRAY);
+        cv_text(3, vc(&FONT_XS, 0, 8), &FONT_XS, "AC", C_GRAY);
+        cv_text(3, vc(&FONT_XS, 10, 8), &FONT_XS, "SL", C_GRAY);
         if (ui.held_step >= 0 || (ui.kbd[b] && ui.rec)) {
             int s = ui.held_step >= 0 ? ui.held_step : ui.wpos[b];
             const bstep_t *st = &bp->step[s];
@@ -1351,19 +1538,19 @@ static void draw_303(int band, int gen)
                 q = put_s(q, " ACC");
             if (st->flags & BS_SLIDE)
                 put_s(q, " SLIDE");
-            cv_text(4, 24, &FONT_B, t, C_WHITE);
+            cv_text(4, 26, &FONT_B, t, C_WHITE);
         } else {
+            char t2[16];
             q = put_s(q, ROOT_N[bp->gen.root % 12]);
             q = put_s(q, " ");
-            q = put_s(q, TB3PO_SCALE_NAMES[bp->gen.scale % TB3PO_NSCALES]);
-            q = put_s(q, "    SEED ");
-            put_hex(q, bp->gen.seed & 0xFFFFu, 4);
-            cv_text(4, 24, &FONT_S, t, C_GRAY);
+            put_s(q, TB3PO_SCALE_NAMES[bp->gen.scale % TB3PO_NSCALES]);
+            put_hex(put_s(t2, "SEED "), bp->gen.seed & 0xFFFFu, 4);
+            segs(4, 26, &FONT_S, C_GRAY, 18, t, t2, 0, 0);
         }
         if (gen)
-            cv_text(4, 50, &FONT_XS, "OCT+ NEW LINE    OCT- MUTATE", C_AMB);
+            segs(4, 50, &FONT_XS, C_AMB, 16, "OCT+  NEW LINE", "OCT-  MUTATE", 0, 0);
         else if (ui.held_step < 0)
-            cv_text(4, 50, &FONT_XS, ui.kbd[b] ? "KEYS PLAY   REC: STEP WRITE" : "TAP: STEP   HOLD + KNOBS: EDIT", C_DIM);
+            segs(4, 50, &FONT_XS, C_DIM, 16, ui.kbd[b] ? "KEYS PLAY" : "TAP: STEP", ui.kbd[b] ? "REC: STEP WRITE" : "HOLD + KNOBS: EDIT", 0, 0);
     }
 }
 
@@ -1402,18 +1589,20 @@ static void draw_break(int band)
             box(x, 2, 12, 10, on ? (c == ph ? C_WHITE : col) : (c == ph ? C_DIM : C_LINE));
         }
         cv_text(3, 1, &FONT_XS, "ON", C_GRAY);
-        q = put_s(q, "A ");
-        q = put_s(q, sn[bp->slot_a % ns]);
-        q = put_s(q, "   B ");
-        put_s(q, sn[bp->slot_b % ns]);
-        cv_text(4, 18, &FONT_S, t, C_HI);
+        {
+            char ta[16], tb[16];
+            put_s(put_s(ta, "A  "), sn[bp->slot_a % ns]);
+            put_s(put_s(tb, "B  "), sn[bp->slot_b % ns]);
+            segs(4, 18, &FONT_S, C_HI, 18, ta, tb, 0, 0);
+            (void)q;
+        }
         if (running) {
             q = put_s(t, bank ? "PLAYING B" : "PLAYING A");
             if (div > 1)
                 put_i(put_s(q, "   RETRIG X"), div);
             cv_text(4, 36, &FONT_S, t, bank ? C_AMB : C_GRAY);
         }
-        cv_text(4, 58, &FONT_XS, "1-8 SLICES  9 REV  10 HALF  11 STUT", C_DIM);
+        segs(4, 58, &FONT_XS, C_DIM, 10, "1-8 SLICES", "9 REV", "10 HALF", "11 STUT");
     }
 }
 
@@ -1425,7 +1614,7 @@ static void lane(int y, int p, uint32_t bits, int ph, int len)
         uint16_t fc = (bits >> c & 1u) ? (muted ? C_DIM : PART_COL[p]) : C_LINE;
         box(col_x(c), y + 2, 12, 9, fc);
         if (seq.playing && (ph & 15) == c)
-            cv_rect(col_x(c), y + 12, 12, 1, C_WHITE);
+            rbox(col_x(c) + 2, y + 12, 8, 2, 1, C_WHITE);
     }
 }
 
@@ -1465,8 +1654,8 @@ static void draw_home(int band)
                 lane((p - 2) * 16 + 1, p, pt->brk.steps, eng_step[TRK_BRK], 16);
             }
         }
-        cv_text(4, 50, &FONT_XS, "WHITE: PATTERN   TWO HELD: CHAIN", C_DIM);
-        cv_text(4, 60, &FONT_XS, "BLACK 1-5: MUTE  SAVE+WHITE: COPY", C_DIM);
+        segs(4, 50, &FONT_XS, C_DIM, 14, "WHITE: PATTERN", "TWO HELD: CHAIN", 0, 0);
+        segs(4, 60, &FONT_XS, C_DIM, 14, "BLACK 1-5: MUTE", "SAVE + WHITE: COPY", 0, 0);
     }
 }
 
@@ -1479,10 +1668,12 @@ static void draw_fx(int band)
         for (p = 0; p < NPARTS; p++) {
             int y = 14 + p * 11, rv = proj.sound.v[T_MIX][p][1], dl = proj.sound.v[T_MIX][p][2];
             cv_text(3, y - 2, &FONT_XS, PART_S[p], PART_COL[p]);
-            cv_rect(52, y + 2, 88, 5, C_LINE);
-            cv_rect(52, y + 2, rv * 88 / 127, 5, PART_COL[p]);
-            cv_rect(148, y + 2, 88, 5, C_LINE);
-            cv_rect(148, y + 2, dl * 88 / 127, 5, PART_COL[p]);
+            rbox(52, y + 2, 88, 6, 3, C_LINE);
+            if (rv)
+                rbox(52, y + 2, 6 + rv * 82 / 127, 6, 3, PART_COL[p]);
+            rbox(148, y + 2, 88, 6, 3, C_LINE);
+            if (dl)
+                rbox(148, y + 2, 6 + dl * 82 / 127, 6, 3, PART_COL[p]);
         }
     } else {
         char a[16], u[8], t[40], *q;
@@ -1491,10 +1682,14 @@ static void draw_fx(int band)
         pref_value(PR(R_ENG, T_FX, 0, FX_DL_TYPE), a, u);
         put_s(put_s(q, "  "), a);
         cv_text(4, 4, &FONT_B, t, C_HI);
-        q = put_i(put_s(t, "FEEDBACK "), proj.sound.v[T_FX][0][FX_DL_FDBK] * 100 / 127);
-        put_i(put_s(q, "%   REVERB "), proj.sound.v[T_FX][0][FX_RV_DECAY] * 100 / 127);
-        cv_text(4, 24, &FONT_S, t, C_GRAY);
-        cv_text(4, 52, &FONT_XS, "FX AGAIN: NEXT PAGE   SEL: EVERYTHING", C_DIM);
+        {
+            char t2[20];
+            put_s(put_i(put_s(t, "FEEDBACK "), proj.sound.v[T_FX][0][FX_DL_FDBK] * 100 / 127), "%");
+            put_i(put_s(t2, "REVERB "), proj.sound.v[T_FX][0][FX_RV_DECAY] * 100 / 127);
+            segs(4, 24, &FONT_S, C_GRAY, 18, t, t2, 0, 0);
+            (void)q;
+        }
+        segs(4, 52, &FONT_XS, C_DIM, 14, "FX AGAIN: NEXT PAGE", "SEL: EVERYTHING", 0, 0);
     }
 }
 
@@ -1504,15 +1699,17 @@ static void draw_mix(int band)
     if (band == 0) {                                   /* channel strips + the master's gain reduction */
         for (p = 0; p < NPARTS; p++) {
             int x = 6 + p * 38, lvl = proj.sound.v[T_MIX][p][0], pk = eng_peak[p] * 64 / 32768;
-            cv_rect(x + 10, 4, 6, 64, C_LINE);
-            cv_rect(x + 10, 68 - pk, 6, pk, part_muted(p) ? C_DIM : PART_COL[p]);
-            cv_rect(x + 4, 68 - lvl * 64 / 127, 18, 2, C_WHITE);
+            rbox(x + 10, 4, 6, 64, 3, C_LINE);
+            if (pk > 1)
+                rbox(x + 10, 68 - pk, 6, pk, 3, part_muted(p) ? C_DIM : PART_COL[p]);
+            rbox(x + 4, 67 - lvl * 64 / 127, 18, 3, 1, C_WHITE);
         }
         {
             int gr = (int)(engine_gr_db() * 64.0f / 24.0f);
             gr = gr > 64 ? 64 : gr;
-            cv_rect(206, 4, 8, 64, C_LINE);
-            cv_rect(206, 4, 8, gr, RGB(255, 80, 60));
+            rbox(206, 4, 8, 64, 4, C_LINE);
+            if (gr > 1)
+                rbox(206, 4, 8, gr, 4, RGB(255, 80, 60));
             cv_text(218, 2, &FONT_XS, "GR", C_GRAY);
         }
     } else {
@@ -1551,12 +1748,15 @@ static void draw_readout(void)
     pref_value(r, num, unit);
     box(8, 12, 224, 54, C_BLACK);
     frame(8, 12, 224, 54, part_col());
-    cv_text(16, 16, &FONT_S, nm, C_GRAY);
+    cv_text(16, vc(&FONT_S, 14, 18), &FONT_S, nm, C_GRAY);
     w = tw(&FONT_L, num) + (unit[0] ? tw(&FONT_S, unit) + 3 : 0);
     x = 120 - w / 2;
-    x = cv_text(x, 30, &FONT_L, num, C_WHITE);
-    if (unit[0])
-        cv_text(x + 3, 44, &FONT_S, unit, C_GRAY);
+    {
+        int32_t ly = vc(&FONT_L, 34, 26);
+        x = cv_text(x, ly, &FONT_L, num, C_WHITE);
+        if (unit[0])
+            cv_text(x + 3, base_y(&FONT_L, ly, &FONT_S), &FONT_S, unit, C_GRAY);
+    }
 }
 
 /* a list over the main area: six rows of 24 px */
@@ -1574,7 +1774,7 @@ static void draw_list(int band)
         d = pref_desc(r);
         if (sel)
             box(0, y + 1, 232, 22, dim(part_col(), 6));
-        cv_text(6, y + 4, sel ? &FONT_B : &FONT_S, pref_name(r), sel ? C_WHITE : C_GRAY);
+        cv_text(8, vc(sel ? &FONT_B : &FONT_S, y + 1, 18), sel ? &FONT_B : &FONT_S, pref_name(r), sel ? C_WHITE : C_GRAY);
         if (r.kind == R_ACT) {                         /* an action: the return arrow */
             uint16_t ac = sel ? C_WHITE : C_DIM;
             cv_rect(212, y + 12, 12, 2, ac);
@@ -1585,20 +1785,22 @@ static void draw_list(int band)
         }
         pref_value(r, num, unit);
         {
-            int32_t ux = 228 - tw(&FONT_XS, unit);
-            cv_text(ux, y + 8, &FONT_XS, unit, C_GRAY);
-            text_r(ux - 2, y + 4, sel ? &FONT_B : &FONT_S, num, sel ? C_WHITE : C_HI);
+            const felucca_font_t *nf = sel ? &FONT_B : &FONT_S;
+            int32_t ny = vc(nf, y + 1, 18), ux = 226 - tw(&FONT_XS, unit);
+            cv_text(ux, base_y(nf, ny, &FONT_XS), &FONT_XS, unit, C_GRAY);
+            text_r(unit[0] ? ux - 2 : 226, ny, nf, num, sel ? C_WHITE : C_HI);
         }
         if (d && !d->names && d->max >= 24) {          /* a continuous value: its bar */
             int v = pref_get(r);
-            cv_rect(108, y + 19, 70, 2, C_LINE);
-            cv_rect(108, y + 19, v * 70 / d->max, 2, sel ? part_col() : C_DIM);
+            rbox(108, y + 18, 70, 3, 1, C_LINE);
+            if (v)
+                rbox(108, y + 18, 3 + v * 67 / d->max, 3, 1, sel ? part_col() : C_DIM);
         }
     }
     if (ui.list_n > 6) {                               /* the scrollbar */
         int h = 144 * 6 / ui.list_n, y = 144 * ui.list_top / ui.list_n - band * 72;
-        cv_rect(236, 0, 2, 72, C_LINE);
-        cv_rect(236, y, 2, h, C_HI);
+        rbox(235, 0, 3, 72, 1, C_LINE);
+        rbox(235, y, 3, h, 1, C_HI);
     }
 }
 
@@ -1615,9 +1817,9 @@ static void draw_ask(int band)
         cv_rect(233, 0, 1, 44, red);
         cv_rect(7, 44, 226, 1, red);
         box(22, 10, 92, 24, red);
-        text_c(68, 14, &FONT_B, "SEL  YES", C_BLACK);
+        text_c(68, vc(&FONT_B, 10, 24), &FONT_B, "SEL  YES", C_BLACK);
         frame(126, 10, 92, 24, C_GRAY);
-        text_c(172, 14, &FONT_B, "HOME  NO", C_GRAY);
+        text_c(172, vc(&FONT_B, 10, 24), &FONT_B, "HOME  NO", C_GRAY);
     }
 }
 
@@ -1656,12 +1858,45 @@ static void cell_value(int cx, int y, const char *num, const char *unit, uint16_
     int32_t w = tw(&FONT_B, num) + (unit[0] ? tw(&FONT_XS, unit) + 1 : 0), x = cx - w / 2;
     x = cv_text(x, y, &FONT_B, num, c);
     if (unit[0])
-        cv_text(x + 1, y + 3, &FONT_XS, unit, C_GRAY);
+        cv_text(x + 1, base_y(&FONT_B, y, &FONT_XS), &FONT_XS, unit, C_GRAY);
+}
+
+/* what the knob strip shows, hashed: it is only redrawn when this changes (the arcs cost a
+ * square root and an arctangent per pixel; most frames nothing in the strip moves) */
+static uint32_t knobs_sig(void)
+{
+    uint32_t h = 2166136261u, i;
+    int pgi = cur_page();
+#define MIXIN(v) (h = (h ^ (uint32_t)(v)) * 16777619u)
+    MIXIN(ui.view);
+    MIXIN(ui.part);
+    MIXIN(pgi);
+    MIXIN(ui.touched);
+    MIXIN(ui.held_step);
+    MIXIN(proj.set.palette);
+    MIXIN(ui.sel[0] | ui.sel[1] << 8);
+    MIXIN(seq.cur);
+    for (i = 0; i < 4; i++) {
+        pref_t r = pg.r[pgi][i];
+        MIXIN(r.kind | r.a << 8 | r.b << 16 | (uint32_t)r.c << 24);
+        MIXIN(pref_get(r));
+    }
+    if (ui.held_step >= 0) {
+        const bstep_t *st = &cur_pat()->bass[bidx()].step[ui.held_step];
+        MIXIN(st->note | st->flags << 8);
+    }
+#undef MIXIN
+    return h;
 }
 
 static void draw_knobs(void)
 {
+    static uint32_t last_sig;
     int i, pgi = cur_page();
+    uint32_t sig = knobs_sig();
+    if (sig == last_sig && blit_hash[3])
+        return;
+    last_sig = sig;
     cv_begin(240, KNOB_H, C_BLACK);
     cv_rect(0, 0, 240, 1, C_LINE);
     if (ui.view == V_PART && is_303() && ui.held_step >= 0) {     /* the held step's own knobs */
@@ -1680,8 +1915,8 @@ static void draw_knobs(void)
                 put_s(v, G[bstep_gate(st)]);
             else
                 put_s(v, (st->flags & (i == 2 ? BS_ACCENT : BS_SLIDE)) ? "ON" : "OFF");
-            text_c(cx, 5, &FONT_XS, SN[i], C_GRAY);
-            text_c(cx, 30, &FONT_M, v, C_WHITE);
+            text_c(cx, vc(&FONT_XS, 5, 12), &FONT_XS, SN[i], C_GRAY);
+            text_c(cx, vc(&FONT_M, 26, 34), &FONT_M, v, C_WHITE);
         }
         cv_commit(3, 0, KNOB_Y);
         return;
@@ -1697,8 +1932,8 @@ static void draw_knobs(void)
         if (!d)
             continue;
         if (touched)
-            box(i * 60 + 2, 3, 56, KNOB_H - 5, dim(col, 4));
-        text_c(cx, 4, &FONT_XS, pref_name(r), touched ? C_WHITE : C_GRAY);
+            box(i * 60 + 2, 2, 56, KNOB_H - 4, dim(col, 4));
+        text_c(cx, vc(&FONT_XS, 6, 12), &FONT_XS, pref_name(r), touched ? C_WHITE : C_GRAY);
         val = pref_get(r);
         if (d->names) {                                /* a switch: its positions as pips */
             int n = d->max + 1, k, pw = n > 6 ? 3 : 6, gap = 2, w0 = n * (pw + gap) - gap;
@@ -1709,7 +1944,7 @@ static void draw_knobs(void)
             arc(cx, 34, 15, d->max ? (float)val / (float)d->max : 0.0f, C_LINE, col, r.kind == R_BTRANS);
         }
         pref_value(r, num, unit);
-        cell_value(cx, 54, num, unit, touched ? C_WHITE : C_HI);
+        cell_value(cx, vc(&FONT_B, 55, 14), num, unit, touched ? C_WHITE : C_HI);
     }
     cv_commit(3, 0, KNOB_Y);
 }
@@ -1798,6 +2033,7 @@ void ui_init(void)
         if (KEY_BLACK[i] >= 0)
             BLACK_KEY[KEY_BLACK[i]] = (uint8_t)i;
     }
+    corners_init();
     ui.view = V_PART;
     ui.prev_view = V_PART;
     ui.part = PART_909;
