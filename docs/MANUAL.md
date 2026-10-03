@@ -1,7 +1,8 @@
 # X0X
 
 Groovebox firmware for the M-VAVE FM-1, version 0.1. It gives you a 909, an 808, two 303s
-and a break, all running at once, across 16 patterns.
+and a break, all running at once, each on its own pattern, with a song mode and recorded knob
+moves.
 
 **Status.** X0X runs in a simulator on a computer, using the same code as the FM-1. Nobody
 has run it on an FM-1 yet.
@@ -18,15 +19,17 @@ has run it on an FM-1 yet.
 6. TB-3PO
 7. Break
 8. Patterns
-9. Recording
-10. Effects
-11. Mix and master
-12. Settings and saving
-13. MIDI
-14. Your own breaks
-15. Update mode and calibration
-16. Parameters
-17. Credits
+9. Song
+10. Recording
+11. Knob motion
+12. Effects
+13. Mix and master
+14. Settings and saving
+15. MIDI
+16. Your own breaks
+17. Update mode and calibration
+18. Parameters
+19. Credits
 
 ---
 
@@ -58,7 +61,7 @@ These work the same on every screen:
 | | |
 |---|---|
 | ALGORITHM | Pick the part: 909, 808, 303A, 303B, BREAK. |
-| PRESETS | Pick the next pattern. |
+| PRESETS | Pick the next pattern: for the part on screen, or on HOME for all five. |
 | SELECT | Next or previous page. In a list, move. Hold HOME and turn it to set the tempo. |
 | KNOB 1–4 | The four values at the bottom of the screen. |
 | SEL | Show everything on this screen as a list. In a list, run an action. In a question, yes. |
@@ -68,7 +71,7 @@ These work the same on every screen:
 | FX | Effects. |
 | LFO | Mix and master. |
 | GLO | Settings. |
-| SEQ | On a 303, switch the keys between steps and keyboard. |
+| SEQ | On a 303, switch the keys between steps and keyboard. On HOME, the song. |
 | PLAY, REC, SAVE | Start/stop, record, save. |
 | ENV, LFO | Hold them to change what the keys do: accent, slide. |
 | OCT-, OCT+ | Steps 1–16 or 17–32. Octave on the 303 keyboard. Mutate and new line in TB-3PO. |
@@ -210,25 +213,53 @@ Loops stretch to the tempo.
 
 ![HOME](img/screen-home.png)
 
-A pattern holds all five parts' steps, their lengths and rates, the break's settings and the
-swing. Sounds, effects and the master stay the same when the pattern changes.
+There are 16 patterns, and each part plays its own: the 303s can be on pattern 3 while the
+drums are on 7. A pattern holds each part's steps, lengths and rates, the break's settings,
+the swing and the knob motion. Sounds, effects and the master stay the same when the pattern
+changes.
 
-- **Next pattern:** turn PRESETS, or on HOME press a white key. It starts at the end of the
-  bar; when stopped, at once.
-- **Chain:** on HOME, hold two white keys. The patterns between them play one bar each.
-  Picking a single pattern ends the chain.
-- **Copy:** hold SAVE and press a white key.
+On HOME, each pattern box shows a coloured bar for every part playing it.
+
+- **One part:** on that part's screen, turn PRESETS.
+- **All five:** turn PRESETS on HOME, or press a white key on HOME.
+- **Chain:** on HOME, hold two white keys. The patterns between them play one bar each, all
+  five parts together. Picking a single pattern ends the chain.
+- **Copy:** hold SAVE and press a white key. On a part's screen this copies that part; on
+  HOME, all five as they're playing now.
 - **Clear a part:** hold SAVE and press REC. GLO > CLEAR PATTERN clears all five.
-- **Mute:** on HOME, black keys 1–5. Mutes aren't saved.
+- **Mute:** on HOME, black keys 1–5. Mutes aren't saved, except in a song.
 
-Parts can have different lengths and drift against each other. The 909's length is the bar.
+A new pattern starts at the end of the bar; when stopped, at once. A part that changes
+pattern starts again from step 1; the others keep going. Parts can have different lengths and
+drift against each other. The 909's length is the bar, and the 909's pattern sets the swing.
 Swing delays every second 16th: 50% is straight, 75% the most.
 
 HOME's knobs are TEMPO, SWING, PUMP and CUTOFF.
 
 ---
 
-## 9. Recording
+## 9. Song
+
+![SONG](img/screen-song.png)
+
+A song is a list of bars, up to 192. Each bar says which pattern each part plays and which
+parts are muted. Press SEQ on HOME to open it.
+
+- **Write bars:** press a white key. The selected bar plays that pattern on all five parts,
+  and the next bar is selected. Past the end, this adds bars.
+- **Edit a bar:** KNOB 1 picks the bar; the other knobs set each part's pattern.
+- **Mute in a bar:** black keys 1–5.
+- **Play it:** set MODE to SONG (second page, or GLO), then PLAY. It starts at the selected
+  bar and loops. The top line shows S and the bar.
+- **Record it:** in SONG mode, arm REC and play. Change patterns and mutes as you like; each
+  bar is written as it plays, from the start bar on, and the song grows past its end. This
+  overwrites what was there.
+
+SEL on the SONG screen has LENGTH, INSERT BAR, DELETE BAR and CLEAR SONG.
+
+---
+
+## 10. Recording
 
 REC arms recording; press it again to stop.
 
@@ -240,7 +271,29 @@ REC arms recording; press it again to stop.
 
 ---
 
-## 10. Effects
+## 11. Knob motion
+
+![A recorded cutoff sweep playing](img/screen-motion.png)
+
+Arm REC, play, and turn any sound knob: the move is recorded into the pattern, on the steps
+where you moved it. Short pauses are filled in, so a slow sweep has no gaps. Playback glides
+between steps rather than jumping.
+
+A knob with motion has a dot in its corner, and its ring follows what plays.
+
+- Steps you didn't touch play the knob's own setting.
+- Turn the knob without recording and it takes over for one pass of the pattern.
+- **Clear:** hold SAVE and turn the knob.
+- Motion belongs to the part's pattern: the 303's knobs to the 303's, the effects and master
+  to the 909's. It follows copies and clears.
+- Stopping puts every knob back to its own setting.
+
+There is room for 160 recorded knobs across all patterns. When it's full, the top line says
+MOTION FULL.
+
+---
+
+## 12. Effects
 
 ![FX](img/screen-fx.png)
 
@@ -255,7 +308,7 @@ each part. Drum tracks also have their own sends, on their own pages.
 
 ---
 
-## 11. Mix and master
+## 13. Mix and master
 
 ![MIX, with the compressor pumping](img/screen-mix.png)
 
@@ -279,7 +332,7 @@ clipping; leave it on.
 
 ---
 
-## 12. Settings and saving
+## 14. Settings and saving
 
 ![GLOBAL](img/screen-global.png)
 
@@ -292,17 +345,18 @@ GLO:
 | KEY LIGHTS | Show steps on the keys. |
 | THEME | Green, amber, cyan, red, mono. |
 | ACCENT | How loud an unaccented hit is next to an accented one. |
+| MODE | PATTERN, or SONG: the song plays. |
 | SAVE PROJECT | Save. |
 | CLEAR PATTERN | Clear the whole pattern. |
-| FACTORY RESET | Factory sounds and patterns. Your saved project survives until you save. |
+| FACTORY RESET | Factory sounds and patterns, no song, no motion. Your saved project survives until you save. |
 | ABOUT X0X | Version and audio load. |
 
-**SAVE** saves the sounds, the 16 patterns, the tempo and the settings. Anything unsaved is
-lost at power off.
+**SAVE** saves the sounds, the 16 patterns, the song, the knob motion, the tempo and the
+settings. Anything unsaved is lost at power off.
 
 ---
 
-## 13. MIDI
+## 15. MIDI
 
 The FM-1 shows up as "X0X FM-1".
 
@@ -319,7 +373,7 @@ Out: clock and start/stop (CLOCK OUT) and the patterns on the channels above (NO
 
 ---
 
-## 14. Your own breaks
+## 16. Your own breaks
 
 X0X ships no recorded breaks. The FM-1 has three sample slots of about 7 seconds; a one-bar
 loop takes about a third of one, so about nine fit. With the FM-1 connected:
@@ -337,7 +391,7 @@ To build loops into the firmware instead, see BUILDING.md.
 
 ---
 
-## 15. Update mode and calibration
+## 17. Update mode and calibration
 
 **Update mode:** hold OCT- and OCT+ for five seconds. Let go during the countdown to cancel.
 
@@ -346,7 +400,7 @@ on, then press and turn each control when asked.
 
 ---
 
-## 16. Parameters
+## 18. Parameters
 
 Drum values are 0–127. DIST is DIODE, CLIP, SAT, BFZ, PDIST, FOLD or CRUSH.
 
@@ -403,7 +457,7 @@ Drum values are 0–127. DIST is DIODE, CLIP, SAT, BFZ, PDIST, FOLD or CRUSH.
 
 ---
 
-## 17. Credits
+## 19. Credits
 
 X0X is free software under the GPL, version 3. If you pass the firmware on, pass on the
 source too.

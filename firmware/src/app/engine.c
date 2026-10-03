@@ -28,6 +28,9 @@ static master_t mst;
 #define DLY_LEN 88200
 static int16_t dly_buf[DLY_LEN] POOL;
 static volatile uint8_t brk_hold;      /* main loop is rewriting the break loops: ISR leaves it alone */
+static motion_t mot;
+static const sound_t *mot_base_snd;    /* the knobs' own values (the project's mirror) */
+static uint8_t mot_playing;
 
 /* mixer: per part Level, Rev send, Dly send (a drum machine's add to its voices' own sends) */
 enum { MX_LEVEL, MX_REV, MX_DLY, MX_NPARAMS };
@@ -186,7 +189,7 @@ static void s_boff(void *x, int p) { (void)x; bass303_note_off(&b303[p]); }
 static uint8_t brk_applied[BRK_NSET];  /* the pattern settings the break was last given */
 static void s_brk(void *x, int s16, int bar, float spb, int en)
 {
-    const brkpart_t *bp = &seq.pat[seq.cur].brk;
+    const brkpart_t *bp = &seq.pat[seq.ppat[TRK_BRK]].brk;
     int i;
     (void)x;
     if (brk_hold)
@@ -205,7 +208,35 @@ static void s_midi(void *x, uint8_t st, uint8_t d1, uint8_t d2)
     (void)x;
     plat_midi_out(cin | ((uint32_t)st << 8) | ((uint32_t)d1 << 16) | ((uint32_t)d2 << 24));
 }
-static void s_step(void *x, int t, int p) { (void)x; eng_step[t] = (uint8_t)p; }
+static void s_step(void *x, int t, int p)
+{
+    (void)x;
+    eng_step[t] = (uint8_t)p;
+    motion_step(&mot, t, seq.ppat[t], p, seq_next_step(&seq, t, p), seq_part_len(&seq, t));
+}
+
+/* --------------------------------------------------------------- motion --- */
+static int mot_base(void *x, int t, int v, int i)
+{
+    (void)x;
+    return mot_base_snd ? mot_base_snd->v[t][v][i] : 0;
+}
+static void mot_apply(void *x, int t, int v, int i, int val) { (void)x; apply_param(t, v, i, val); }
+
+int engine_motion_part(int t, int v)
+{
+    switch (t) {
+    case T_909: return PART_909;
+    case T_808: return PART_808;
+    case T_303: return PART_303A + (v & 1);
+    case T_BRK: return PART_BRK;
+    case T_MIX: return v < NPARTS ? v : PART_909;
+    default: return PART_909;                     /* FX, master: the bar */
+    }
+}
+int engine_motion_value(int k) { return motion_value(&mot, k); }
+void engine_motion_rec(int k) { motion_req_rec(&mot, k); }
+void engine_motion_hold(int k) { motion_req_hold(&mot, k); }
 static const seq_sink_t SINK = {s_drum, s_bon, s_boff, s_brk, s_brkstop, s_midi, s_step, 0};
 
 /* ---------------------------------------------------------------- MIDI in --- */
@@ -346,6 +377,7 @@ void engine_render(int32_t *out_lr, uint32_t n)
     if (n > 256u)
         n = 256u;
     drain();
+    motion_tick(&mot, n);
     fxbus_set_bpm(&fx, seq_tempo(&seq));
     seq_advance(&seq, 0, &SINK);
     while (done < n) {
@@ -354,6 +386,9 @@ void engine_render(int32_t *out_lr, uint32_t n)
         seq_advance(&seq, k, &SINK);
         done += k;
     }
+    if (mot_playing && !seq.playing)                     /* stopped: every knob back to its own value */
+        motion_release(&mot);
+    mot_playing = seq.playing;
     master_process(&mst, mono, (int)n, vol);
     for (i = 0; i < n; i++) {
         int32_t s = (int32_t)(mono[i] * 4194303.0f);     /* 2^22: Felucca's -6 dBFS ceiling of the 24-bit codec */
@@ -514,7 +549,7 @@ void engine_master_format(int i, char *buf) { master_format(&mst, i, buf); }
 
 void engine_brk_loops(void)
 {
-    const brkpart_t *bp = &seq.pat[seq.cur].brk;
+    const brkpart_t *bp = &seq.pat[seq.ppat[TRK_BRK]].brk;
     brk_loop_t L[2];
     int w;
     scan_loops();                                       /* an upload may have changed the user loops */
@@ -538,7 +573,7 @@ void engine_brk_loops(void)
     brk_hold = 0;
 }
 
-void engine_init(pattern_t *patterns)
+void engine_init(pattern_t *patterns, song_t *song, lane_t *lanes, const sound_t *base)
 {
     int p;
     drum909_init(&d909);
@@ -549,6 +584,11 @@ void engine_init(pattern_t *patterns)
     fxbus_init(&fx, dly_buf, DLY_LEN);
     master_init(&mst);
     seq_init(&seq, patterns);
+    seq.song = song;
+    motion_init(&mot, lanes);
+    mot.base = mot_base;
+    mot.apply = mot_apply;
+    mot_base_snd = base;
     for (p = 0; p < NPARTS; p++) {
         mix_level[p] = 1.0f;
         mix_rev[p] = mix_dly[p] = 0.0f;

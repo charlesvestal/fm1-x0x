@@ -10,7 +10,8 @@
  *   wait MS                      run the device for MS milliseconds
  *   press BTN | release BTN | tap BTN     (BTN: FX SEL ENV LFO EDIT GLO HOME SAVE ARP SEQ PLAY REC OCT- OCT+)
  *   key K down|up | tapkey K     (K: 0..26 = F3..G5, or w0..w15 white keys, b0..b10 black keys)
- *   turn ENC N                   (ENC: SELECT ALGO PRESET K1 K2 K3 K4; N detents, signed)
+ *   turn ENC N                   (ENC: SELECT ALGO PRESET K1 K2 K3 K4; N detents, signed, 80 ms apart)
+ *   spin ENC N                   N detents at once (1 ms)
  *   master N                     MASTER pot 0..4096
  *   slot K NAME A.wav [B.wav..]  user sample slot K (0..2): one loop (zone) per WAV, encoded here
  *   slotimg K F.hdr F.bin       slot K from tools/upload_breaks.py --dry-run's image (the device format)
@@ -18,7 +19,8 @@
  *   wav FILE | wavstop           start / stop recording the output
  *   shot FILE.png                save the screen
  *   leds                         print the lit buttons and keys
- *   expect WHAT VALUE            check state (playing, pattern, cue, view-part, ...): exit 1 on mismatch
+ *   expect WHAT VALUE            check state (playing, pattern, cue, view-part, ...): exit 1 on mismatch;
+ *                                VALUE "<N" / ">N" is a bound
  *   reboot                       save nothing; re-run boot from the simulated flash (persistence test)
  */
 #define X0X_HOST 1
@@ -97,7 +99,7 @@ void plat_midi_out(uint32_t pkt)
 
 /* flash: one buffer per object, kept across a simulated reboot */
 static uint8_t store[OBJ_NOBJ][PLAT_STORE_MAX];
-static int store_len[OBJ_NOBJ] = {-1, -1, -1, -1, -1};
+static int store_len[OBJ_NOBJ] = {-1, -1, -1, -1, -1, -1, -1};
 static uint32_t store_writes;
 int plat_store_load(uint32_t obj, void *dst, uint32_t max)
 {
@@ -318,7 +320,7 @@ static double now_ns(void)
 
 static void boot(void)
 {
-    engine_init(proj.pat);
+    engine_init(proj.pat, &proj.arr.song, proj.arr.lane, &proj.sound);
     if (project_load() != 0)
         project_defaults();
     engine_apply_sound(&proj.sound);
@@ -359,8 +361,8 @@ static void run_ms(uint32_t ms)
             }
             audio_due_ms += 256.0 * 1000.0 / 44100.0;
         }
-        if (seq.cur != last_pat) {
-            last_pat = seq.cur;
+        if (seq.ppat[TRK_BRK] != last_pat) {
+            last_pat = seq.ppat[TRK_BRK];
             engine_brk_loops();
         }
         if (now_ms >= ui_due) {
@@ -519,9 +521,41 @@ static int expect(const char *what, const char *val)
     if (!strcmp(what, "playing"))
         got = seq.playing;
     else if (!strcmp(what, "pattern"))
-        got = seq.cur + 1;
+        got = seq.ppat[PART_909] + 1;
     else if (!strcmp(what, "cue"))
-        got = seq.cue < NPAT ? seq.cue + 1 : 0;
+        got = seq_cue_of(&seq, PART_909) + 1;
+    else if (!strncmp(what, "ppat", 4))            /* ppatP: part P's pattern, 1-based */
+        got = seq.ppat[atoi(what + 4) % NPARTS] + 1;
+    else if (!strcmp(what, "songon"))
+        got = seq.song_on;
+    else if (!strcmp(what, "songlen"))
+        got = proj.arr.song.len;
+    else if (!strcmp(what, "songpos"))
+        got = seq.song_pos + 1;
+    else if (!strncmp(what, "songbar", 7)) {       /* songbarK.P: bar K (1-based) part P's pattern, 1-based; P 5 = mutes */
+        int k, q;
+        sscanf(what, "songbar%d.%d", &k, &q);
+        got = q < NPARTS ? proj.arr.song.bar[k - 1].pat[q] + 1 : proj.arr.song.bar[k - 1].mute;
+    } else if (!strcmp(what, "lanes"))
+        got = motion_count(proj.arr.lane);
+    else if (!strncmp(what, "motion", 6)) {        /* motionT.V.I: what that knob's lane plays now (-1 none) */
+        int t, v, i, part;
+        sscanf(what, "motion%d.%d.%d", &t, &v, &i);
+        part = engine_motion_part(t, v);
+        got = engine_motion_value(motion_find(proj.arr.lane, seq.ppat[part], part, t, v, i));
+    } else if (!strncmp(what, "laneval", 7)) {     /* lanevalT.V.I.S: the lane's value on step S (255 none, -1 no lane) */
+        int t, v, i, st, part, k;
+        sscanf(what, "laneval%d.%d.%d.%d", &t, &v, &i, &st);
+        part = engine_motion_part(t, v);
+        k = motion_find(proj.arr.lane, seq.ppat[part], part, t, v, i);
+        got = k < 0 ? -1 : proj.arr.lane[k].val[st];
+        if (k >= 0 && getenv("X0X_LANEDUMP")) {
+            int j;
+            for (j = 0; j < 16; j++)
+                printf(" %d", proj.arr.lane[k].val[j]);
+            printf("  (lane %d)\n", k);
+        }
+    }
     else if (!strcmp(what, "part"))
         got = ui.part;
     else if (!strcmp(what, "view"))
@@ -543,19 +577,19 @@ static int expect(const char *what, const char *val)
     } else if (!strncmp(what, "hit", 3)) {         /* hitK.V.S: kit K voice V step S set */
         int k, v, s;
         sscanf(what, "hit%d.%d.%d", &k, &v, &s);
-        got = (int)((proj.pat[seq.cur].drum[k].hit[v] >> s) & 1u);
+        got = (int)((proj.pat[seq.ppat[k]].drum[k].hit[v] >> s) & 1u);
     } else if (!strncmp(what, "gate", 4)) {        /* gateB.S: 303 B step S gate */
         int b, s;
         sscanf(what, "gate%d.%d", &b, &s);
-        got = bstep_gate(&proj.pat[seq.cur].bass[b].step[s]);
+        got = bstep_gate(&proj.pat[seq.ppat[PART_303A + b]].bass[b].step[s]);
     } else if (!strncmp(what, "note", 4)) {
         int b, s;
         sscanf(what, "note%d.%d", &b, &s);
-        got = proj.pat[seq.cur].bass[b].step[s].note;
+        got = proj.pat[seq.ppat[PART_303A + b]].bass[b].step[s].note;
     } else if (!strncmp(what, "brk", 3)) {
         int s;
         sscanf(what, "brk%d", &s);
-        got = (int)((proj.pat[seq.cur].brk.steps >> s) & 1u);
+        got = (int)((proj.pat[seq.ppat[PART_BRK]].brk.steps >> s) & 1u);
     } else if (!strncmp(what, "sound", 5)) {       /* soundT.V.I */
         int t, v, i;
         sscanf(what, "sound%d.%d.%d", &t, &v, &i);
@@ -565,10 +599,19 @@ static int expect(const char *what, const char *val)
     else if (!strcmp(what, "loops"))
         got = engine_brk_nslots();
     else if (!strcmp(what, "loop_a"))
-        got = proj.pat[seq.cur].brk.slot_a;
+        got = proj.pat[seq.ppat[PART_BRK]].brk.slot_a;
     else {
         printf("FAIL unknown expect %s\n", what);
         return 1;
+    }
+    if (val[0] == '<' || val[0] == '>') {          /* a bound: "<30", ">0" */
+        int lim = (int)strtol(val + 1, 0, 0);
+        if (val[0] == '<' ? got >= lim : got <= lim) {
+            printf("FAIL expect %s %s, got %d\n", what, val, got);
+            return 1;
+        }
+        printf("  ok %s == %d (%s)\n", what, got, val);
+        return 0;
     }
     if (got != (int)strtol(val, 0, 0)) {
         printf("FAIL expect %s == %s, got %d\n", what, val, got);
@@ -640,6 +683,14 @@ int main(int argc, char **argv)
                 enc_acc[e] += s;
                 run_ms(80);
             }
+        } else if (!strcmp(cmd, "spin")) {              /* spin ENC N: all N detents at once (a fast hand) */
+            int e = find_name(ENC_N, NE, a);
+            if (e < 0) {
+                printf("line %d: no encoder %s\n", lineno, a);
+                return 2;
+            }
+            enc_acc[e] += atoi(b);
+            run_ms(1);
         } else if (!strcmp(cmd, "master"))
             master = (uint32_t)atoi(a);
         else if (!strcmp(cmd, "slot")) {                /* slot K NAME a.wav [b.wav ...]: one zone each */

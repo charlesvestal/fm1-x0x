@@ -19,8 +19,8 @@ static const int8_t KEY_WHITE[NKEYS] = {0, -1, 1, -1, 2, -1, 3, 4, -1, 5, -1, 6,
 static const int8_t KEY_BLACK[NKEYS] = {-1, 0, -1, 1, -1, 2, -1, -1, 3, -1, 4, -1, -1, 5, -1, 6, -1, 7, -1, -1, 8, -1, 9, -1, -1, 10, -1};
 static uint8_t WHITE_KEY[16], BLACK_KEY[11];
 
-enum { V_HOME, V_PART, V_GEN, V_FX, V_MIX, V_GLO, NVIEWS };
-static const char *const VIEW_N[NVIEWS] = {"HOME", "", "TB-3PO", "FX", "MIX", "GLOBAL"};
+enum { V_HOME, V_PART, V_GEN, V_FX, V_MIX, V_GLO, V_SONG, NVIEWS };
+static const char *const VIEW_N[NVIEWS] = {"HOME", "", "TB-3PO", "FX", "MIX", "GLOBAL", "SONG"};
 static const uint16_t PART_COL[NPARTS] = {RGB(255, 150, 40), RGB(255, 72, 64), RGB(130, 240, 90), RGB(70, 205, 255),
                                           RGB(214, 120, 255)};
 static const char *const PART_N[NPARTS] = {"909", "808", "303A", "303B", "BREAK"};
@@ -28,7 +28,8 @@ static const char *const PART_S[NPARTS] = {"909", "808", "303A", "303B", "BRK"};
 
 /* overlays drawn over the main area */
 enum { O_NONE, O_LIST, O_ASK };
-enum { ACT_NONE, ACT_SAVE, ACT_CLEAR_PART, ACT_CLEAR_PAT, ACT_COPY, ACT_RESET, ACT_ABOUT };
+enum { ACT_NONE, ACT_SAVE, ACT_CLEAR_PART, ACT_CLEAR_PAT, ACT_COPY, ACT_RESET, ACT_ABOUT, ACT_SONG_INS,
+       ACT_SONG_DEL, ACT_SONG_CLR };
 
 typedef struct {
     uint8_t view, part, prev_view;
@@ -56,10 +57,14 @@ typedef struct {
     uint32_t dirty;
     uint8_t outline[232];              /* the break loop's outline */
     uint8_t outline_ok, outline_slot;
+    uint8_t song_sel;                  /* the SONG screen's bar */
 } ui_t;
 static ui_t ui;
 
-static pattern_t *cur_pat(void) { return &proj.pat[seq.cur]; }
+static pattern_t *pat_of(int part) { return &proj.pat[seq.ppat[part]]; }
+static pattern_t *cur_pat(void) { return pat_of(ui.part); }    /* the pattern the part on screen plays */
+static int part_view(void) { return ui.view == V_PART || ui.view == V_GEN; }
+static song_t *song(void) { return &proj.arr.song; }
 static int is_303(void) { return ui.part == PART_303A || ui.part == PART_303B; }
 static int is_drum(void) { return ui.part == PART_909 || ui.part == PART_808; }
 static int bidx(void) { return ui.part == PART_303B ? 1 : 0; }
@@ -113,7 +118,8 @@ static void say(const char *a, const char *b)
 
 /* =============================================================== param refs === */
 enum { R_NONE, R_ENG, R_SWING, R_DLEN, R_DRATE, R_BLEN, R_BRATE, R_BDIR, R_BTRANS, R_GEN, R_BRKSET,
-       R_BRKSLOT, R_TEMPO, R_ACCENT, R_CLKOUT, R_NOTEOUT, R_PALETTE, R_KEYLED, R_ACT };
+       R_BRKSLOT, R_TEMPO, R_ACCENT, R_CLKOUT, R_NOTEOUT, R_PALETTE, R_KEYLED, R_ACT, R_SBAR, R_SPAT, R_SMODE,
+       R_SLEN };
 typedef struct { uint8_t kind, a, b, c; } pref_t;
 #define PR(k, a, b, c) ((pref_t){(k), (a), (b), (c)})
 #define NONE PR(R_NONE, 0, 0, 0)
@@ -139,8 +145,32 @@ static const x0x_param_t SEQ_P[NSQ] = {
 };
 static const x0x_param_t ACT_P[] = {
     {"", 0, 0, 0}, {"SAVE PROJECT", 0, 0, 0}, {"CLEAR THIS PART", 0, 0, 0}, {"CLEAR PATTERN", 0, 0, 0},
-    {"COPY PATTERN", 0, 0, 0}, {"FACTORY RESET", 0, 0, 0}, {"ABOUT X0X", 0, 0, 0},
+    {"COPY PATTERN", 0, 0, 0}, {"FACTORY RESET", 0, 0, 0}, {"ABOUT X0X", 0, 0, 0}, {"INSERT BAR", 0, 0, 0},
+    {"DELETE BAR", 0, 0, 0}, {"CLEAR SONG", 0, 0, 0},
 };
+static const char *const MODE_N[] = {"PATTERN", "SONG"};
+static const x0x_param_t SONG_P[] = {
+    {"909", 15, 0, 0}, {"808", 15, 0, 0}, {"303A", 15, 0, 0}, {"303B", 15, 0, 0}, {"BREAK", 15, 0, 0},
+    {"MODE", 1, 0, MODE_N}, {"LENGTH", NSONG, 0, 0},
+};
+
+/* the song's bar k exists from here on: a new bar repeats the one before (the first: what plays) */
+static void song_fill(int k)
+{
+    song_t *sg = song();
+    while (sg->len <= k && sg->len < NSONG) {
+        song_bar_t *b = &sg->bar[sg->len];
+        int p;
+        if (sg->len)
+            *b = sg->bar[sg->len - 1];
+        else {
+            for (p = 0; p < NPARTS; p++)
+                b->pat[p] = seq.ppat[p];
+            b->mute = 0;
+        }
+        sg->len++;
+    }
+}
 
 static const x0x_param_t *pref_desc(pref_t r)
 {
@@ -168,6 +198,14 @@ static const x0x_param_t *pref_desc(pref_t r)
     case R_PALETTE: return &SEQ_P[SQ_THEME];
     case R_KEYLED: return &SEQ_P[SQ_KEYLED];
     case R_ACT: return &ACT_P[r.a];
+    case R_SBAR: {
+        static x0x_param_t d = {"BAR", 0, 0, 0};
+        d.max = (uint8_t)(song()->len < NSONG ? song()->len : NSONG - 1);
+        return &d;
+    }
+    case R_SPAT: return &SONG_P[r.a % NPARTS];
+    case R_SMODE: return &SONG_P[5];
+    case R_SLEN: return &SONG_P[6];
     default: return 0;
     }
 }
@@ -177,7 +215,7 @@ static int pref_get(pref_t r)
     pattern_t *p = cur_pat();
     switch (r.kind) {
     case R_ENG: return proj.sound.v[r.a][r.b][r.c];
-    case R_SWING: return p->swing;
+    case R_SWING: return pat_of(PART_909)->swing;
     case R_DLEN: return p->drum[r.a].len - 1;
     case R_DRATE: return p->drum[r.a].rate;
     case R_BLEN: return p->bass[r.a].len - 1;
@@ -205,6 +243,14 @@ static int pref_get(pref_t r)
     case R_NOTEOUT: return seq.send_notes;
     case R_PALETTE: return proj.set.palette;
     case R_KEYLED: return proj.set.keyled;
+    case R_SBAR: return ui.song_sel;
+    case R_SPAT: {
+        const song_t *sg = song();
+        int k = ui.song_sel < sg->len ? ui.song_sel : sg->len - 1;
+        return k >= 0 ? sg->bar[k].pat[r.a] : seq.ppat[r.a];
+    }
+    case R_SMODE: return seq.song_on;
+    case R_SLEN: return song()->len;
     default: return 0;
     }
 }
@@ -222,7 +268,7 @@ static void pref_set(pref_t r, int v)
         proj.sound.v[r.a][r.b][r.c] = (uint8_t)v;
         engine_set(r.a, r.b, r.c, v);
         break;
-    case R_SWING: p->swing = (uint8_t)v; break;
+    case R_SWING: pat_of(PART_909)->swing = (uint8_t)v; break;
     case R_DLEN: p->drum[r.a].len = (uint8_t)(v + 1); break;
     case R_DRATE: p->drum[r.a].rate = (uint8_t)v; break;
     case R_BLEN: p->bass[r.a].len = (uint8_t)(v + 1); break;
@@ -260,6 +306,20 @@ static void pref_set(pref_t r, int v)
     case R_NOTEOUT: seq.send_notes = (uint8_t)v; break;
     case R_PALETTE: proj.set.palette = (uint8_t)v; palette_set((uint32_t)v); break;
     case R_KEYLED: proj.set.keyled = (uint8_t)v; break;
+    case R_SBAR: ui.song_sel = (uint8_t)v; break;
+    case R_SPAT:
+        song_fill(ui.song_sel);
+        song()->bar[ui.song_sel].pat[r.a] = (uint8_t)v;
+        break;
+    case R_SMODE: seq.song_on = (uint8_t)v; break;
+    case R_SLEN:
+        if (v > song()->len)
+            song_fill(v - 1);
+        else
+            song()->len = (uint16_t)v;
+        if (ui.song_sel > song()->len)
+            ui.song_sel = (uint8_t)(song()->len < NSONG ? song()->len : NSONG - 1);
+        break;
     default: break;
     }
 }
@@ -279,10 +339,9 @@ static const char *pref_name(pref_t r)
 }
 
 /* the value, as a number and a unit ("-6" "dB"); a switch gives its name and no unit */
-static void pref_value(pref_t r, char *num, char *unit)
+static void pref_value_of(pref_t r, int v, char *num, char *unit)
 {
     const x0x_param_t *d = pref_desc(r);
-    int v = pref_get(r);
     *num = *unit = 0;
     if (!d || r.kind == R_ACT)
         return;
@@ -358,9 +417,13 @@ static void pref_value(pref_t r, char *num, char *unit)
         return;
     case R_BRKSET: put_i(num, v); put_s(unit, "%"); return;
     case R_TEMPO: put_i(num, v + 20); put_s(unit, "bpm"); return;
+    case R_SBAR: put_i(num, v + 1); return;
+    case R_SPAT: num[0] = 'P'; put_i(num + 1, v + 1); return;
+    case R_SLEN: put_i(num, v); put_s(unit, "bar"); return;
     default: put_i(num, v); return;
     }
 }
+static void pref_value(pref_t r, char *num, char *unit) { pref_value_of(r, pref_get(r), num, unit); }
 
 /* ===================================================================== pages === */
 #define MAXPAGES 14
@@ -480,6 +543,12 @@ static void build_pages(void)
         add_page("MORE", PR(R_ENG, T_MIX, PART_BRK, 0), PR(R_SWING, 0, 0, 0), PR(R_TEMPO, 0, 0, 0),
                  PR(R_ACCENT, 0, 0, 0));
         break;
+    case V_SONG:
+        add_page("BAR", PR(R_SBAR, 0, 0, 0), PR(R_SPAT, PART_909, 0, 0), PR(R_SPAT, PART_808, 0, 0),
+                 PR(R_SPAT, PART_303A, 0, 0));
+        add_page("BAR", PR(R_SBAR, 0, 0, 0), PR(R_SPAT, PART_303B, 0, 0), PR(R_SPAT, PART_BRK, 0, 0),
+                 PR(R_SMODE, 0, 0, 0));
+        break;
     default: break;
     }
     if (pg.n == 0)
@@ -515,6 +584,12 @@ static void open_list_of_pages(void)
     for (p = 0; p < pg.n; p++)
         for (k = 0; k < 4; k++)
             list_add(pg.r[p][k]);
+    if (ui.view == V_SONG) {
+        list_add(PR(R_SLEN, 0, 0, 0));
+        list_add(PR(R_ACT, ACT_SONG_INS, 0, 0));
+        list_add(PR(R_ACT, ACT_SONG_DEL, 0, 0));
+        list_add(PR(R_ACT, ACT_SONG_CLR, 0, 0));
+    }
     put_s(list_title, ui.view == V_PART ? PART_N[ui.part] : VIEW_N[ui.view]);
     ui.list_sel = ui.list_top = 0;
     ui.overlay = ui.list_n ? O_LIST : O_NONE;
@@ -528,6 +603,7 @@ static void open_global(void)
     list_add(PR(R_KEYLED, 0, 0, 0));
     list_add(PR(R_PALETTE, 0, 0, 0));
     list_add(PR(R_ACCENT, 0, 0, 0));
+    list_add(PR(R_SMODE, 0, 0, 0));
     list_add(PR(R_ACT, ACT_SAVE, 0, 0));
     list_add(PR(R_ACT, ACT_CLEAR_PAT, 0, 0));
     list_add(PR(R_ACT, ACT_RESET, 0, 0));
@@ -555,6 +631,49 @@ static int pattern_used(const pattern_t *pt)
     for (s = 0; s < NSTEPS; s++)
         used |= bstep_gate(&pt->bass[0].step[s]) != G_REST || bstep_gate(&pt->bass[1].step[s]) != G_REST;
     return used;
+}
+
+/* motion lanes of one part pattern: gone, and the knobs back to their own values */
+static void clear_lanes(int pat, int part)
+{
+    int k;
+    for (k = 0; k < NLANE; k++) {
+        lane_t *l = &proj.arr.lane[k];
+        if (l->used && l->pat == pat && l->part == part) {
+            motion_clear(proj.arr.lane, k);
+            engine_set(l->t, l->v, l->i, proj.sound.v[l->t][l->v][l->i]);
+        }
+    }
+}
+
+/* part `part` of pattern src onto pattern dst, its lanes too; 0 = done, -1 = lanes did not fit */
+static int copy_part(int dst, int src, int part)
+{
+    pattern_t *d = &proj.pat[dst];
+    const pattern_t *a = &proj.pat[src];
+    int k, rc = 0;
+    if (part < NKIT) {
+        d->drum[part] = a->drum[part];
+        if (part == PART_909)
+            d->swing = a->swing;                      /* the 909 is the bar: its groove goes with it */
+    } else if (part < PART_BRK)
+        d->bass[part - NKIT] = a->bass[part - NKIT];
+    else
+        d->brk = a->brk;
+    clear_lanes(dst, part);
+    for (k = 0; k < NLANE; k++) {                     /* a copy lands on pattern dst: never copied again */
+        const lane_t *l = &proj.arr.lane[k];
+        int n, i;
+        if (!l->used || l->pat != src || l->part != part)
+            continue;
+        if ((n = motion_alloc(proj.arr.lane, dst, part, l->t, l->v, l->i)) < 0) {
+            rc = -1;
+            break;
+        }
+        for (i = 0; i < NSTEPS; i++)
+            proj.arr.lane[n].val[i] = l->val[i];
+    }
+    return rc;
 }
 
 static void clear_part(pattern_t *p, int part)
@@ -586,23 +705,55 @@ static void run_action(int act, int arg)
     switch (act) {
     case ACT_SAVE: save_project(); break;
     case ACT_CLEAR_PART:
-        clear_part(cur_pat(), arg);
+        clear_part(pat_of(arg), arg);
+        clear_lanes(seq.ppat[arg], arg);
         ui.dirty = 1;
         say("CLEARED ", PART_N[arg]);
         break;
     case ACT_CLEAR_PAT: {
         int i;
-        for (i = 0; i < NPARTS; i++)
-            clear_part(cur_pat(), i);
+        for (i = 0; i < NPARTS; i++) {
+            clear_part(pat_of(i), i);
+            clear_lanes(seq.ppat[i], i);
+        }
         ui.dirty = 1;
         say("PATTERN CLEARED", 0);
         break;
     }
-    case ACT_COPY:
-        proj.pat[arg] = *cur_pat();
+    case ACT_COPY: {                                  /* arg: pattern | (part + 1) << 4, part 0 = all five */
+        int dst = arg & 15, part = (arg >> 4) - 1, i, rc = 0;
+        for (i = 0; i < NPARTS; i++)
+            if ((part < 0 || i == part) && seq.ppat[i] != dst)
+                rc |= copy_part(dst, seq.ppat[i], i);
         ui.dirty = 1;
-        put_i(put_s(t, "COPIED TO P"), arg + 1);
-        say(t, 0);
+        put_i(put_s(t, part < 0 ? "COPIED TO P" : "PART COPIED TO P"), dst + 1);
+        say(rc ? "MOTION FULL: NOT ALL COPIED" : t, 0);
+        break;
+    }
+    case ACT_SONG_INS:
+    case ACT_SONG_DEL: {
+        song_t *sg = song();
+        int k = ui.song_sel, i;
+        if (k >= sg->len)
+            break;
+        if (act == ACT_SONG_INS && sg->len < NSONG) {
+            for (i = sg->len; i > k; i--)
+                sg->bar[i] = sg->bar[i - 1];
+            sg->len++;
+        } else if (act == ACT_SONG_DEL) {
+            for (i = k; i + 1 < sg->len; i++)
+                sg->bar[i] = sg->bar[i + 1];
+            sg->len--;
+        }
+        ui.dirty = 1;
+        say(act == ACT_SONG_INS ? "BAR INSERTED" : "BAR DELETED", 0);
+        break;
+    }
+    case ACT_SONG_CLR:
+        song()->len = 0;
+        ui.song_sel = 0;
+        ui.dirty = 1;
+        say("SONG CLEARED", 0);
         break;
     case ACT_RESET:
         project_defaults();
@@ -642,6 +793,61 @@ static void set_view(int v)
     build_pages();
 }
 
+/* a sound knob turned: record its lane (REC, playing), or let the knob win over the lane for a pass */
+static void motion_touch(pref_t r)
+{
+    int part, k;
+    if (r.kind != R_ENG || !seq.playing)
+        return;
+    part = engine_motion_part(r.a, r.b);
+    k = motion_find(proj.arr.lane, seq.ppat[part], part, r.a, r.b, r.c);
+    if (ui.rec) {
+        if (k < 0 && (k = motion_alloc(proj.arr.lane, seq.ppat[part], part, r.a, r.b, r.c)) < 0) {
+            say("MOTION FULL", 0);
+            return;
+        }
+        engine_motion_rec(k);
+    } else if (k >= 0) {
+        engine_motion_hold(k);
+    }
+}
+
+/* SAVE held + a sound knob: forget its motion in this pattern */
+static void motion_forget(pref_t r)
+{
+    int part, k;
+    if (r.kind != R_ENG)
+        return;
+    part = engine_motion_part(r.a, r.b);
+    k = motion_find(proj.arr.lane, seq.ppat[part], part, r.a, r.b, r.c);
+    if (k < 0) {
+        say("NO MOTION ON ", pref_name(r));
+        return;
+    }
+    motion_clear(proj.arr.lane, k);
+    engine_set(r.a, r.b, r.c, proj.sound.v[r.a][r.b][r.c]);
+    ui.dirty = 1;
+    say("MOTION CLEARED: ", pref_name(r));
+}
+
+/* what a knob's lane plays now in this pattern, -1 none (the knob strip draws it) */
+static int motion_now(pref_t r)
+{
+    int part;
+    if (r.kind != R_ENG)
+        return -1;
+    part = engine_motion_part(r.a, r.b);
+    return engine_motion_value(motion_find(proj.arr.lane, seq.ppat[part], part, r.a, r.b, r.c));
+}
+static int has_motion(pref_t r)
+{
+    int part;
+    if (r.kind != R_ENG)
+        return 0;
+    part = engine_motion_part(r.a, r.b);
+    return motion_find(proj.arr.lane, seq.ppat[part], part, r.a, r.b, r.c) >= 0;
+}
+
 static void turn_ref(pref_t r, int e, int knob)
 {
     const x0x_param_t *d = pref_desc(r);
@@ -652,6 +858,7 @@ static void turn_ref(pref_t r, int e, int knob)
     else
         e = accel(knob, e, d->max);
     pref_set(r, pref_get(r) + e);
+    motion_touch(r);
 }
 
 static int rec_step(int track) { return eng_step[track]; }
@@ -756,6 +963,15 @@ static void bass_step_key(int white, int down)
     }
 }
 
+static int all_on(int w)                               /* every part plays pattern w */
+{
+    int p;
+    for (p = 0; p < NPARTS; p++)
+        if (seq.ppat[p] != w)
+            return 0;
+    return 1;
+}
+
 static const uint32_t MUTE_MASK[NPARTS] = {(1u << NDRUM) - 1u, ((1u << NDRUM) - 1u) << NDRUM, 1u << MUTE_BASS0,
                                            1u << (MUTE_BASS0 + 1), 1u << MUTE_BRK};
 static int part_muted(int p) { return (seq.mute & MUTE_MASK[p]) == MUTE_MASK[p]; }
@@ -766,15 +982,33 @@ static void key_event(int k, int down)
     if (ui.overlay == O_ASK)
         return;
     if (down && w >= 0 && (ui.btn & (1u << B_SAVE))) {     /* SAVE held + white key: copy here */
+        int part = part_view() ? ui.part : -1, arg = w | (part + 1) << 4;   /* a part's screen: that part */
         ui.btn_used |= 1u << B_SAVE;
-        if (w == seq.cur)
+        if (part >= 0 ? seq.ppat[part] == w : all_on(w))
             return;
         if (pattern_used(&proj.pat[w])) {
             char t[24];
             put_s(put_i(put_s(t, "COPY OVER P"), w + 1), "?");
-            ask(ACT_COPY, w, t, "IT HAS NOTES");
+            ask(ACT_COPY, arg, t, "IT HAS NOTES");
         } else
-            run_action(ACT_COPY, w);
+            run_action(ACT_COPY, arg);
+        return;
+    }
+    if (ui.view == V_SONG && !(ui.btn & (1u << B_HOME))) {   /* SONG: white = the bar's pattern, black = its mutes */
+        int k = ui.song_sel;
+        if (!down || k >= NSONG || (w < 0 && bl >= NPARTS))
+            return;
+        song_fill(k);
+        if (w >= 0) {
+            int p;
+            for (p = 0; p < NPARTS; p++)
+                song()->bar[k].pat[p] = (uint8_t)w;
+            if (k + 1 < NSONG)
+                ui.song_sel = (uint8_t)(k + 1);
+        } else {
+            song()->bar[k].mute ^= (uint8_t)(1u << bl);
+        }
+        ui.dirty = 1;
         return;
     }
     if (w >= 0 && (ui.view == V_HOME || (ui.btn & (1u << B_HOME)))) {
@@ -801,6 +1035,10 @@ static void key_event(int k, int down)
     if (ui.view == V_HOME && bl >= 0) {
         if (down && bl < NPARTS) {
             seq.mute = part_muted(bl) ? seq.mute & ~MUTE_MASK[bl] : seq.mute | MUTE_MASK[bl];
+            if (seq.song_rec && seq.playing && seq.song_pos < song()->len) {   /* song recording: this bar too */
+                song_bar_t *b = &song()->bar[seq.song_pos];
+                b->mute = (uint8_t)(part_muted(bl) ? b->mute | 1u << bl : b->mute & ~(1u << bl));
+            }
             say(part_muted(bl) ? "MUTED " : "UNMUTED ", PART_N[bl]);
         }
         return;
@@ -844,7 +1082,9 @@ static void list_enter(void)
     if (r.a == ACT_CLEAR_PAT)
         ask(ACT_CLEAR_PAT, 0, "CLEAR THIS PATTERN?", "ALL FIVE PARTS");
     else if (r.a == ACT_RESET)
-        ask(ACT_RESET, 0, "FACTORY RESET?", "SOUND + 16 PATTERNS");
+        ask(ACT_RESET, 0, "FACTORY RESET?", "SOUND, PATTERNS, SONG");
+    else if (r.a == ACT_SONG_CLR)
+        ask(ACT_SONG_CLR, 0, "CLEAR THE SONG?", 0);
     else
         run_action(r.a, 0);
 }
@@ -878,8 +1118,10 @@ static void button_tap(int b)
     case B_PLAY:
         if (seq.playing)
             seq_stop(&seq);
-        else
+        else {
+            seq.song_start = ui.song_sel < song()->len ? ui.song_sel : 0;
             seq_start(&seq);
+        }
         break;
     case B_REC:
         if (ui.btn & (1u << B_SAVE)) {               /* SAVE + REC: clear this part (asks) */
@@ -943,6 +1185,10 @@ static void button_tap(int b)
         }
         break;
     case B_SEQ:
+        if (ui.view == V_HOME || ui.view == V_SONG) {      /* HOME <-> SONG */
+            set_view(ui.view == V_HOME ? V_SONG : V_HOME);
+            break;
+        }
         if (is_303()) {
             ui.kbd[bidx()] = !ui.kbd[bidx()];
             say(ui.kbd[bidx()] ? "303: KEYBOARD" : "303: STEPS", 0);
@@ -1017,6 +1263,7 @@ static void input(void)
         if (ch & (1u << i))
             key_event((int)i, (keys >> i) & 1u);
     build_pages();
+    seq.song_rec = (uint8_t)(seq.song_on && ui.rec);  /* SONG mode + REC: the song is being written */
     if (ui.overlay == O_ASK) {                         /* a question: the knobs wait */
         for (i = 0; i < NE; i++)
             plat_enc((int)i);
@@ -1043,17 +1290,21 @@ static void input(void)
         } else {
             int p = ui.part + (e > 0 ? 1 : -1);
             ui.part = (uint8_t)(p < 0 ? 0 : p >= NPARTS ? NPARTS - 1 : p);
-            if (ui.view == V_HOME || (ui.view == V_GEN && !is_303()))
+            if (ui.view == V_HOME || ui.view == V_SONG || (ui.view == V_GEN && !is_303()))
                 set_view(V_PART);
             ui.outline_ok = 0;
             build_pages();
         }
     }
-    if ((e = plat_enc(EN_PRESET)) != 0) {
-        int base = seq.cue < NPAT ? seq.cue : seq.cur, p = base + (e > 0 ? 1 : -1);
+    if ((e = plat_enc(EN_PRESET)) != 0) {             /* PRESETS: a part's screen, that part; else all five */
+        int part = part_view() ? ui.part : PART_909, c = seq_cue_of(&seq, part);
+        int p = (c >= 0 ? c : seq.ppat[part]) + (e > 0 ? 1 : -1);
         p = p < 0 ? 0 : p >= NPAT ? NPAT - 1 : p;
         seq_chain(&seq, 0, 0);
-        seq_cue(&seq, p);
+        if (part_view())
+            seq_cue_part(&seq, part, p);
+        else
+            seq_cue(&seq, p);
     }
     for (i = 0; i < 4; i++) {
         if ((e = plat_enc(EN_K1 + (int)i)) == 0)
@@ -1076,6 +1327,11 @@ static void input(void)
             } else {
                 st->flags ^= BS_SLIDE;
             }
+            continue;
+        }
+        if (ui.btn & (1u << B_SAVE)) {                  /* SAVE + knob: forget that knob's motion */
+            ui.btn_used |= 1u << B_SAVE;
+            motion_forget(pg.r[cur_page()][i]);
             continue;
         }
         turn_ref(pg.r[cur_page()][i], e, EN_K1 + (int)i);
@@ -1399,15 +1655,24 @@ static void draw_header(void)
         for (i = 0; i < pg.n && i < 9; i++)
             cv_rect(x + i * 5, 8, 3, 3, i == p ? C_HI : C_LINE);
     }
-    b[0] = 'P';
-    put_i(b + 1, seq.cur + 1);
-    x = cv_text(132, vc(&FONT_B, 1, 17), &FONT_B, b, C_WHITE);
-    if (seq.cue < NPAT && seq.cue != seq.cur) {
-        b[0] = '>';
-        put_i(b + 1, seq.cue + 1);
-        cv_text(x + 2, vc(&FONT_S, 1, 17), &FONT_S, b, (ui.frame & 16u) ? C_WHITE : C_GRAY);
-    } else if (seq.chain_a != seq.chain_b) {
-        cv_text(x + 3, vc(&FONT_XS, 1, 17), &FONT_XS, "CHN", C_AMB);
+    {   /* the pattern of the part on screen (else the 909's), its cue; in SONG mode the bar */
+        int part = part_view() ? ui.part : PART_909, cue = seq_cue_of(&seq, part);
+        if (seq.song_on) {
+            b[0] = 'S';
+            put_i(b + 1, (seq.playing ? seq.song_pos : ui.song_sel) + 1);
+            x = cv_text(132, vc(&FONT_B, 1, 17), &FONT_B, b, seq.song_rec ? RGB(255, 90, 80) : C_AMB);
+        } else {
+            b[0] = 'P';
+            put_i(b + 1, seq.ppat[part] + 1);
+            x = cv_text(132, vc(&FONT_B, 1, 17), &FONT_B, b, C_WHITE);
+        }
+        if (cue >= 0 && cue != seq.ppat[part] && !seq.song_on) {
+            b[0] = '>';
+            put_i(b + 1, cue + 1);
+            cv_text(x + 2, vc(&FONT_S, 1, 17), &FONT_S, b, (ui.frame & 16u) ? C_WHITE : C_GRAY);
+        } else if (seq.chain_a != seq.chain_b && !seq.song_on) {
+            cv_text(x + 3, vc(&FONT_XS, 1, 17), &FONT_XS, "CHN", C_AMB);
+        }
     }
     put_i(b, (int)(seq_tempo(&seq) + 0.5f));
     text_r(212, vc(&FONT_S, 1, 17), &FONT_S, b, seq.ext ? C_AMB : C_HI);
@@ -1620,42 +1885,82 @@ static void lane(int y, int p, uint32_t bits, int ph, int len)
 
 static void draw_home(int band)
 {
-    const pattern_t *pt = cur_pat();
     int p, c;
-    if (band == 0) {                                   /* the 16 patterns */
+    if (band == 0) {                                   /* the 16 patterns; in each, a bar per part playing it */
+        int cue = seq_cue_of(&seq, PART_909);
         for (c = 0; c < NPAT; c++) {
             int x = 4 + c * 14 + (c >= 8 ? 4 : 0);
             int in_chain = seq.chain_a != seq.chain_b &&
                            c >= (seq.chain_a < seq.chain_b ? seq.chain_a : seq.chain_b) &&
                            c <= (seq.chain_a < seq.chain_b ? seq.chain_b : seq.chain_a);
-            box(x, 3, 12, 18, c == seq.cur ? C_WHITE : pattern_used(&proj.pat[c]) ? C_DIM : C_LINE);
-            if (c == seq.cue && c != seq.cur && (ui.frame & 16u))
+            box(x, 3, 12, 18, pattern_used(&proj.pat[c]) ? C_DIM : C_LINE);
+            for (p = 0; p < NPARTS; p++)
+                if (seq.ppat[p] == c)
+                    rbox(x + 2, 5 + p * 3, 8, 2, 1, PART_COL[p]);
+            if (c == cue && c != seq.ppat[PART_909] && (ui.frame & 16u))
                 frame(x - 1, 2, 14, 20, C_WHITE);
             if (in_chain)
                 cv_rect(x, 23, 12, 2, C_AMB);
         }
         for (p = 0; p < 2; p++) {
+            const dpart_t *d = &pat_of(p)->drum[p];
             uint32_t bits = 0;
             int v;
             for (v = 0; v < NDRUM; v++)
-                bits |= pt->drum[p].hit[v];
-            lane(32 + p * 16, p, bits, eng_step[TRK_DRUM + p], pt->drum[p].len);
+                bits |= d->hit[v];
+            lane(32 + p * 16, p, bits, eng_step[TRK_DRUM + p], d->len);
         }
     } else {
         for (p = 2; p < NPARTS; p++) {
             uint32_t bits = 0;
             int s;
             if (p < PART_BRK) {
+                const bpart_t *bp = &pat_of(p)->bass[p - NKIT];
                 for (s = 0; s < NSTEPS; s++)
-                    if (bstep_gate(&pt->bass[p - NKIT].step[s]) != G_REST)
+                    if (bstep_gate(&bp->step[s]) != G_REST)
                         bits |= 1u << s;
-                lane((p - 2) * 16 + 1, p, bits, eng_step[TRK_BASS0 + p - NKIT], pt->bass[p - NKIT].len);
+                lane((p - 2) * 16 + 1, p, bits, eng_step[TRK_BASS0 + p - NKIT], bp->len);
             } else {
-                lane((p - 2) * 16 + 1, p, pt->brk.steps, eng_step[TRK_BRK], 16);
+                lane((p - 2) * 16 + 1, p, pat_of(p)->brk.steps, eng_step[TRK_BRK], 16);
             }
         }
         segs(4, 50, &FONT_XS, C_DIM, 14, "WHITE: PATTERN", "TWO HELD: CHAIN", 0, 0);
-        segs(4, 60, &FONT_XS, C_DIM, 14, "BLACK 1-5: MUTE", "SAVE + WHITE: COPY", 0, 0);
+        segs(4, 60, &FONT_XS, C_DIM, 14, "BLACK 1-5: MUTE", "SEQ: SONG", 0, 0);
+    }
+}
+
+/* SONG: a table of bars, twelve rows across the two bands (the first is the heading) */
+static void draw_song(int band)
+{
+    const song_t *sg = song();
+    int r, p, top = ui.song_sel > 5 ? ui.song_sel - 5 : 0;
+    for (r = 0; r < 6; r++) {
+        int row = band * 6 + r, y = r * 12, k = top + row - 1;
+        char t[8];
+        if (row == 0) {                                /* the heading */
+            cv_text(4, vc(&FONT_XS, y, 12), &FONT_XS, "BAR", C_GRAY);
+            for (p = 0; p < NPARTS; p++)
+                text_c(58 + p * 36, vc(&FONT_XS, y, 12), &FONT_XS, PART_S[p], PART_COL[p]);
+            continue;
+        }
+        if (k > sg->len || k >= NSONG)
+            break;
+        if (k == ui.song_sel)
+            box(0, y, 236, 12, C_LINE);
+        put_i(t, k + 1);
+        cv_text(4, vc(&FONT_XS, y, 12), &FONT_XS, t, k == ui.song_sel ? C_WHITE : C_GRAY);
+        if (seq.song_on && seq.playing && k == seq.song_pos)
+            play_icon(26, y + 1, seq.song_rec ? RGB(255, 80, 70) : C_WHITE);
+        if (k == sg->len) {                            /* one past the end: where the song grows */
+            cv_text(50, vc(&FONT_XS, y, 12), &FONT_XS, k ? "END" : "EMPTY: WHITE KEYS ADD BARS", C_DIM);
+            continue;
+        }
+        for (p = 0; p < NPARTS; p++) {
+            int muted = sg->bar[k].mute >> p & 1u;
+            t[0] = 'P';
+            put_i(t + 1, sg->bar[k].pat[p] + 1);
+            text_c(58 + p * 36, vc(&FONT_XS, y, 12), &FONT_XS, muted ? "-" : t, muted ? C_DIM : PART_COL[p]);
+        }
     }
 }
 
@@ -1841,6 +2146,8 @@ static void draw_main(void)
             draw_fx(band);
         else if (ui.view == V_MIX)
             draw_mix(band);
+        else if (ui.view == V_SONG)
+            draw_song(band);
         else if (is_drum())
             draw_drum(band);
         else if (is_303())
@@ -1876,11 +2183,13 @@ static uint32_t knobs_sig(void)
     MIXIN(ui.held_step);
     MIXIN(proj.set.palette);
     MIXIN(ui.sel[0] | ui.sel[1] << 8);
-    MIXIN(seq.cur);
+    MIXIN(seq.ppat[ui.part]);
+    MIXIN(ui.song_sel);
     for (i = 0; i < 4; i++) {
         pref_t r = pg.r[pgi][i];
         MIXIN(r.kind | r.a << 8 | r.b << 16 | (uint32_t)r.c << 24);
         MIXIN(pref_get(r));
+        MIXIN(has_motion(r) | (motion_now(r) + 1) << 1);
     }
     if (ui.held_step >= 0) {
         const bstep_t *st = &cur_pat()->bass[bidx()].step[ui.held_step];
@@ -1936,6 +2245,12 @@ static void draw_knobs(void)
             box(i * 60 + 2, 2, 56, KNOB_H - 4, dim(col, 4));
         text_c(cx, vc(&FONT_XS, 6, 12), &FONT_XS, pref_name(r), touched ? C_WHITE : C_GRAY);
         val = pref_get(r);
+        if (has_motion(r)) {                           /* recorded motion: a mark, and what it plays now */
+            int mv = motion_now(r);
+            dot(i * 60 + 52, 8, 2, mv >= 0 ? C_WHITE : C_DIM);
+            if (mv >= 0)
+                val = mv;
+        }
         if (d->names) {                                /* a switch: its positions as pips */
             int n = d->max + 1, k, pw = n > 6 ? 3 : 6, gap = 2, w0 = n * (pw + gap) - gap;
             if (n <= 12)
@@ -1944,7 +2259,7 @@ static void draw_knobs(void)
         } else {
             arc(cx, 34, 15, d->max ? (float)val / (float)d->max : 0.0f, C_LINE, col, r.kind == R_BTRANS);
         }
-        pref_value(r, num, unit);
+        pref_value_of(r, val, num, unit);
         cell_value(cx, vc(&FONT_B, 55, 14), num, unit, touched ? C_WHITE : C_HI);
     }
     cv_commit(3, 0, KNOB_Y);
@@ -1971,6 +2286,8 @@ static void leds(void)
         b |= 1u << B_LFO;
     if (ui.view == V_GLO)
         b |= 1u << B_GLO;
+    if (ui.view == V_SONG || (seq.song_on && blink))
+        b |= 1u << B_SEQ;
     if (ui.overlay != O_NONE)
         b |= 1u << B_SEL;
     if (is_303() && ui.kbd[bidx()])
@@ -1981,12 +2298,20 @@ static void leds(void)
         b |= 1u << B_SAVE;
     if (proj.set.keyled) {
         if (ui.view == V_HOME) {
-            k |= 1u << WHITE_KEY[seq.cur];
-            if (seq.cue < NPAT && blink)
-                k |= 1u << WHITE_KEY[seq.cue];
+            k |= 1u << WHITE_KEY[seq.ppat[PART_909]];
+            if (seq_cue_of(&seq, PART_909) >= 0 && blink)
+                k |= 1u << WHITE_KEY[seq_cue_of(&seq, PART_909)];
             for (i = 0; i < NPARTS; i++)
                 if (!part_muted((int)i))
                     k |= 1u << BLACK_KEY[i];
+        } else if (ui.view == V_SONG) {               /* the selected bar: its 909 pattern, its unmuted parts */
+            const song_t *sg = song();
+            if (ui.song_sel < sg->len) {
+                k |= 1u << WHITE_KEY[sg->bar[ui.song_sel].pat[PART_909] & 15u];
+                for (i = 0; i < NPARTS; i++)
+                    if (!(sg->bar[ui.song_sel].mute >> i & 1u))
+                        k |= 1u << BLACK_KEY[i];
+            }
         } else if (is_drum()) {
             const dpart_t *d = &cur_pat()->drum[ui.part];
             uint32_t bits = (ui.btn & (1u << B_ENV)) ? d->accent : d->hit[ui.sel[ui.part]];

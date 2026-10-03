@@ -17,6 +17,7 @@
 #include <stdint.h>
 #include "../dsp/x0x_param.h"
 #include "../seq/sequencer.h"
+#include "../seq/motion.h"
 
 enum { T_909, T_808, T_303, T_BRK, T_FX, T_MIX, T_MST, NTARGETS };
 enum { PART_909, PART_808, PART_303A, PART_303B, PART_BRK, NPARTS };
@@ -35,7 +36,7 @@ extern volatile uint16_t eng_peak[NPARTS];   /* part meters, Q15, decaying (UI) 
 extern int16_t eng_scope[SCOPE_N];     /* the last output samples, for the screen */
 extern volatile uint32_t eng_scope_w;
 
-void engine_init(pattern_t *patterns);
+void engine_init(pattern_t *patterns, song_t *song, lane_t *lanes, const sound_t *base);
 void engine_render(int32_t *out_lr, uint32_t n);   /* ISR: n stereo frames, 24-bit in int32 */
 
 /* parameter descriptors (UI) */
@@ -56,6 +57,11 @@ void engine_brk_loops(void);                                /* (re)read the A / 
 int engine_brk_slice(void);                                 /* slice sounding now, -1 none (UI) */
 void engine_brk_state(int *slice, int *bank, int *div, int *running);
 int engine_brk_outline(int which, uint8_t *peaks, int n);   /* the loop's peaks for the screen (main loop) */
+/* motion (seq/motion.h): lanes play into the engine, never into the sound_t mirror */
+int engine_motion_part(int target, int voice);              /* the part a parameter's lane follows */
+int engine_motion_value(int lane);                          /* what the lane plays now, -1 none */
+void engine_motion_rec(int lane);                           /* record a pass from the next step */
+void engine_motion_hold(int lane);                          /* the knob wins for a pass */
 float engine_gr_db(void);                                   /* master compressor gain reduction (UI meter) */
 void engine_master_format(int i, char *buf);                /* a master pot in its unit */
 int engine_brk_nslots(void);                                /* built-in loops + user slots */

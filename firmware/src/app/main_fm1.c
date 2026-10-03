@@ -162,7 +162,7 @@ static void fm1_main(void)
     fm1_adc_init();
     panel_init();
     led_pos_init();
-    engine_init(proj.pat);
+    engine_init(proj.pat, &proj.arr.song, proj.arr.lane, &proj.sound);
     if (project_load() != 0)
         project_defaults();                         /* nothing saved yet (or another format) */
     engine_apply_sound(&proj.sound);
@@ -233,8 +233,8 @@ static void fm1_main(void)
 #if X0X_CDC
         cdc_task();
 #endif
-        if (seq.cur != last_pat) {                  /* a new pattern may name other break loops */
-            last_pat = seq.cur;
+        if (seq.ppat[TRK_BRK] != last_pat) {        /* the break's new pattern may name other loops */
+            last_pat = seq.ppat[TRK_BRK];
             engine_brk_loops();
         }
         if (fm1_ms - last_frame >= 16u) {           /* ~60 frames/s at most; input in between */

@@ -29,6 +29,7 @@ SHOTS = {"t01_909.png": "screen-909.png", "t04_303a.png": "screen-303.png", "t10
          "t08_break.png": "screen-break.png", "t14_mix_pump.png": "screen-mix.png", "t15_list.png": "screen-list.png",
          "t19_ask.png": "screen-ask.png", "t02_909_readout.png": "screen-readout.png", "t06_tb3po.png": "screen-tb3po.png",
          "t12_fx.png": "screen-fx.png", "t17_global.png": "screen-global.png"}
+SONG_SHOTS = {"s04_song_playing.png": "screen-song.png", "s05_motion.png": "screen-motion.png"}   # build/scenarios/song
 
 
 def png_data_uri(path, scale=1):
@@ -127,9 +128,10 @@ def main():
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "fm1-panel.svg").write_text(panel(tour / "t01_909.png"))
     (OUT / "fm1-keys.svg").write_text(keymap())
-    for src, dst in SHOTS.items():
-        Image.open(tour / src).convert("RGB").resize((480, 480), Image.NEAREST).save(OUT / dst, optimize=True)
-    print(f"figures in {OUT}: fm1-panel.svg, fm1-keys.svg, {len(SHOTS)} screenshots")
+    for d, shots in ((tour, SHOTS), (tour.parent / "song", SONG_SHOTS)):
+        for src, dst in shots.items():
+            Image.open(d / src).convert("RGB").resize((480, 480), Image.NEAREST).save(OUT / dst, optimize=True)
+    print(f"figures in {OUT}: fm1-panel.svg, fm1-keys.svg, {len(SHOTS) + len(SONG_SHOTS)} screenshots")
 
 
 if __name__ == "__main__":

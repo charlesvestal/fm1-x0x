@@ -181,7 +181,7 @@ static void test_polymeter_cue_chain(void)
     run((uint32_t)(step * 17));                               /* to the bar line and one more */
     i = find(E_DRUM, 1, 0);
     CHECK(i >= 0 && abs((int)evs[i].t - (int)(16 * step + 0.5)) <= 1, "cued pattern starts on the bar (%u)", i >= 0 ? evs[i].t : 0);
-    CHECK(S.cur == 1, "now playing pattern 2");
+    CHECK(S.ppat[0] == 1 && S.ppat[4] == 1, "now playing pattern 2");
     i = find(E_ON, 0, 0);
     /* pattern 2's 303 A line is empty: no notes after the switch */
     for (n = 0; (i = find(E_ON, 0, i < 0 ? 0 : i)) >= 0; i++)
@@ -193,11 +193,12 @@ static void test_polymeter_cue_chain(void)
     S.bpm = 120.0f;
     for (i = 0; i < NPAT; i++)
         P[i].drum[0].hit[0] = 1u;
-    S.cur = 3;
+    for (i = 0; i < NTRACKS; i++)
+        S.ppat[i] = 3;
     seq_chain(&S, 3, 5);
     seq_start(&S);
     for (i = 0, last = -1; i < 7; i++) {
-        uint8_t c = S.cur;
+        uint8_t c = S.ppat[0];
         run((uint32_t)(16 * step));
         if (i < 6)
             CHECK(c == 3 + (i % 3), "chain bar %d plays pattern %d (got %d)", i, 3 + i % 3, c + 1 - 1);
@@ -205,6 +206,91 @@ static void test_polymeter_cue_chain(void)
     }
     (void)last;
     printf("  polymeter, cue on the bar, chain 4-6: checked\n");
+}
+
+/* one part's cue: it switches on the bar and restarts; the others keep their place */
+static void test_part_cue(void)
+{
+    int i, n;
+    double step = 44100.0 * 60.0 / 120.0 / 4.0;
+    reset();
+    S.bpm = 120.0f;
+    P[0].drum[0].hit[0] = 1u;
+    P[0].bass[1].len = 3;                                       /* 303 B: a 3-step loop */
+    P[0].bass[1].step[0] = (bstep_t){40, G_NOTE};
+    P[1].bass[0].step[0] = (bstep_t){50, G_NOTE};               /* 303 A in pattern 2 */
+    seq_start(&S);
+    run((uint32_t)(step * 5));
+    seq_cue_part(&S, TRK_BASS0, 1);
+    run((uint32_t)(step * 11) - 1);                             /* to just before the bar */
+    CHECK(S.ppat[TRK_BASS0] == 0, "a part's cue waits for the bar");
+    nev = 0;
+    run((uint32_t)(step * 4));
+    CHECK(S.ppat[TRK_BASS0] == 1 && S.ppat[0] == 0 && S.ppat[TRK_BASS0 + 1] == 0, "only 303 A switched");
+    i = find(E_ON, 0, 0);
+    CHECK(i >= 0 && evs[i].b == 50 && abs((int)evs[i].t - (int)(16 * step + 0.5)) <= 1, "303 A's new line on the bar");
+    for (i = 0, n = 0; (i = find(E_ON, 1, i)) >= 0; i++, n++)   /* 303 B: steps 18 (its 7th loop), not 16 */
+        CHECK(abs((int)evs[i].t - (int)(18 * step + 0.5)) <= 1, "303 B kept its place (note at %u)", evs[i].t);
+    CHECK(n == 1, "303 B: one note in the window, %d", n);
+    printf("  a part's own cue: checked\n");
+}
+
+static void test_song(void)
+{
+    static song_t sg;
+    double bar = 44100.0 * 60.0 / 120.0 * 4.0;
+    int i;
+    /* playback: three bars, looping; a bar's mutes */
+    reset();
+    S.bpm = 120.0f;
+    S.song = &sg;
+    sg.len = 3;
+    for (i = 0; i < NTRACKS; i++) {
+        sg.bar[0].pat[i] = 0;
+        sg.bar[1].pat[i] = 1;
+        sg.bar[2].pat[i] = 2;
+    }
+    sg.bar[1].pat[TRK_BRK] = 7;
+    sg.bar[0].mute = sg.bar[1].mute = 0;
+    sg.bar[2].mute = 1u << 1;                                   /* the 808 out in bar 3 */
+    S.song_on = 1;
+    S.song_start = 1;
+    seq_start(&S);
+    run(1);
+    CHECK(S.ppat[0] == 1 && S.ppat[TRK_BRK] == 7 && S.song_pos == 1, "starts at the start bar");
+    run((uint32_t)bar);
+    CHECK(S.ppat[0] == 2 && S.song_pos == 2 && seq_part_muted(&S, 1) && !seq_part_muted(&S, 0), "bar 3, 808 muted");
+    run((uint32_t)bar);
+    CHECK(S.ppat[0] == 0 && S.song_pos == 0 && !seq_part_muted(&S, 1), "loops to bar 1, 808 back");
+    seq_cue(&S, 9);
+    run((uint32_t)bar);
+    CHECK(S.ppat[0] == 1, "playing the song, a cue does not override it");
+    /* recording: from an empty song, the live cues and mutes are written bar by bar */
+    reset();
+    S.bpm = 120.0f;
+    S.song = &sg;
+    sg.len = 0;
+    S.song_on = S.song_rec = 1;
+    S.song_start = 0;
+    seq_start(&S);
+    run(1);
+    CHECK(sg.len == 1 && sg.bar[0].pat[0] == 0, "record: bar 1 written at the start");
+    seq_cue_part(&S, TRK_BASS0, 5);
+    S.mute |= seq_part_mask(TRK_BRK);
+    run((uint32_t)bar);
+    CHECK(sg.len == 2 && sg.bar[1].pat[TRK_BASS0] == 5 && sg.bar[1].pat[0] == 0 && sg.bar[1].mute == 1u << TRK_BRK,
+          "record: bar 2 has the cue and the mute (len %d, pat %d, mute %d)", sg.len, sg.bar[1].pat[TRK_BASS0], sg.bar[1].mute);
+    run((uint32_t)bar * 2);
+    CHECK(sg.len == 4 && sg.bar[3].pat[TRK_BASS0] == 5, "record: the song grows while it runs (%d)", sg.len);
+    /* overdub from bar 2 plays bar 2 as it is, then writes on */
+    seq_stop(&S);
+    run(1);
+    S.song_start = 1;
+    sg.bar[1].pat[0] = 6;
+    seq_start(&S);
+    run(1);
+    CHECK(S.ppat[0] == 6 && sg.len == 4, "overdub starts from the song's bar");
+    printf("  song: playback, loop, mutes, record, overdub: checked\n");
 }
 
 static void test_ext_clock_and_midi_out(void)
@@ -332,6 +418,8 @@ int main(void)
     test_swing_and_rates();
     test_303();
     test_polymeter_cue_chain();
+    test_part_cue();
+    test_song();
     test_ext_clock_and_midi_out();
     test_break_clock();
 #ifdef REF_TB3PO

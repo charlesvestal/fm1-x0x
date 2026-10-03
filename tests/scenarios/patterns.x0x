@@ -56,7 +56,7 @@ key w0 up
 expect gate0.0 1
 # save, scramble, reboot from the simulated flash
 tap SAVE
-expect store_writes 4
+expect store_writes 6
 reboot
 wait 300
 expect pattern 1

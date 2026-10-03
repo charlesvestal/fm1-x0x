@@ -1,0 +1,131 @@
+# Part patterns, the song, knob motion: each part its own pattern, bars arranged, moves recorded.
+wait 300
+# the 909 (on screen at boot): a kick on the quarters
+tapkey b0
+tapkey w0
+tapkey w4
+tapkey w8
+tapkey w12
+press HOME
+turn SELECT -5
+release HOME
+expect tempo 120
+# PRESETS on 303 A's screen moves 303 A alone (stopped: at once)
+turn ALGO 2
+expect part 2
+turn PRESET 1
+expect ppat2 2
+expect ppat0 1
+expect ppat3 1
+wait 1000
+shot s01_303a_on_p2.png
+tap HOME
+shot s02_home_parts.png
+# a HOME white key: all five parts
+tapkey w0
+expect ppat2 1
+# SONG (SEQ on HOME): white keys write bars 1, 2, 1
+tap SEQ
+expect view 6
+tapkey w0
+tapkey w1
+tapkey w0
+expect songlen 3
+expect songbar2.0 2
+expect songbar3.0 1
+# bar 3 without the 808
+turn K1 -1
+tapkey b1
+expect songbar3.5 2
+# bar 2: 303 B three patterns on, P5 (page 2, knob 2)
+turn K1 -1
+turn SELECT 1
+turn K2 3
+expect songbar2.3 5
+shot s03_song.png
+# SONG mode on (page 2, knob 4); play from bar 1
+turn K4 1
+expect songon 1
+turn K1 -5
+tap PLAY
+wait 100
+expect songpos 1
+expect ppat0 1
+wait 2000
+expect songpos 2
+expect ppat0 2
+expect ppat3 5
+wait 2000
+expect songpos 3
+expect mute 4192256
+shot s04_song_playing.png
+wait 2000
+expect songpos 1
+expect mute 0
+tap PLAY
+turn K4 -1
+expect songon 0
+# motion: 303 A's cutoff, swept while recording, one turn a step (16 steps of 125 ms)
+tap HOME
+tap EDIT
+expect part 2
+expect sound2.0.0 64
+tap REC
+tap PLAY
+wait 60
+spin K1 -40
+wait 124
+spin K1 10
+wait 124
+spin K1 10
+wait 124
+spin K1 10
+wait 124
+spin K1 10
+wait 124
+spin K1 10
+wait 124
+spin K1 10
+wait 124
+tap REC
+expect lanes 1
+expect sound2.0.0 84
+# the first turn lands on step 3 (PLAY's tap takes a moment), one step per turn after it
+expect laneval2.0.0.2 24
+expect laneval2.0.0.5 54
+expect laneval2.0.0.8 84
+expect laneval2.0.0.1 255
+expect laneval2.0.0.9 255
+# the next pass plays it back: step 4 (34 rising to 44), not the knob's 84
+wait 1310
+expect motion2.0.0 <45
+expect motion2.0.0 >33
+shot s05_motion.png
+# turning the knob (not recording): the knob wins for a pass
+spin K1 -4
+wait 200
+expect motion2.0.0 -1
+expect sound2.0.0 80
+# SAVE held + the knob: its motion is gone; the knob keeps its value
+press SAVE
+spin K1 1
+release SAVE
+expect lanes 0
+expect sound2.0.0 80
+tap PLAY
+# a touch, saved: the song and the lane survive a reboot
+tap REC
+tap PLAY
+wait 60
+spin K1 -20
+wait 300
+tap REC
+tap PLAY
+expect lanes 1
+tap SAVE
+expect store_writes 6
+reboot
+expect lanes 1
+expect songlen 3
+expect songbar2.3 5
+expect songbar3.5 2

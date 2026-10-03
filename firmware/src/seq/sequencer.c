@@ -18,7 +18,8 @@ void seq_init(seq_t *s, pattern_t *patterns)
     for (i = 0; i < sizeof *s; i++)
         p[i] = 0;
     s->pat = patterns;
-    s->cue = 0xFF;
+    for (i = 0; i < NTRACKS; i++)
+        s->pcue[i] = 0xFF;
     s->bpm = 125.0f;
     s->ext_bpm = 125.0f;
     s->accent_q7 = 88;                /* a 909 non-accented hit sits ~3 dB under an accent */
@@ -44,12 +45,12 @@ uint32_t seq_step_q8(const seq_t *s, int rate)
     return (uint32_t)(q * 256.0f * (float)TICKS_PER_STEP[rate & 3] / 24.0f);
 }
 
-static const dpart_t *dpart(const seq_t *s, int k) { return &s->pat[s->cur].drum[k]; }
+static const dpart_t *dpart(const seq_t *s, int k) { return &s->pat[s->ppat[k]].drum[k]; }
 static int is_drum(int t) { return t < NKIT; }
 static int is_bass(int t) { return t >= TRK_BASS0 && t < TRK_BASS0 + NBASS; }
-static bpart_t *bpart(const seq_t *s, int b) { return &s->pat[s->cur].bass[b]; }
+static bpart_t *bpart(const seq_t *s, int b) { return &s->pat[s->ppat[TRK_BASS0 + b]].bass[b]; }
 
-static int part_len(const seq_t *s, int t)
+int seq_part_len(const seq_t *s, int t)
 {
     int n = is_drum(t) ? dpart(s, t)->len : t == TRK_BRK ? 16 : bpart(s, t - TRK_BASS0)->len;
     return n < 1 ? 1 : n > NSTEPS ? NSTEPS : n;
@@ -63,7 +64,7 @@ static int part_rate(const seq_t *s, int t)
 /* swing offset of a step, Q8: odd 16ths / 32nds come late; triplets are never swung */
 static uint32_t swing_q8(const seq_t *s, int rate, uint32_t step_q8)
 {
-    uint32_t sw = s->pat[s->cur].swing;
+    uint32_t sw = s->pat[s->ppat[TRK_DRUM]].swing;   /* the 909 is the bar: its pattern's groove */
     if (rate == RATE_16T || rate == RATE_8T || !sw)
         return 0;
     if (sw > 100u)
@@ -84,7 +85,7 @@ static uint32_t rng_next(uint32_t *r)
 static int next_pos(seq_t *s, int t, int p, int commit)
 {
     seq_track_t *tr = &s->t[t];
-    int len = part_len(s, t), dir = is_bass(t) ? bpart(s, t - TRK_BASS0)->dir : DIR_FWD, n;
+    int len = seq_part_len(s, t), dir = is_bass(t) ? bpart(s, t - TRK_BASS0)->dir : DIR_FWD, n;
     switch (dir & 3) {
     case DIR_REV:
         return (p - 1 + len) % len;
@@ -179,22 +180,92 @@ static void fire_bass(seq_t *s, int b, int p, uint32_t step_q8, uint32_t carry, 
     tr->to_off = hold ? 0 : carry + step_q8 / 2u;
 }
 
-/* the pattern switch at the end of the bar (the 909 part wrapping) */
-static int bar_end(seq_t *s)
+int seq_part_muted(const seq_t *s, int p)
 {
-    int next = s->cur;
-    if (s->cue < NPAT) {
-        next = s->cue;
-        s->cue = 0xFF;
-    } else if (s->chain_a != s->chain_b) {
-        int a = s->chain_a < s->chain_b ? s->chain_a : s->chain_b;
-        int b = s->chain_a < s->chain_b ? s->chain_b : s->chain_a;
-        next = (s->cur < a || s->cur >= b) ? a : s->cur + 1;
+    uint32_t m = seq_part_mask(p);
+    return (s->mute & m) == m;
+}
+
+/* the song's bar k into the parts and their mutes (into next[]: the caller switches) */
+static void song_read(seq_t *s, int k, uint8_t *next)
+{
+    const song_bar_t *b = &s->song->bar[k];
+    uint32_t mute = 0;                                  /* the bar decides every part's mute (built up, */
+    int p;                                              /* not masked: ~mask reads as a ROM address) */
+    for (p = 0; p < NTRACKS; p++) {
+        next[p] = b->pat[p] < NPAT ? b->pat[p] : 0;
+        if (b->mute >> p & 1u)
+            mute |= seq_part_mask(p);
     }
-    if (next == s->cur)
-        return 0;
-    s->cur = (uint8_t)next;
-    return 1;
+    s->mute = mute;
+}
+
+/* the live state (next[], the mutes) into the song's bar k, growing it */
+static void song_write(seq_t *s, int k, const uint8_t *next)
+{
+    song_bar_t *b = &s->song->bar[k];
+    int p;
+    b->mute = 0;
+    for (p = 0; p < NTRACKS; p++) {
+        b->pat[p] = next[p];
+        if (seq_part_muted(s, p))
+            b->mute |= (uint8_t)(1u << p);
+    }
+    if (s->song->len < k + 1)
+        s->song->len = (uint16_t)(k + 1);
+}
+
+static int song_plays(const seq_t *s) { return s->song_on && s->song && (s->song_rec || s->song->len); }
+
+/* the bar's end (the 909 wrapping), or the start: cues, the chain or the song decide each
+ * part's next pattern. Returns the parts whose pattern changed (bit t). */
+static uint32_t bar_end(seq_t *s, int start)
+{
+    uint8_t next[NTRACKS];
+    uint32_t changed = 0;
+    int t, cued = 0;
+    for (t = 0; t < NTRACKS; t++)
+        next[t] = s->ppat[t];
+    if (song_plays(s) && !s->song_rec) {               /* the song: its next bar (looping) */
+        int k = start ? s->song_start : s->song_pos + 1;
+        if (k >= s->song->len)
+            k = 0;
+        s->song_pos = (uint16_t)k;
+        song_read(s, k, next);
+        for (t = 0; t < NTRACKS; t++)
+            s->pcue[t] = 0xFF;
+    } else {
+        for (t = 0; t < NTRACKS; t++)
+            if (s->pcue[t] < NPAT) {
+                next[t] = s->pcue[t];
+                s->pcue[t] = 0xFF;
+                cued = 1;
+            }
+        if (!cued && !start && s->chain_a != s->chain_b) {
+            int a = s->chain_a < s->chain_b ? s->chain_a : s->chain_b;
+            int b = s->chain_a < s->chain_b ? s->chain_b : s->chain_a, c = s->ppat[TRK_DRUM];
+            c = (c < a || c >= b) ? a : c + 1;
+            for (t = 0; t < NTRACKS; t++)
+                next[t] = (uint8_t)c;
+        }
+        if (song_plays(s)) {                           /* recording: what plays is the song */
+            int k = start ? s->song_start : s->song_pos + 1;
+            if (k >= NSONG) {
+                s->song_rec = 0;                       /* full */
+            } else {
+                if (start && k < s->song->len)         /* overdub from where the song is */
+                    song_read(s, k, next);
+                s->song_pos = (uint16_t)k;
+                song_write(s, k, next);
+            }
+        }
+    }
+    for (t = 0; t < NTRACKS; t++)
+        if (next[t] != s->ppat[t]) {
+            s->ppat[t] = next[t];
+            changed |= 1u << t;
+        }
+    return changed;
 }
 
 static void auto_mutate(seq_t *s, int b)
@@ -206,24 +277,26 @@ static void auto_mutate(seq_t *s, int b)
         tb3po_mutate(bp, &s->mut_rng[b]);
 }
 
-/* fire track t's next step now; returns 1 if the 909 part wrapped and the pattern changed */
-static int fire_step(seq_t *s, int t, const seq_sink_t *o)
+/* fire track t's next step now; returns the parts whose pattern changed (the 909 wrapping) */
+static uint32_t fire_step(seq_t *s, int t, const seq_sink_t *o)
 {
     seq_track_t *tr = &s->t[t];
-    int rate = part_rate(s, t), p, changed = 0, wrapped;
+    int rate = part_rate(s, t), p, wrapped;
+    uint32_t changed = 0;
     uint32_t L = seq_step_q8(s, rate);
     uint32_t carry = tr->to_next < 256u ? tr->to_next : 0;   /* the step was due this far into the sample: keep it */
     int bass = is_bass(t);
     if (!tr->started) {
-        p = (bass && bpart(s, t - TRK_BASS0)->dir == DIR_REV) ? part_len(s, t) - 1 : 0;
+        p = (bass && bpart(s, t - TRK_BASS0)->dir == DIR_REV) ? seq_part_len(s, t) - 1 : 0;
         tr->started = 1;
         wrapped = 0;
     } else {
         p = next_pos(s, t, tr->pos, 1);
-        wrapped = !bass ? p == 0 : p == 0 || (bpart(s, t - TRK_BASS0)->dir == DIR_REV && p == part_len(s, t) - 1);
+        wrapped = !bass ? p == 0 : p == 0 || (bpart(s, t - TRK_BASS0)->dir == DIR_REV && p == seq_part_len(s, t) - 1);
     }
-    if (wrapped && t == TRK_DRUM && bar_end(s)) {
-        changed = 1;
+    if (wrapped && t == TRK_DRUM && (changed = bar_end(s, 0)) != 0) {
+        rate = part_rate(s, t);                       /* the 909's new pattern */
+        L = seq_step_q8(s, rate);
         p = 0;
     }
     if (wrapped && bass)
@@ -236,7 +309,7 @@ static int fire_step(seq_t *s, int t, const seq_sink_t *o)
     else if (t == TRK_BRK) {
         if (o->brk)
             o->brk(o->ctx, p, tr->bars, (float)L / 256.0f,
-                   (s->pat[s->cur].brk.steps >> p & 1u) && !(s->mute & (1u << MUTE_BRK)));
+                   (s->pat[s->ppat[TRK_BRK]].brk.steps >> p & 1u) && !(s->mute & (1u << MUTE_BRK)));
     } else
         fire_bass(s, t - TRK_BASS0, p, L, carry, o);
     if (o->step)
@@ -254,10 +327,12 @@ static int fire_step(seq_t *s, int t, const seq_sink_t *o)
     return changed;
 }
 
-static void restart_others(seq_t *s)          /* every part but the 909's, on a pattern switch */
+static void restart(seq_t *s, uint32_t parts)  /* parts whose pattern switched: from step 1 (not the 909's) */
 {
     int t;
     for (t = 1; t < NTRACKS; t++) {
+        if (!(parts >> t & 1u))
+            continue;
         s->t[t].started = 0;
         s->t[t].to_next = s->ext ? NEVER : 0;
         s->t[t].ext_ticks = (uint8_t)(TICKS_PER_STEP[part_rate(s, t)] - 1);
@@ -269,10 +344,8 @@ static void restart_others(seq_t *s)          /* every part but the 909's, on a 
 static void do_start(seq_t *s, int from_top, const seq_sink_t *o)
 {
     int t;
-    if (from_top && s->cue < NPAT) {
-        s->cur = s->cue;
-        s->cue = 0xFF;
-    }
+    if (from_top)
+        bar_end(s, 1);                                /* cues, or the song's start bar */
     for (t = 0; t < NTRACKS; t++) {
         seq_track_t *tr = &s->t[t];
         if (from_top) {
@@ -383,10 +456,11 @@ void seq_advance(seq_t *s, uint32_t k, const seq_sink_t *o)
     if (!s->playing) {
         if (!s->ext)
             s->clk_to_next = 0;
-        if (s->cue < NPAT) {                         /* stopped: a cue takes effect at once */
-            s->cur = s->cue;
-            s->cue = 0xFF;
-        }
+        for (t = 0; t < NTRACKS; t++)                /* stopped: a cue takes effect at once */
+            if (s->pcue[t] < NPAT) {
+                s->ppat[t] = s->pcue[t];
+                s->pcue[t] = 0xFF;
+            }
         return;
     }
     for (t = 0; t < NTRACKS; t++) {                 /* move time */
@@ -408,8 +482,9 @@ void seq_advance(seq_t *s, uint32_t k, const seq_sink_t *o)
                 fired = 1;
             }
             if (tr->to_next < 256u) {
-                if (fire_step(s, t, o) && t == TRK_DRUM)
-                    restart_others(s);                /* a new pattern starts every part on step 1 */
+                uint32_t ch = fire_step(s, t, o);
+                if (ch)
+                    restart(s, ch);                   /* a part's new pattern starts on step 1 */
                 fired = 1;
             }
         }
@@ -428,9 +503,18 @@ void seq_continue(seq_t *s) { s->req_cont = 1; }
 void seq_ext_clock(seq_t *s) { s->ext_pending++; }
 void seq_cue(seq_t *s, int p)
 {
+    int t;
     if (p >= 0 && p < NPAT)
-        s->cue = (uint8_t)p;
+        for (t = 0; t < NTRACKS; t++)
+            s->pcue[t] = (uint8_t)p;
 }
+void seq_cue_part(seq_t *s, int t, int p)
+{
+    if (t >= 0 && t < NTRACKS && p >= 0 && p < NPAT)
+        s->pcue[t] = (uint8_t)p;
+}
+int seq_cue_of(const seq_t *s, int t) { return s->pcue[t] < NPAT ? s->pcue[t] : -1; }
+int seq_next_step(seq_t *s, int t, int p) { return next_pos(s, t, p, 0); }
 void seq_chain(seq_t *s, int a, int b)
 {
     s->chain_a = (uint8_t)a;

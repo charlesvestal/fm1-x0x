@@ -17,9 +17,10 @@
 #define ST_PAYLOAD_OFF 256u
 #define ST_PAYLOAD_MAX (ST_SECTOR - ST_PAYLOAD_OFF)
 
-/* flash map, X0X (plat.h OBJ_*): settings 0xFC000 (FL_GLOB); sound, patterns 1-8, patterns 9-16
- * at 0x97000.. (2 sectors each, below the user sample slots at 0xA0000); the panel calibration
- * at 0xDC000 (Felucca's user-preset area, unused by X0X). */
+/* flash map, X0X (plat.h OBJ_*): settings 0xFC000 (FL_GLOB); sound, patterns 1-8, patterns 9-16,
+ * the song at 0x97000.. (2 sectors each, below the user sample slots at 0xA0000); the panel
+ * calibration at 0xDC000 and motion at 0xDE000 (Felucca's user-preset area, unused by X0X). Nothing
+ * above 0xDFFFF: 0xE0000.. is the update loader's staging area. */
 typedef struct {
     uint32_t magic;
     uint16_t type, slot;
@@ -52,6 +53,10 @@ static uint32_t st_sector(uint32_t obj, uint32_t copy)  /* flash offset of copy 
         return 0xFC000u + copy * ST_SECTOR;
     if (obj == OBJ_PANEL)
         return 0xDC000u + copy * ST_SECTOR;
+    if (obj == OBJ_MOTION)
+        return 0xDE000u + copy * ST_SECTOR;
+    if (obj == OBJ_SONG)
+        return 0x9D000u + copy * ST_SECTOR;
     return 0x97000u + (obj - OBJ_SOUND) * 2u * ST_SECTOR + copy * ST_SECTOR;   /* SOUND, PAT0, PAT1 */
 }
 

@@ -8,6 +8,7 @@
 #include "../seq/pattern.h"
 #include "../seq/sequencer.h"
 #include "../seq/tb3po.h"
+#include "../seq/motion.h"
 #include "../dsp/breaks.h"
 #include "../dsp/fxbus.h"            /* FX_* param indices (the send pages) */
 
@@ -22,10 +23,17 @@ typedef struct {
     uint8_t accent_q7, rsv;
 } settings_t;
 
+/* the song and the motion lanes: one blob, split across OBJ_SONG and OBJ_MOTION */
+typedef struct {
+    song_t song;
+    lane_t lane[NLANE];
+} arrange_t;
+
 typedef struct {
     settings_t set;
     sound_t sound;
     pattern_t pat[NPAT];
+    arrange_t arr;
 } project_t;
 
 extern project_t proj;

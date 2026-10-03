@@ -74,11 +74,11 @@ nav.contents li { break-inside: avoid; }
 <body>
 <main>
 <h1>X0X</h1>
-<p class="lede">Groovebox firmware for the M-VAVE FM-1, version 0.1. It gives you a 909, an 808, two 303s and a break, all running at once, across 16 patterns.</p>
+<p class="lede">Groovebox firmware for the M-VAVE FM-1, version 0.1. It gives you a 909, an 808, two 303s and a break, all running at once, each on its own pattern, with a song mode and recorded knob moves.</p>
 <div class="status"><p><strong>Status.</strong> X0X runs in a simulator on a computer, using the same code as the FM-1. Nobody has run it on an FM-1 yet.</p></div>
 <hr>
 <nav class="contents" aria-label="Contents"><h2 id="contents">Contents</h2>
-<ol><li><a href="#s1">Install</a></li><li><a href="#s2">Controls</a></li><li><a href="#s3">The screen</a></li><li><a href="#s4">909 and 808</a></li><li><a href="#s5">303A and 303B</a></li><li><a href="#s6">TB-3PO</a></li><li><a href="#s7">Break</a></li><li><a href="#s8">Patterns</a></li><li><a href="#s9">Recording</a></li><li><a href="#s10">Effects</a></li><li><a href="#s11">Mix and master</a></li><li><a href="#s12">Settings and saving</a></li><li><a href="#s13">MIDI</a></li><li><a href="#s14">Your own breaks</a></li><li><a href="#s15">Update mode and calibration</a></li><li><a href="#s16">Parameters</a></li><li><a href="#s17">Credits</a></li></ol>
+<ol><li><a href="#s1">Install</a></li><li><a href="#s2">Controls</a></li><li><a href="#s3">The screen</a></li><li><a href="#s4">909 and 808</a></li><li><a href="#s5">303A and 303B</a></li><li><a href="#s6">TB-3PO</a></li><li><a href="#s7">Break</a></li><li><a href="#s8">Patterns</a></li><li><a href="#s9">Song</a></li><li><a href="#s10">Recording</a></li><li><a href="#s11">Knob motion</a></li><li><a href="#s12">Effects</a></li><li><a href="#s13">Mix and master</a></li><li><a href="#s14">Settings and saving</a></li><li><a href="#s15">MIDI</a></li><li><a href="#s16">Your own breaks</a></li><li><a href="#s17">Update mode and calibration</a></li><li><a href="#s18">Parameters</a></li><li><a href="#s19">Credits</a></li></ol>
 </nav>
 <hr>
 <h2 id="s1"><span class="num">1</span>Install</h2>
@@ -90,7 +90,7 @@ nav.contents li { break-inside: avoid; }
 <h2 id="s2"><span class="num">2</span>Controls</h2>
 <div class="figs"><figure class="wide"><img src="img/fm1-panel.svg" alt="The FM-1 (a drawing), running X0X" loading="lazy"><figcaption>The FM-1 (a drawing), running X0X</figcaption></figure><figure class="wide"><img src="img/fm1-keys.svg" alt="What the keys do" loading="lazy"><figcaption>What the keys do</figcaption></figure></div>
 <p>These work the same on every screen:</p>
-<div class="table"><table><thead><tr><th></th><th></th></tr></thead><tbody><tr><td>ALGORITHM</td><td>Pick the part: 909, 808, 303A, 303B, BREAK.</td></tr><tr><td>PRESETS</td><td>Pick the next pattern.</td></tr><tr><td>SELECT</td><td>Next or previous page. In a list, move. Hold HOME and turn it to set the tempo.</td></tr><tr><td>KNOB 1–4</td><td>The four values at the bottom of the screen.</td></tr><tr><td>SEL</td><td>Show everything on this screen as a list. In a list, run an action. In a question, yes.</td></tr><tr><td>HOME</td><td>Home. From a list or a question, back (or no).</td></tr><tr><td>EDIT</td><td>The part. Press again for the next page.</td></tr><tr><td>ARP</td><td>TB-3PO (303s only).</td></tr><tr><td>FX</td><td>Effects.</td></tr><tr><td>LFO</td><td>Mix and master.</td></tr><tr><td>GLO</td><td>Settings.</td></tr><tr><td>SEQ</td><td>On a 303, switch the keys between steps and keyboard.</td></tr><tr><td>PLAY, REC, SAVE</td><td>Start/stop, record, save.</td></tr><tr><td>ENV, LFO</td><td>Hold them to change what the keys do: accent, slide.</td></tr><tr><td>OCT-, OCT+</td><td>Steps 1–16 or 17–32. Octave on the 303 keyboard. Mutate and new line in TB-3PO.</td></tr><tr><td>White keys</td><td>Steps. On HOME, patterns.</td></tr><tr><td>Black keys</td><td>Drum tracks, or the break's slices. On HOME, mutes.</td></tr><tr><td>MASTER</td><td>Volume.</td></tr></tbody></table></div>
+<div class="table"><table><thead><tr><th></th><th></th></tr></thead><tbody><tr><td>ALGORITHM</td><td>Pick the part: 909, 808, 303A, 303B, BREAK.</td></tr><tr><td>PRESETS</td><td>Pick the next pattern: for the part on screen, or on HOME for all five.</td></tr><tr><td>SELECT</td><td>Next or previous page. In a list, move. Hold HOME and turn it to set the tempo.</td></tr><tr><td>KNOB 1–4</td><td>The four values at the bottom of the screen.</td></tr><tr><td>SEL</td><td>Show everything on this screen as a list. In a list, run an action. In a question, yes.</td></tr><tr><td>HOME</td><td>Home. From a list or a question, back (or no).</td></tr><tr><td>EDIT</td><td>The part. Press again for the next page.</td></tr><tr><td>ARP</td><td>TB-3PO (303s only).</td></tr><tr><td>FX</td><td>Effects.</td></tr><tr><td>LFO</td><td>Mix and master.</td></tr><tr><td>GLO</td><td>Settings.</td></tr><tr><td>SEQ</td><td>On a 303, switch the keys between steps and keyboard. On HOME, the song.</td></tr><tr><td>PLAY, REC, SAVE</td><td>Start/stop, record, save.</td></tr><tr><td>ENV, LFO</td><td>Hold them to change what the keys do: accent, slide.</td></tr><tr><td>OCT-, OCT+</td><td>Steps 1–16 or 17–32. Octave on the 303 keyboard. Mutate and new line in TB-3PO.</td></tr><tr><td>White keys</td><td>Steps. On HOME, patterns.</td></tr><tr><td>Black keys</td><td>Drum tracks, or the break's slices. On HOME, mutes.</td></tr><tr><td>MASTER</td><td>Volume.</td></tr></tbody></table></div>
 <p>The second button is printed SEL. Felucca calls it SCL.</p>
 <p>In a list, ALGORITHM changes the highlighted value. A return arrow marks an action. Anything that would lose notes asks first.</p>
 <div class="figs"><figure class="shot"><img src="img/screen-list.png" alt="A list" loading="lazy"><figcaption>A list</figcaption></figure><figure class="shot"><img src="img/screen-ask.png" alt="A question" loading="lazy"><figcaption>A question</figcaption></figure></div>
@@ -134,49 +134,63 @@ nav.contents li { break-inside: avoid; }
 <hr>
 <h2 id="s8"><span class="num">8</span>Patterns</h2>
 <div class="figs"><figure class="shot"><img src="img/screen-home.png" alt="HOME" loading="lazy"><figcaption>HOME</figcaption></figure></div>
-<p>A pattern holds all five parts' steps, their lengths and rates, the break's settings and the swing. Sounds, effects and the master stay the same when the pattern changes.</p>
-<ul><li><strong>Next pattern:</strong> turn PRESETS, or on HOME press a white key. It starts at the end of the bar; when stopped, at once.</li><li><strong>Chain:</strong> on HOME, hold two white keys. The patterns between them play one bar each. Picking a single pattern ends the chain.</li><li><strong>Copy:</strong> hold SAVE and press a white key.</li><li><strong>Clear a part:</strong> hold SAVE and press REC. GLO &gt; CLEAR PATTERN clears all five.</li><li><strong>Mute:</strong> on HOME, black keys 1–5. Mutes aren't saved.</li></ul>
-<p>Parts can have different lengths and drift against each other. The 909's length is the bar. Swing delays every second 16th: 50% is straight, 75% the most.</p>
+<p>There are 16 patterns, and each part plays its own: the 303s can be on pattern 3 while the drums are on 7. A pattern holds each part's steps, lengths and rates, the break's settings, the swing and the knob motion. Sounds, effects and the master stay the same when the pattern changes.</p>
+<p>On HOME, each pattern box shows a coloured bar for every part playing it.</p>
+<ul><li><strong>One part:</strong> on that part's screen, turn PRESETS.</li><li><strong>All five:</strong> turn PRESETS on HOME, or press a white key on HOME.</li><li><strong>Chain:</strong> on HOME, hold two white keys. The patterns between them play one bar each, all five parts together. Picking a single pattern ends the chain.</li><li><strong>Copy:</strong> hold SAVE and press a white key. On a part's screen this copies that part; on HOME, all five as they're playing now.</li><li><strong>Clear a part:</strong> hold SAVE and press REC. GLO &gt; CLEAR PATTERN clears all five.</li><li><strong>Mute:</strong> on HOME, black keys 1–5. Mutes aren't saved, except in a song.</li></ul>
+<p>A new pattern starts at the end of the bar; when stopped, at once. A part that changes pattern starts again from step 1; the others keep going. Parts can have different lengths and drift against each other. The 909's length is the bar, and the 909's pattern sets the swing. Swing delays every second 16th: 50% is straight, 75% the most.</p>
 <p>HOME's knobs are TEMPO, SWING, PUMP and CUTOFF.</p>
 <hr>
-<h2 id="s9"><span class="num">9</span>Recording</h2>
+<h2 id="s9"><span class="num">9</span>Song</h2>
+<div class="figs"><figure class="shot"><img src="img/screen-song.png" alt="SONG" loading="lazy"><figcaption>SONG</figcaption></figure></div>
+<p>A song is a list of bars, up to 192. Each bar says which pattern each part plays and which parts are muted. Press SEQ on HOME to open it.</p>
+<ul><li><strong>Write bars:</strong> press a white key. The selected bar plays that pattern on all five parts, and the next bar is selected. Past the end, this adds bars.</li><li><strong>Edit a bar:</strong> KNOB 1 picks the bar; the other knobs set each part's pattern.</li><li><strong>Mute in a bar:</strong> black keys 1–5.</li><li><strong>Play it:</strong> set MODE to SONG (second page, or GLO), then PLAY. It starts at the selected bar and loops. The top line shows S and the bar.</li><li><strong>Record it:</strong> in SONG mode, arm REC and play. Change patterns and mutes as you like; each bar is written as it plays, from the start bar on, and the song grows past its end. This overwrites what was there.</li></ul>
+<p>SEL on the SONG screen has LENGTH, INSERT BAR, DELETE BAR and CLEAR SONG.</p>
+<hr>
+<h2 id="s10"><span class="num">10</span>Recording</h2>
 <p>REC arms recording; press it again to stop.</p>
 <ul><li><strong>Drums:</strong> play the black keys while the pattern runs. Hold ENV for accents.</li><li><strong>303, live:</strong> in keyboard mode, play while the pattern runs.</li><li><strong>303, step by step:</strong> in keyboard mode, stopped. Each key fills the next step, starting from step 1. Hold ENV for an accent, LFO for a slide. Tap ENV alone for a rest; hold LFO and press OCT- or OCT+ for a tie.</li></ul>
 <hr>
-<h2 id="s10"><span class="num">10</span>Effects</h2>
+<h2 id="s11"><span class="num">11</span>Knob motion</h2>
+<div class="figs"><figure class="shot"><img src="img/screen-motion.png" alt="A recorded cutoff sweep playing" loading="lazy"><figcaption>A recorded cutoff sweep playing</figcaption></figure></div>
+<p>Arm REC, play, and turn any sound knob: the move is recorded into the pattern, on the steps where you moved it. Short pauses are filled in, so a slow sweep has no gaps. Playback glides between steps rather than jumping.</p>
+<p>A knob with motion has a dot in its corner, and its ring follows what plays.</p>
+<ul><li>Steps you didn't touch play the knob's own setting.</li><li>Turn the knob without recording and it takes over for one pass of the pattern.</li><li><strong>Clear:</strong> hold SAVE and turn the knob.</li><li>Motion belongs to the part's pattern: the 303's knobs to the 303's, the effects and master to the 909's. It follows copies and clears.</li><li>Stopping puts every knob back to its own setting.</li></ul>
+<p>There is room for 160 recorded knobs across all patterns. When it's full, the top line says MOTION FULL.</p>
+<hr>
+<h2 id="s12"><span class="num">12</span>Effects</h2>
 <div class="figs"><figure class="shot"><img src="img/screen-fx.png" alt="FX" loading="lazy"><figcaption>FX</figcaption></figure></div>
 <p>One reverb and one delay, shared by every part. FX opens on the sends: reverb and delay for each part. Drum tracks also have their own sends, on their own pages.</p>
 <ul><li>REVERB: DECAY, TONE, HPF, LEVEL.</li><li>DELAY: TIME (in note values, 1/32 to a dotted half), FEEDBACK, TONE, LEVEL.</li><li>TAPE: TYPE is DIGI (clean, 12-bit) or TAPE (wobbles, saturates, self-oscillates at high feedback). WEAR sets how worn the tape is. HPF.</li><li>KIT DRIVE: the 909's drive and glue compressor, on the whole mix.</li></ul>
 <hr>
-<h2 id="s11"><span class="num">11</span>Mix and master</h2>
+<h2 id="s13"><span class="num">13</span>Mix and master</h2>
 <div class="figs"><figure class="shot"><img src="img/screen-mix.png" alt="MIX, with the compressor pumping" loading="lazy"><figcaption>MIX, with the compressor pumping</figcaption></figure></div>
 <p>LFO opens MIX: a level and meter for each part, and the compressor's gain reduction in red.</p>
 <div class="table"><table><thead><tr><th>Compressor</th><th></th></tr></thead><tbody><tr><td>THRESH</td><td>-48 to 0 dB</td></tr><tr><td>RATIO</td><td>1:1 (off) to 20:1, and INF</td></tr><tr><td>ATTACK</td><td>0.1 to 100 ms</td></tr><tr><td>RELEASE</td><td>10 to 1500 ms</td></tr><tr><td>MAKEUP</td><td>0 to 24 dB</td></tr><tr><td>MIX</td><td>dry to wet, for parallel compression</td></tr></tbody></table></div>
 <p><strong>PUMP</strong> ducks the whole mix on each kick, by up to 24 dB, and lets it swell back over the release. PUMP BY picks the kick: 909, 808 or both. Accented kicks pump harder. It works with the ratio at 1:1, and with the kick muted.</p>
 <p><strong>FILTER</strong> is off, low pass, band pass or high pass, with CUTOFF and RESO. <strong>LIMIT</strong> stops clipping; leave it on.</p>
 <hr>
-<h2 id="s12"><span class="num">12</span>Settings and saving</h2>
+<h2 id="s14"><span class="num">14</span>Settings and saving</h2>
 <div class="figs"><figure class="shot"><img src="img/screen-global.png" alt="GLOBAL" loading="lazy"><figcaption>GLOBAL</figcaption></figure></div>
 <p>GLO:</p>
-<div class="table"><table><thead><tr><th></th><th></th></tr></thead><tbody><tr><td>CLOCK OUT</td><td>Send MIDI clock and start/stop.</td></tr><tr><td>NOTES OUT</td><td>Send the patterns as MIDI notes.</td></tr><tr><td>KEY LIGHTS</td><td>Show steps on the keys.</td></tr><tr><td>THEME</td><td>Green, amber, cyan, red, mono.</td></tr><tr><td>ACCENT</td><td>How loud an unaccented hit is next to an accented one.</td></tr><tr><td>SAVE PROJECT</td><td>Save.</td></tr><tr><td>CLEAR PATTERN</td><td>Clear the whole pattern.</td></tr><tr><td>FACTORY RESET</td><td>Factory sounds and patterns. Your saved project survives until you save.</td></tr><tr><td>ABOUT X0X</td><td>Version and audio load.</td></tr></tbody></table></div>
-<p><strong>SAVE</strong> saves the sounds, the 16 patterns, the tempo and the settings. Anything unsaved is lost at power off.</p>
+<div class="table"><table><thead><tr><th></th><th></th></tr></thead><tbody><tr><td>CLOCK OUT</td><td>Send MIDI clock and start/stop.</td></tr><tr><td>NOTES OUT</td><td>Send the patterns as MIDI notes.</td></tr><tr><td>KEY LIGHTS</td><td>Show steps on the keys.</td></tr><tr><td>THEME</td><td>Green, amber, cyan, red, mono.</td></tr><tr><td>ACCENT</td><td>How loud an unaccented hit is next to an accented one.</td></tr><tr><td>MODE</td><td>PATTERN, or SONG: the song plays.</td></tr><tr><td>SAVE PROJECT</td><td>Save.</td></tr><tr><td>CLEAR PATTERN</td><td>Clear the whole pattern.</td></tr><tr><td>FACTORY RESET</td><td>Factory sounds and patterns, no song, no motion. Your saved project survives until you save.</td></tr><tr><td>ABOUT X0X</td><td>Version and audio load.</td></tr></tbody></table></div>
+<p><strong>SAVE</strong> saves the sounds, the 16 patterns, the song, the knob motion, the tempo and the settings. Anything unsaved is lost at power off.</p>
 <hr>
-<h2 id="s13"><span class="num">13</span>MIDI</h2>
+<h2 id="s15"><span class="num">15</span>MIDI</h2>
 <p>The FM-1 shows up as "X0X FM-1".</p>
 <div class="table"><table><thead><tr><th>In</th><th></th></tr></thead><tbody><tr><td>ch 10</td><td>909: 36 kick, 38 snare, 41 45 50 toms, 37 rim, 39 clap, 42 closed hat, 46 open hat, 49 crash, 51 ride.</td></tr><tr><td>ch 11</td><td>808: the same, plus 56 cowbell and 49 cymbal.</td></tr><tr><td>ch 2</td><td>303A. Overlapping notes slide; velocity 100 and up accents.</td></tr><tr><td>ch 3</td><td>303B, the same.</td></tr><tr><td>ch 4</td><td>Notes 36–43 play break slices 1–8.</td></tr><tr><td>clock</td><td>Followed automatically. X0X goes back to its own tempo half a second after the clock stops.</td></tr></tbody></table></div>
 <p>Out: clock and start/stop (CLOCK OUT) and the patterns on the channels above (NOTES OUT).</p>
 <hr>
-<h2 id="s14"><span class="num">14</span>Your own breaks</h2>
+<h2 id="s16"><span class="num">16</span>Your own breaks</h2>
 <p>X0X ships no recorded breaks. The FM-1 has three sample slots of about 7 seconds; a one-bar loop takes about a third of one, so about nine fit. With the FM-1 connected:</p>
 <pre><code>python3 tools/upload_breaks.py --bars amen.wav think.wav funky.wav ...</code></pre>
 <p><code>--bars</code> takes one bar from each file. Without it, files go up as they are. Loops are named BR1.1, BR1.2 ... BR2.1 and show up after X0X's own. Uploading to a slot replaces what was there. <code>--dry-run FOLDER</code> checks what fits without the FM-1. <code>--bbgen</code> uploads BB Gen's classic breaks if you have schwung-breakbeat next to X0X.</p>
 <p>To build loops into the firmware instead, see BUILDING.md.</p>
 <hr>
-<h2 id="s15"><span class="num">15</span>Update mode and calibration</h2>
+<h2 id="s17"><span class="num">17</span>Update mode and calibration</h2>
 <p><strong>Update mode:</strong> hold OCT- and OCT+ for five seconds. Let go during the countdown to cancel.</p>
 <p><strong>Calibration:</strong> if a button or knob does the wrong thing, hold OCT- and OCT+ while switching on, then press and turn each control when asked.</p>
 <hr>
-<h2 id="s16"><span class="num">16</span>Parameters</h2>
+<h2 id="s18"><span class="num">18</span>Parameters</h2>
 <p>Drum values are 0–127. DIST is DIODE, CLIP, SAT, BFZ, PDIST, FOLD or CRUSH.</p>
 <div class="table"><table><thead><tr><th>909</th><th></th></tr></thead><tbody><tr><td>BD</td><td>Tune, Attack, Decay, Level, Pitch depth, Pitch, Drive, Dist</td></tr><tr><td>SD</td><td>Tune, Tone, Snappy, Level, Drive, Dist, Rev, Dly</td></tr><tr><td>LT MT HT</td><td>Tune, Decay, Level, Attack, Drive, Dist, Rev, Dly</td></tr><tr><td>RS</td><td>Level, Tune, Drive, Dist, Rev, Dly</td></tr><tr><td>CP</td><td>Level, Tune, Tail, Drive, Dist, Rev, Dly</td></tr><tr><td>CH OH</td><td>Decay, Level, Tune, Drive, Dist, Rev, Dly</td></tr><tr><td>CR RD</td><td>Tune, Level, Decay, Drive, Dist, Rev, Dly</td></tr><tr><td>KIT</td><td>Accent, Velocity</td></tr></tbody></table></div>
 <div class="table"><table><thead><tr><th>808</th><th></th></tr></thead><tbody><tr><td>BD</td><td>Level, Tone, Decay, Tune, Attack, Drive, Dist</td></tr><tr><td>SD</td><td>Level, Tone, Snappy, Tune, Decay, Drive, Dist, Rev, Dly</td></tr><tr><td>LT MT HT</td><td>Level, Tune, Decay, Sound, Drive, Dist, Rev, Dly</td></tr><tr><td>RS</td><td>Level, Tune, Decay, Sound, Drive, Dist, Rev, Dly</td></tr><tr><td>CP</td><td>Level, Tune, Decay, Attack, Sound, Drive, Dist, Rev, Dly</td></tr><tr><td>CB CH</td><td>Level, Tune, Decay, Drive, Dist, Rev, Dly</td></tr><tr><td>CY OH</td><td>Level, Decay, Tune, Drive, Dist, Rev, Dly</td></tr><tr><td>KIT</td><td>Level, Accent, Choke (off, closed cuts open, both)</td></tr></tbody></table></div>
@@ -184,7 +198,7 @@ nav.contents li { break-inside: avoid; }
 <div class="table"><table><thead><tr><th>Break</th><th></th></tr></thead><tbody><tr><td>Complexity, Anchor, Roll, Fill</td><td>0–100</td></tr><tr><td>Retrig 2x 3x 4x 8x</td><td>0–100</td></tr><tr><td>Phrase</td><td>Off, 2, 4, 8, 16</td></tr><tr><td>B chance</td><td>0–100</td></tr><tr><td>A length, B length</td><td>1/4, 1/2, 1, 2, 4, 8 bars</td></tr><tr><td>Level</td><td></td></tr><tr><td>Pitch</td><td>-12 to +12 semitones</td></tr></tbody></table></div>
 <div class="table"><table><thead><tr><th>Effects</th><th></th></tr></thead><tbody><tr><td>REVERB</td><td>Decay, Tone, HPF, Level</td></tr><tr><td>DELAY</td><td>Time (1/32, 1/16T, 1/16, 1/8T, 1/16., 1/8, 1/4T, 1/8., 1/4, 1/2T, 1/4., 1/2, 1/2.), Feedback, Tone, Level</td></tr><tr><td>TAPE</td><td>Type (DIGI, TAPE), Wear, HPF</td></tr><tr><td>KIT DRIVE</td><td>Volume, Dist, Drive, Comp</td></tr></tbody></table></div>
 <hr>
-<h2 id="s17"><span class="num">17</span>Credits</h2>
+<h2 id="s19"><span class="num">19</span>Credits</h2>
 <p>X0X is free software under the GPL, version 3. If you pass the firmware on, pass on the source too.</p>
 <ul><li>Platform (hardware layer, USB, update loader, installer, storage): <strong>Felucca</strong> by Leo Kuroshita, Hügelton Instruments.</li><li>909: <strong>9W9</strong> by athousanddetails, after <strong>ER-99</strong> by Matthew Cieplak, whose hat and cymbal samples it uses.</li><li>808: <strong>8W8</strong> by athousanddetails.</li><li>303: <strong>schwung-303</strong>, built on Open303 by Robin Schmidt (MIT), with extensions after jc303 and dm-Rat.</li><li>TB-3PO: <strong>schwung-tb3po</strong>, from the Phazerville Hemisphere Suite.</li><li>Break generator: <strong>BB Gen</strong> by mestela, used with permission.</li><li>Fonts: Barlow Semi Condensed and Terminus (SIL Open Font License).</li></ul>
 <p>M-VAVE and FM-1 belong to their owners; TR-808, TR-909 and TB-303 are Roland trademarks. X0X isn't connected with M-VAVE, Roland or Hügelton Instruments.</p>
