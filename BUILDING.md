@@ -73,8 +73,9 @@ script (the command list is at the top of `host/x0x_host.c`).
 
 ## Install
 
-Use the web installer in Chrome or Edge:
-<https://hugelton.github.io/Felucca/webapp/installer/>. It installs the released package.
+The hosted web installer (<https://hugelton.github.io/Felucca/webapp/installer/>) installs
+**Felucca**, not X0X. To install X0X, use the command line, or a local copy of the installer
+site built from `build/x0x.fwsc` (below).
 
 From the command line (needs `pip3 install mido python-rtmidi`):
 
