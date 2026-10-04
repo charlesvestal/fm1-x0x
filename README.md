@@ -15,8 +15,8 @@ Instruments). It keeps Felucca's platform — the hardware layer, USB MIDI, the 
 the web installer and the flash storage — and replaces the instrument.
 
 > **Status: beta.** X0X runs on the FM-1. With every part playing a dense pattern at once it
-> can still run out of processor time (PERF TEST's worst case is ~102 %); an overload guard is
-> planned. Installing is at your own risk: the web installer can put M-VAVE's firmware back, an
+> can still run out of processor time (PERF TEST's worst case is ~102 %). An overload guard
+> trades a little 303 and 808 quality for headroom when it gets close. Installing is at your own risk: the web installer can put M-VAVE's firmware back, an
 > FM-1 that keeps crashing starts in safe mode, and the manual's Troubleshooting covers the rest.
 
 ## The instrument

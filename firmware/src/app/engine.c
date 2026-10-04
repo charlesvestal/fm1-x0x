@@ -43,6 +43,50 @@ void engine_motion_enable(int on) { mot_on = (uint8_t)(on != 0); }   /* the ISR 
 static volatile uint8_t mot_release_req;
 void engine_motion_reset(void) { mot_release_req = 1; }   /* lanes changed under it (undo): knobs back */
 
+/* overload guard: past the CPU (a block over 92%, or 85% on average) the two 303s drop their
+ * oversampling (~12% of the CPU: a little aliasing on bright notes) and the 808's voices end at
+ * -50 dB instead of -90 (~2%); after 3 s back under 65% both return. The platform reports each
+ * block's load after rendering it (engine_load, same context as engine_render); the change is
+ * made at the start of the next block. Off during the PERF test, which measures the full cost. */
+#define GUARD_ON_LAST 92u
+#define GUARD_ON_AVG 85u
+#define GUARD_OFF 65u
+#define GUARD_CALM_FRAMES (3u * 44100u)
+extern float drum808_quiet;
+static uint8_t guard_on, guard_applied, guard_enabled = 1;
+static uint32_t guard_avg_q8, guard_calm;
+volatile uint32_t eng_guard_count;
+void engine_guard_enable(int on) { guard_enabled = (uint8_t)(on != 0); }
+int engine_guard_active(void) { return guard_on; }
+void engine_load(uint32_t pct, uint32_t frames)
+{
+    guard_avg_q8 = (guard_avg_q8 * 15u + pct * 256u) / 16u;
+    if (!guard_enabled) {
+        guard_on = 0;
+        guard_calm = 0;
+    } else if (!guard_on) {
+        if (pct > GUARD_ON_LAST || guard_avg_q8 > GUARD_ON_AVG * 256u) {
+            guard_on = 1;
+            guard_calm = 0;
+            eng_guard_count++;
+        }
+    } else if (pct >= GUARD_OFF || guard_avg_q8 >= GUARD_OFF * 256u) {
+        guard_calm = 0;
+    } else if ((guard_calm += frames) >= GUARD_CALM_FRAMES) {
+        guard_on = 0;
+    }
+}
+static void guard_apply(void)
+{
+    int k;
+    if (guard_on == guard_applied)
+        return;
+    guard_applied = guard_on;
+    for (k = 0; k < NBASS; k++)
+        bass303_set_lite(&b303[k], guard_on);
+    drum808_quiet = guard_on ? 3.2e-3f : 3.2e-5f;
+}
+
 /* mixer: per part Level, Rev send, Dly send (a drum machine's add to its voices' own sends) */
 enum { MX_LEVEL, MX_REV, MX_DLY, MX_NPARAMS };
 static const x0x_param_t MIX_P[MX_NPARAMS] = {{"LEVEL", 127, 100, 0}, {"REV", 127, 0, 0}, {"DLY", 127, 0, 0}};
@@ -454,6 +498,7 @@ void engine_render(int32_t *out_lr, uint32_t n)
         motion_release(&mot);
     }
     mot_was_on = mot_on;
+    guard_apply();
     {
         PROF_T(pt);
         drain();

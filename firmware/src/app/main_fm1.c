@@ -39,6 +39,7 @@ void fm1_alnk0_irq(void)                            /* via isr_alnk0 (hal/fm1_is
             x0x_dbg.late++;                         /* the DMA moved on while we rendered */
             audio_xruns++;
         }
+        engine_load(us * 100u / budget, HALF_FRAMES);
         x0x_dbg.halves++;
         x0x_dbg.last_us = us;
         if (us > x0x_dbg.max_us)

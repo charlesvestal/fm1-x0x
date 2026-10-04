@@ -35,6 +35,11 @@ enum { PR_909, PR_808, PR_303A, PR_303B, PR_BRK, PR_FX, PR_MST, PR_SEQ, ENG_PROF
 extern volatile uint32_t eng_prof[ENG_PROF_N], eng_prof_frames;
 void engine_motion_enable(int on);                          /* off: lanes do not play (the PERF test) */
 void engine_motion_reset(void);                             /* lanes replaced (undo): knobs to their own values */
+/* overload guard (engine.c): the platform reports each block's load after rendering it */
+void engine_load(uint32_t pct, uint32_t frames);           /* ISR, after engine_render */
+void engine_guard_enable(int on);                           /* off: full quality always (the PERF test) */
+int engine_guard_active(void);
+extern volatile uint32_t eng_guard_count;                   /* times it engaged (PERF screen) */
 extern volatile uint8_t eng_step[NTRACKS];   /* playheads for the UI */
 extern volatile uint16_t eng_peak[NPARTS];   /* part meters, Q15, decaying (UI) */
 #define SCOPE_N 256u

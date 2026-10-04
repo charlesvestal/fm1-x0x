@@ -5,7 +5,8 @@ X0X is groovebox firmware for the M-VAVE FM-1, version 0.1. It turns the FM-1 in
 pattern, you can arrange patterns into a song, and you can record knob moves.
 
 **Status.** X0X is a beta. It runs on the FM-1, but with every part playing a dense pattern at
-once it can still run out of processor time and drop out (see Performance).
+once it can still run out of processor time. When it gets close, it trades a little sound quality
+for headroom (see Performance).
 
 ---
 
@@ -507,6 +508,13 @@ To measure it properly, press SEL and choose RUN PERF TEST. X0X plays three patt
 on the factory sound for about 15 seconds: a simple loop, all five parts, and everything as busy
 as it gets. Then it puts back your patterns, sound and tempo, and shows a table. Your project
 isn't changed. HOME or PLAY stops the test early.
+
+When the FM-1 is close to running out of processor time, X0X saves some on its own instead of
+dropping out. Both 303s stop oversampling, which costs a little brightness and aliasing on high,
+resonant notes, and the 808's sounds end a little sooner as they fade. GUARD lights in amber next
+to the audio load while this is on. It turns off again after three quiet seconds. The performance
+page shows how many times it has switched on (GUARD 3x). The test above runs without it, so it
+measures the full cost.
 
 If X0X drops out on your patterns, a photo of that table, and of the pattern, is the most useful
 thing you can send.

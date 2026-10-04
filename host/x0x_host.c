@@ -18,6 +18,7 @@
  *   slotimg K F.hdr F.bin       slot K from tools/upload_breaks.py --dry-run's image (the device format)
  *   midi B0 B1 B2                incoming USB MIDI message (hex bytes)
  *   wav FILE | wavstop           start / stop recording the output
+ *   load N                       the overload guard sees every block cost N% (-1: as measured)
  *   peakreset                    restart the output peak (expect peak_db_min / peak_db_max)
  *   shot FILE.png                save the screen
  *   leds                         print the lit buttons and keys
@@ -185,6 +186,7 @@ const uint8_t *plat_slot(int k, int z, uint32_t *ns, uint32_t *rate, char name[9
 }
 
 static uint32_t cpu_pct, cpu_peak;
+static int load_force = -1;                      /* script "load N": the guard sees N%, -1 measured */
 uint32_t plat_cpu_pct(void) { return cpu_pct; }
 uint32_t plat_xruns(void) { return 0; }
 /* performance: no CPU counter here: the "cycles" are nanoseconds (plat_cycles_hz) */
@@ -410,6 +412,11 @@ static void run_ms(uint32_t ms)
             cpu_pct = (uint32_t)(100.0 * dt / (256.0 * 1e9 / 44100.0));
             if (cpu_pct > cpu_peak)
                 cpu_peak = cpu_pct;
+#ifdef X0X_WEB
+            engine_load(load_force >= 0 ? (uint32_t)load_force : 0u, 256);   /* a browser's timing is not the FM-1's */
+#else
+            engine_load(load_force >= 0 ? (uint32_t)load_force : cpu_pct, 256);
+#endif
             for (k = 0; k < 256; k++) {
                 float l = (float)blk[2 * k] / 8388608.0f;
                 int16_t s[2];
@@ -592,6 +599,10 @@ static int expect(const char *what, const char *val)
         got = perf.test;
     else if (!strncmp(what, "perfres", 7))         /* perfresK: scenario K's share of the CPU x 10 */
         got = perf.res_load[atoi(what + 7) % 3];
+    else if (!strcmp(what, "guard"))               /* the overload guard: 1 engaged */
+        got = engine_guard_active();
+    else if (!strcmp(what, "guardcount"))
+        got = (int)eng_guard_count;
     else if (!strcmp(what, "patptr"))              /* 1: the sequencer plays the project's patterns */
         got = seq.pat == proj.pat;
     else if (!strcmp(what, "songon"))
@@ -839,7 +850,9 @@ int main(int argc, char **argv)
         } else if (!strcmp(cmd, "wav")) {
             snprintf(out, sizeof out, "%s/%s", dir, a);
             wav_open(out);
-        } else if (!strcmp(cmd, "peakreset"))
+        } else if (!strcmp(cmd, "load"))              /* load N: every block costs N% (the guard's input) */
+            load_force = atoi(a);
+        else if (!strcmp(cmd, "peakreset"))
             peak_out = 0.0f;
         else if (!strcmp(cmd, "wavstop"))
             wav_close();

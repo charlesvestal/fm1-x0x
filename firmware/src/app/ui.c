@@ -1044,6 +1044,7 @@ static void perf_restore(void)
     seq.bpm = perf.bpm;
     engine_apply_sound(&proj.sound);
     engine_motion_enable(1);
+    engine_guard_enable(1);
     engine_brk_loops();
 }
 
@@ -1100,6 +1101,7 @@ static void perf_test_tick(void)
         engine_sound_defaults(&perf_snd);
         engine_apply_sound(&perf_snd);
         engine_motion_enable(0);
+        engine_guard_enable(0);
         engine_brk_loops();
         seq_start(&seq);
         perf.phase = 1;
@@ -2540,6 +2542,8 @@ static void draw_mix(int band)
         put_s(put_i(a, (int)plat_cpu_pct()), "%");
         cv_text(4, 50, &FONT_XS, "AUDIO LOAD", C_DIM);
         cv_text(70, 50, &FONT_XS, a, plat_cpu_pct() > 85u ? RGB(255, 60, 60) : C_GRAY);
+        if (engine_guard_active())                    /* the overload guard is saving the CPU */
+            cv_text(100, 50, &FONT_XS, "GUARD", C_AMB);
     }
 }
 
@@ -2630,6 +2634,9 @@ static void draw_perf(int band)
         put_s(q, " CYCLES / SAMPLE");
         cv_text(4, 50, &FONT_XS, t, C_GRAY);
     }
+    q = put_s(t, engine_guard_active() ? "GUARD ON  " : "GUARD ");   /* the overload guard: engaged, times */
+    put_s(put_i(q, (int)eng_guard_count), "x");
+    text_r(236, 60, &FONT_XS, t, engine_guard_active() ? C_AMB : C_DIM);
     cv_text(4, 60, &FONT_XS, "SEL: RUN PERF TEST", C_DIM);
 }
 

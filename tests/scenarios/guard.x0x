@@ -1,0 +1,65 @@
+# The overload guard (engine.c): past the CPU it lightens the 303s and the 808's tails, shows GUARD,
+# and lets go after 3 s back under 65%. "load N" stands in for the FM-1's measured load.
+wait 300
+# 909 kick on the quarters, 808 too, 303 A on a TB-3PO line
+tapkey b0
+tapkey w0
+tapkey w4
+tapkey w8
+tapkey w12
+turn ALGO 1
+tapkey w0
+tapkey w8
+turn ALGO 1
+tap ARP
+tap OCT+
+tap PLAY
+wait 1500
+expect guard 0
+# a block over 92%: on at once, and the music plays on
+load 95
+wait 100
+expect guard 1
+expect guardcount 1
+shot g01_guard.png
+peakreset
+wait 2000
+expect peak_db_max >-30
+# 2 s under 65% is not enough; 3 s is
+load 40
+wait 2000
+expect guard 1
+wait 1500
+expect guard 0
+# 80% sustained is under both thresholds; 90% sustained crosses the average one
+load 80
+wait 2000
+expect guard 0
+load 90
+wait 2000
+expect guard 1
+expect guardcount 2
+# a load that comes back between 65 and 92 keeps it on
+load 70
+wait 5000
+expect guard 1
+# the PERF test measures the full cost: no guard while it runs, back after
+load 95
+tap PLAY
+tap GLO
+turn SELECT 12
+tap SEL
+expect view 7
+tap SEL
+turn SELECT 1
+tap SEL
+wait 1000
+expect perftest 0
+expect guard 0
+shot g02_perftest.png
+tap HOME
+wait 300
+expect perftest -1
+wait 100
+expect guard 1
+shot g03_perf_after.png

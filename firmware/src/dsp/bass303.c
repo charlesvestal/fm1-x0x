@@ -272,6 +272,12 @@ void bass303_init(bass303_t *b)
     x = fm_expf(-FM_TWO_PI * 150.0f / FSO);          /* feedback highpass (stock 150 Hz) */
     b->fbhp_b0 = 0.5f * (1.0f + x);
     b->fbhp_a1 = x;
+    x = fm_expf(-FM_TWO_PI * 44.486f / BASS303_SR);  /* the same two at the base rate (lite) */
+    b->hp1l_b0 = 0.5f * (1.0f + x);
+    b->hp1l_a1 = x;
+    x = fm_expf(-FM_TWO_PI * 150.0f / BASS303_SR);
+    b->fbhpl_b0 = 0.5f * (1.0f + x);
+    b->fbhpl_a1 = x;
     x = fm_expf(-FM_TWO_PI * 24.167f / BASS303_SR);
     b->hp2_b0 = 0.5f * (1.0f + x);
     b->hp2_a1 = x;
@@ -361,6 +367,7 @@ void bass303_note_on(bass303_t *b, int note, int accent, int slide)
 }
 
 void bass303_note_off(bass303_t *b) { b->gate = 0; }
+void bass303_set_lite(bass303_t *b, int on) { b->lite = on != 0; }
 void bass303_all_off(bass303_t *b) { b->gate = 0; }
 
 /* ---- render ---------------------------------------------------------------------------- */
@@ -514,7 +521,13 @@ static void run(bass303_t *b, float *out, int n)
     const float scaler = b->env_scaler, offset = b->env_offset, cutoff = b->cutoff, r = b->reso;
     const float *amp_pw = b->gate ? b->ampd_pw : b->amp_acc ? b->ampa_pw : b->ampn_pw;
     const float amp_boost = b->gate ? 0.45f + 4.0f * acc : 0.0f;
-    const float hp1_b0 = b->hp1_b0, hp1_a1 = b->hp1_a1, fb_b0 = b->fbhp_b0, fb_a1 = b->fbhp_a1;
+    /* the overload guard's lite mode: no oversampling; a change of rate jumps to the new rate's
+     * coefficients (snap) rather than gliding between the two rates' values */
+    const int lite = b->lite;
+    const int nos = lite ? 1 : BASS303_OS;
+    const float fso = lite ? BASS303_SR : FSO;
+    const float hp1_b0 = lite ? b->hp1l_b0 : b->hp1_b0, hp1_a1 = lite ? b->hp1l_a1 : b->hp1_a1;
+    const float fb_b0 = lite ? b->fbhpl_b0 : b->fbhp_b0, fb_a1 = lite ? b->fbhpl_a1 : b->fbhp_a1;
     const float sq_dc = b->sq_dc, sq_h2 = 0.5f * b->sq_h;
     const float out_gain = b->amp_scaler;
     const int square = b->wave;
@@ -537,13 +550,17 @@ static void run(bass303_t *b, float *out, int n)
         } else {
             b->amp_y *= amp_pw[m];
         }
-        n_inc = b->slew_y * (1.0f / FSO);
+        if (lite != b->lite_cur) {
+            b->lite_cur = lite;
+            b->snap = 1;
+        }
+        n_inc = b->slew_y * (1.0f / fso);
         n_a = b->amp_y + amp_boost * b->env_y;
         fc = cutoff * fm_exp2f(scaler * (b->rc1_y - offset) + acc * b->rc2_y);   /* n1 = n2 = 1 */
         fc = fm_clampf(fc, 200.0f, 20000.0f);
         /* TeeBeeFilter::calculateCoefficientsApprox4, TB_303 branch only (the a1 polynomial
          * it computes first is overwritten there, so it is skipped) */
-        fx = fc * (0.707106781f / FSO);
+        fx = fc * (0.707106781f / fso);
         n_b0 = (0.00045522346f + 6.1922189f * fx) / (1.0f + 12.358354f * fx + 4.4156345f * (fx * fx));
         n_k = fx * (fx * (fx * (fx * (fx * (fx + 7198.6997f) - 5837.7917f) - 476.47308f) + 614.95611f) + 213.87126f) + 16.998792f;
         n_g2 = 2.0f * ((n_k * (1.0f / 17.0f) - 1.0f) * r + 1.0f) * (1.0f + r);
@@ -586,7 +603,7 @@ static void run(bass303_t *b, float *out, int n)
             /* oversampled: oscillator -> highpass -> TeeBeeFilter */
             {
                 int q;
-                for (q = 0; q < BASS303_OS; q++) {
+                for (q = 0; q < nos; q++) {
                     if (!square) {
                         t = phase + 0.5f;                       /* Saw303: rises -1..1, jump at p = .5 */
                         if (t >= 1.0f)
@@ -620,9 +637,9 @@ static void run(bass303_t *b, float *out, int n)
 #if BASS303_OS == 1
             s = os[0];
 #elif BASS303_OS == 2
-            s = decim_hb1(b->hb1, os[0], os[1]);
+            s = lite ? os[0] : decim_hb1(b->hb1, os[0], os[1]);
 #else
-            s = decim_hb1(b->hb1, decim_hb2(b->hb2, os[0], os[1]), decim_hb2(b->hb2, os[2], os[3]));
+            s = lite ? os[0] : decim_hb1(b->hb1, decim_hb2(b->hb2, os[0], os[1]), decim_hb2(b->hb2, os[2], os[3]));
 #endif
 
             /* allpass 14 Hz, highpass 24 Hz, notch 7.5 Hz at the base rate */

@@ -97,6 +97,8 @@ typedef struct bass303 {
     float dc_b0, dc_b1, dc_a1, dc_a2;   /* de-clicker: 200 Hz Butterworth lowpass, b2 = b0 */
     float hp1_b0, hp1_a1;               /* pre-filter highpass at the oversampled rate */
     float fbhp_b0, fbhp_a1;             /* feedback highpass at the oversampled rate */
+    float hp1l_b0, hp1l_a1, fbhpl_b0, fbhpl_a1;   /* the same two at the base rate (lite) */
+    int lite, lite_cur;      /* X0X overload guard: render without oversampling (bass303_set_lite) */
     float ap_b0, ap_a1;                 /* 14 Hz allpass (b1 = 1) */
     float hp2_b0, hp2_a1;               /* 24 Hz highpass */
     float nt_b0, nt_b1, nt_a1, nt_a2;   /* 7.5 Hz notch (b2 = b0) */
@@ -149,6 +151,9 @@ void bass303_note_on(bass303_t *b, int note, int accent, int slide);
 void bass303_note_off(bass303_t *b);
 void bass303_all_off(bass303_t *b);
 void bass303_render(bass303_t *b, float *out, int n);
+/* the engine's overload guard: 1 = no oversampling from the next block (~12 % of the worst case
+ * on the FM-1; some aliasing on bright, resonant notes), 0 = back to BASS303_OS */
+void bass303_set_lite(bass303_t *b, int on);
 int bass303_nparams(void);
 const x0x_param_t *bass303_param(int i);
 void bass303_set(bass303_t *b, int i, int value);
