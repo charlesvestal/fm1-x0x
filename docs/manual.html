@@ -82,9 +82,10 @@ nav.contents li { break-inside: avoid; }
 </nav>
 <hr>
 <h2 id="s1"><span class="num">1</span>Install</h2>
-<p>You need Python 3 with the <code>mido</code> and <code>python-rtmidi</code> packages (<code>pip3 install mido python-rtmidi</code>). Connect the FM-1 to your computer over USB and run:</p>
-<pre><code>python3 tools/fm1_install.py x0x.fwsc</code></pre>
-<p>When the install finishes, the FM-1 restarts into X0X. Note that the web installer on hugelton.github.io installs Felucca, not X0X.</p>
+<p>The easiest way to install X0X is the web installer at <strong>https://charlesvestal.github.io/fm1-x0x/install/</strong>. It works in Chrome or Edge on a computer, and you don't need to install anything else. Connect the FM-1 to the computer with a USB data cable, open the page and press Install. Don't unplug the cable while it's writing. When it finishes, the FM-1 restarts into X0X.</p>
+<p>You can also install from the command line. Download the firmware file (for example <code>x0x-0.1-beta.fwsc</code>) from the [releases page](https://github.com/charlesvestal/fm1-x0x/releases), get the X0X source code from GitHub, install Python 3 with the <code>mido</code> and <code>python-rtmidi</code> packages (<code>pip3 install mido python-rtmidi</code>), and run:</p>
+<pre><code>python3 tools/fm1_install.py x0x-0.1-beta.fwsc</code></pre>
+<p>Note that the web installer on hugelton.github.io installs Felucca, not X0X.</p>
 <p>To go back to the original firmware, use M-VAVE's own updater. If an install is interrupted and the FM-1 won't start, Felucca's FM-1-transporter can still reach it. Installing third-party firmware is at your own risk.</p>
 <hr>
 <h2 id="s2"><span class="num">2</span>Getting started</h2>

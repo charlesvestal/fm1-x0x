@@ -75,9 +75,9 @@ script (the command list is at the top of `host/x0x_host.c`).
 
 ## Install
 
-The hosted web installer (<https://hugelton.github.io/Felucca/webapp/installer/>) installs
-**Felucca**, not X0X. To install X0X, use the command line, or a local copy of the installer
-site built from `build/x0x.fwsc` (below).
+X0X's web installer is <https://charlesvestal.github.io/fm1-x0x/install/> (Felucca's, at
+hugelton.github.io, installs Felucca). To install your own build, use the command line, or a local
+copy of the site (below).
 
 From the command line (needs `pip3 install mido python-rtmidi`):
 
@@ -90,10 +90,20 @@ Or, to install your own build from the web installer, make a local copy of the s
 (Web MIDI needs a secure context):
 
 ```
-python3 web/make_site.py build/x0x.fwsc dev /tmp/x0x-site
-cd /tmp/x0x-site && python3 -m http.server 8000
-# open http://localhost:8000/webapp/installer/
+./build.sh --release 0.1-beta                     # the site wants a release build (identity FM-1_9XY)
+python3 tools/make_pages.py build/x0x-0.1-beta.fwsc 0.1-beta build/pages
+cd build/pages && python3 -m http.server 8000
+# open http://localhost:8000/install/
 ```
 
 Installing firmware is at your own risk. If an install fails and the FM-1 no longer
 starts, recovery needs [FM-1-transporter](https://github.com/kurogedelic/FM-1-transporter).
+
+## Publishing a release
+
+1. `./build.sh --release X.Y-beta` (the identity, FM-1_9XY, is what the installers check).
+2. `tools/publish_pages.sh X.Y-beta`: builds the site (landing page, web installer, manual,
+   firmware) with `tools/make_pages.py` and pushes it to the `gh-pages` branch, which GitHub
+   Pages serves at <https://charlesvestal.github.io/fm1-x0x/>.
+3. `gh release create vX.Y-beta build/x0x-X.Y-beta.fwsc --prerelease` for the command-line
+   download.

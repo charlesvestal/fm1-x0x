@@ -1,7 +1,8 @@
 # X0X for the M-VAVE FM-1
 
-The manual: [docs/MANUAL.md](docs/MANUAL.md) (and [docs/manual.html](docs/manual.html), made from it by
-`tools/manual_html.py`).
+**Install:** <https://charlesvestal.github.io/fm1-x0x/install/> (Chrome or Edge, the FM-1 on USB).
+**Manual:** <https://charlesvestal.github.io/fm1-x0x/manual/> (source: [docs/MANUAL.md](docs/MANUAL.md)).
+**Firmware file:** [releases](https://github.com/charlesvestal/fm1-x0x/releases).
 
 Standalone groovebox firmware for the M-VAVE FM-1: a **TR-909**, a **TR-808**, **two TB-303s**
 with **TB-3PO** acid generators, and a **breakbeat generator**, with 16 patterns (each part can
