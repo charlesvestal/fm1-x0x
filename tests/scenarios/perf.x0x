@@ -11,9 +11,9 @@ expect tempo 120
 tap HOME
 tapkey b2
 expect mute 4194304
-# GLO > PERFORMANCE (the twelfth row)
+# GLO > PERFORMANCE (the thirteenth row)
 tap GLO
-turn SELECT 11
+turn SELECT 12
 tap SEL
 expect view 7
 tap PLAY

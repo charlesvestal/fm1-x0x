@@ -399,9 +399,15 @@ D8_TICK float env_next(d8_env_t *e)
 /* the voices                                                              */
 /* ======================================================================= */
 
+/* a voice ends after n samples below drum808_quiet (8W8: 3.2e-5, -90 dB); the engine's overload
+ * guard raises it so that tails nobody hears in a dense mix stop costing CPU */
+#ifndef D8_QUIET_INIT
+#define D8_QUIET_INIT 3.2e-5f
+#endif
+float drum808_quiet = D8_QUIET_INIT;
 #define QUIET(v, o, n)                                                    \
     do {                                                                  \
-        if ((o) > 3.2e-5f || (o) < -3.2e-5f) (v)->quiet = 0;              \
+        if ((o) > drum808_quiet || (o) < -drum808_quiet) (v)->quiet = 0;  \
         else if (++(v)->quiet > (n)) (v)->active = 0;                     \
     } while (0)
 

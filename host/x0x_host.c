@@ -10,8 +10,8 @@
  *   wait MS                      run the device for MS milliseconds
  *   press BTN | release BTN | tap BTN     (BTN: FX SEL ENV LFO EDIT GLO HOME SAVE ARP SEQ PLAY REC OCT- OCT+)
  *   key K down|up | tapkey K     (K: 0..26 = F3..G5, or w0..w15 white keys, b0..b10 black keys)
- *   turn ENC N                   (ENC: SELECT ALGO PRESET K1 K2 K3 K4; N detents, signed, 80 ms apart)
- *   spin ENC N                   N detents at once (1 ms)
+ *   turn ENC N [MS]              (ENC: SELECT ALGO PRESET K1 K2 K3 K4; N detents, signed, MS apart, 80 = slow)
+ *   spin ENC N                   N detents at once (1 ms), exactly N (no knob acceleration)
  *   master N                     MASTER pot 0..4096
  *   param T V I VALUE            a sound pot (engine.h target, voice, index), as its knob would
  *   slot K NAME A.wav [B.wav..]  user sample slot K (0..2): one loop (zone) per WAV, encoded here
@@ -78,6 +78,8 @@ int32_t plat_enc(int role)
     return v;
 }
 uint32_t plat_master(void) { return master; }
+static int brightness = 8;
+void plat_brightness(int level) { brightness = level; }
 void plat_leds(uint32_t b, uint32_t k)
 {
     lit_btn = b;
@@ -762,18 +764,23 @@ int main(int argc, char **argv)
                 printf("line %d: no encoder %s\n", lineno, a);
                 return 2;
             }
-            for (; n; n -= s) {                       /* one detent every 80 ms: no acceleration */
-                enc_acc[e] += s;
-                run_ms(80);
+            {
+                uint32_t gap = c[0] ? (uint32_t)atoi(c) : 80u;   /* turn ENC N [MS]: a detent every MS */
+                for (; n; n -= s) {                   /* (80 ms, the default: no acceleration) */
+                    enc_acc[e] += s;
+                    run_ms(gap);
+                }
             }
-        } else if (!strcmp(cmd, "spin")) {              /* spin ENC N: all N detents at once (a fast hand) */
+        } else if (!strcmp(cmd, "spin")) {              /* spin ENC N: all N detents at once, exactly N */
             int e = find_name(ENC_N, NE, a);
             if (e < 0) {
                 printf("line %d: no encoder %s\n", lineno, a);
                 return 2;
             }
             enc_acc[e] += atoi(b);
+            accel_off = 1;                              /* a test's exact values, not a hand's speed */
             run_ms(1);
+            accel_off = 0;
         } else if (!strcmp(cmd, "param")) {             /* param T V I VALUE: a sound pot, as a knob would set it */
             int t = atoi(a), v = atoi(b), i = atoi(c), val = atoi(line_d);
             if (t < 0 || t >= NTARGETS || v < 0 || v >= NVOICES_MAX || i < 0 || i >= NPARAMS_MAX) {

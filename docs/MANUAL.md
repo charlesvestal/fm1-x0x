@@ -107,7 +107,7 @@ These controls do the same thing on every screen:
 | ALGORITHM | Chooses the part you're working on: 909, 808, 303A, 303B or BREAK. |
 | PRESETS | Chooses the next pattern. On a part's screen it changes only that part; on HOME it changes all five. |
 | SELECT | Moves to the next or previous page. In a list, it moves up and down. Hold HOME and turn SELECT to set the tempo. |
-| KNOB 1–4 | Change the four values shown at the bottom of the screen. |
+| KNOB 1–4 | Change the four values shown at the bottom of the screen. Turn slowly for single steps, quickly to sweep: a fast half turn covers the whole range. |
 | SEL | Shows everything on the current screen as a list. In a list, it runs the highlighted action. When X0X asks a question, SEL means yes. |
 | HOME | Goes to the HOME screen. In a list, it goes back. When X0X asks a question, HOME means no. |
 | EDIT | Shows the part's own screen. Press it again for the next page. |
@@ -477,6 +477,7 @@ Press GLO for these settings:
 | KEY LIGHTS | Shows the steps on the key lights. |
 | KEY SOUND | STOPPED (the default): the black drum keys play their sound only when the pattern is stopped, or with REC on; while it plays they only select. ALWAYS: they always play. |
 | THEME | The screen colour: green, amber, cyan, red or mono. |
+| BRIGHTNESS | The screen's brightness, 1 (dim) to 8 (full). |
 | ACCENT | How loud an unaccented drum hit is compared with an accented one. |
 | MODE | PATTERN, or SONG to play the song. |
 | SAVE PROJECT | Saves everything. |

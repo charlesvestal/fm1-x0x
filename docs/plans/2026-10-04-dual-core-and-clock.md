@@ -68,7 +68,18 @@ Risks: both cores missing the I-cache at once contend for the flash; the I-cache
 code paths at once may evict more. Behind a switch, with a fallback to one core if core 1 does not
 report in.
 
-## The clock: probably 240 MHz, and 320 is supported
+## The clock: MEASURED 360 MHz (2026-10-05) -- no headroom
+
+Read off a real FM-1 with a development build (X0X_DEBUG=1, tools/fm1_debug.py): reference 24 MHz
+(0x119A0 & 0xC000000 != 0x8000000), PLL = 24 / (((0x119A8 >> 2) & 31) + 2) * ((0x119AC & 0xFFF) + 2)
+= 24 / 12 * 270 = 540 MHz; system source 0x10014 & 0xF = 6 = 2/3 of the PLL = **360 MHz**; HSB /2
+= 180, LSB /3 = 60 (0x10008 bits 16-17 and 8-10, minus one), which is the 60 MHz the LCD assumes.
+A one-instruction loop (`if (--r != 0) goto`) runs at 51.43 per us = 7 cycles at 360 MHz.
+C0_TL_CKCNT does not count (DBG_CON 0). M-VAVE already runs the chip above the SDK's 320 MHz table
+(only its "overclocking" 396 MHz entry is higher): raising the clock is not an option. What follows
+was written before the measurement.
+
+### Before the measurement: probably 240 MHz, and 320 is supported
 
 `sys_clock_table` (apps/common/system/system_vdd_clock.c) gives the bus clocks for each CPU clock.
 X0X's LCD driver (Felucca's) assumes a 60 MHz peripheral (lsb) clock; that occurs only at **120 MHz

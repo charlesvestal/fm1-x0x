@@ -185,7 +185,9 @@ def build_loader():
 
 def build_app():
     flags = [*CFLAGS, *FPU, "-Ifirmware/hal", "-Ifirmware/src", "-Ibuild/gen"]
-    for flag in ("X0X_CDC",):
+    if VERSION and os.environ.get("X0X_DEBUG") == "1":
+        raise SystemExit("X0X_DEBUG=1 (register peek / poke over USB) is for development builds only")
+    for flag in ("X0X_CDC", "X0X_DEBUG"):
         v = os.environ.get(flag)    # unset: the default in firmware/src/x0x.c
         if v in ("0", "1"):
             flags.append(f"-D{flag}={v}")

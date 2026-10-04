@@ -93,6 +93,66 @@ static int ed_smp_end(uint32_t k, const uint8_t *a, uint32_t na)
     return usr_nz[k] ? 0 : 5;
 }
 
+#ifndef X0X_DEBUG
+#define X0X_DEBUG 0
+#endif
+#if X0X_DEBUG
+/* development builds only (X0X_DEBUG=1; tools/build.py refuses it in a release): the clock work
+ * reads and writes the chip's registers live over USB.
+ *   PEEK  40 addr n        -> addr, n words      (n <= 16)
+ *   POKE  41 addr value    -> addr, old, new
+ *   CLOCK 42 iterations    -> 24 MHz ticks a fixed loop took (IRQs off), C0_TL_CKCNT before, after
+ * A number is 5 x 7 bits, least significant first. Only these ranges, word aligned: an address
+ * outside them gets no reply (a stray read of a gated block could fault). */
+enum { ED_PEEK = 40, ED_POKE, ED_CLOCK };
+#include "fm1_debug.h"
+static uint32_t ed_u35(const uint8_t *a)
+{
+    return (uint32_t)a[0] | (uint32_t)a[1] << 7 | (uint32_t)a[2] << 14 | (uint32_t)a[3] << 21 | (uint32_t)a[4] << 28;
+}
+static void ed_w35(uint32_t v)
+{
+    uint32_t k;
+    for (k = 0; k < 5u; k++)
+        ed_b(v >> (7u * k));
+}
+static int ed_debug(uint32_t cmd, const uint8_t *a, uint32_t na)
+{
+    uint32_t addr, i;
+    if (cmd == ED_CLOCK) {
+        uint32_t it, c0, c1;
+        if (na < 5u)
+            return 0;
+        it = ed_u35(a);
+        if (!it || it > 50000000u)
+            return 0;
+        ed_w35(fm1_dbg_clock(it, &c0, &c1));
+        ed_w35(c0);
+        ed_w35(c1);
+        return 1;
+    }
+    if (na < 10u)
+        return 0;
+    addr = ed_u35(a);
+    if (cmd == ED_PEEK) {
+        uint32_t n = ed_u35(a + 5);
+        if (!n || n > 16u || !fm1_dbg_ok(addr, n))
+            return 0;
+        ed_w35(addr);
+        for (i = 0; i < n; i++)
+            ed_w35(fm1_dbg_rd(addr + 4u * i));
+        return 1;
+    }
+    if (!fm1_dbg_ok(addr, 1))
+        return 0;
+    ed_w35(addr);
+    ed_w35(fm1_dbg_rd(addr));
+    fm1_dbg_wr(addr, ed_u35(a + 5));
+    ed_w35(fm1_dbg_rd(addr));
+    return 1;
+}
+#endif
+
 static void ed_handle(const uint8_t *f, uint32_t n)
 {
     uint32_t cmd = f[3], i;
@@ -150,6 +210,14 @@ static void ed_handle(const uint8_t *f, uint32_t n)
         ed_b(a[0]);
         ed_b((uint32_t)ed_smp_end(a[0], a + 1, na - 1u));
         break;
+#if X0X_DEBUG
+    case ED_PEEK:
+    case ED_POKE:
+    case ED_CLOCK:
+        if (!ed_debug(cmd, a, na))
+            return;
+        break;
+#endif
     case ED_SMP_INFO:
         ed_b(SMP_USER_SLOTS);
         ed_b(SMP_USER_SIZE / 1024u);
