@@ -13,6 +13,7 @@
 #include "x0x.h"
 #include "../dsp/fastmath.h"
 #include "../dsp/master.h"
+#include "undo.c"
 
 /* ================================================================ model === */
 static const int8_t KEY_WHITE[NKEYS] = {0, -1, 1, -1, 2, -1, 3, 4, -1, 5, -1, 6, 7, -1, 8, -1, 9, -1, 10, 11, -1, 12, -1, 13, 14, -1, 15};
@@ -750,6 +751,96 @@ static void clear_part(pattern_t *p, int part)
     }
 }
 
+/* ================================================================ undo === */
+/* HOME + REC undoes, HOME + PLAY redoes (undo.c): everything after the settings is undoable, the
+ * sound, the patterns, the song and the knob motion. A step is one gesture: what changed between
+ * two quiet moments (UNDO_QUIET ms with nothing touched or held), or a whole recording pass. */
+#define UNDO_QUIET 400u
+static int perf_testing(void);
+#define UNDO_OFF __builtin_offsetof(project_t, sound)
+static undo_t undo X0X_POOL;
+static uint8_t undo_shadow[sizeof(project_t) - UNDO_OFF] X0X_POOL;
+static uint8_t undo_lanes;             /* the last undo / redo touched the knob motion */
+
+static void undo_start(void) { undo_init(&undo, (uint8_t *)&proj + UNDO_OFF, undo_shadow, sizeof undo_shadow); }
+
+static void undo_tick(void)
+{
+    if (perf_testing() || (ui.rec && seq.playing) || ui.btn || ui.keys || plat_ms() - ui.act_t < UNDO_QUIET ||
+        (ui.frame & 3u))
+        return;
+    undo_commit(&undo);
+}
+
+/* a run of the project changed under the engine: the sound's pots go to the engine again */
+static void undo_changed(uint32_t off, uint32_t len)
+{
+    const uint32_t s0 = __builtin_offsetof(project_t, sound), s1 = s0 + sizeof(sound_t);
+    const uint32_t l0 = __builtin_offsetof(project_t, arr) + __builtin_offsetof(arrange_t, lane);
+    uint32_t a = off + UNDO_OFF, k;
+    for (k = a; k < a + len; k++) {
+        if (k >= s0 && k < s1) {
+            uint32_t x = k - s0, t = x / (NVOICES_MAX * NPARAMS_MAX), v = (x / NPARAMS_MAX) % NVOICES_MAX,
+                     i = x % NPARAMS_MAX;
+            if ((int)v < engine_nvoices((int)t) && (int)i < engine_nparams((int)t, (int)v))
+                engine_set((int)t, (int)v, (int)i, proj.sound.v[t][v][i]);
+        } else if (k >= l0) {
+            undo_lanes = 1;
+        }
+    }
+}
+
+/* what an undo step touched, in words: "909 P3", "SOUND", "SONG", "MOTION" */
+static void undo_name(uint32_t lo, uint32_t hi, char *t)
+{
+    const uint32_t p0 = __builtin_offsetof(project_t, pat), a0 = __builtin_offsetof(project_t, arr),
+                   l0 = a0 + __builtin_offsetof(arrange_t, lane);
+    uint32_t a = lo + UNDO_OFF, b = hi + UNDO_OFF;
+    if (b < p0) {
+        put_s(t, "SOUND");
+    } else if (a >= p0 && b < a0 && (a - p0) / sizeof(pattern_t) == (b - p0) / sizeof(pattern_t)) {
+        uint32_t pi = (a - p0) / sizeof(pattern_t), x = (a - p0) % sizeof(pattern_t), y = (b - p0) % sizeof(pattern_t);
+        int pa = (int)(x < __builtin_offsetof(pattern_t, bass) ? x / sizeof(dpart_t)
+                       : x < __builtin_offsetof(pattern_t, brk) ? NKIT + (x - __builtin_offsetof(pattern_t, bass)) / sizeof(bpart_t)
+                       : PART_BRK);
+        int pb = (int)(y < __builtin_offsetof(pattern_t, bass) ? y / sizeof(dpart_t)
+                       : y < __builtin_offsetof(pattern_t, brk) ? NKIT + (y - __builtin_offsetof(pattern_t, bass)) / sizeof(bpart_t)
+                       : PART_BRK);
+        char *q = put_s(t, pa == pb ? PART_N[pa] : "PATTERN");
+        put_i(put_s(q, " P"), (int)pi + 1);
+    } else if (a >= p0 && b < a0) {
+        put_s(t, "PATTERNS");
+    } else if (a >= a0 && b < l0) {
+        put_s(t, "SONG");
+    } else if (a >= l0) {
+        put_s(t, "MOTION");
+    } else {
+        put_s(t, "CHANGES");
+    }
+}
+
+static void do_undo(int redo)
+{
+    uint32_t lo, hi;
+    char t[24];
+    undo_commit(&undo);                              /* what was just done is a step too */
+    undo_lanes = 0;
+    if (!(redo ? undo_redo : undo_undo)(&undo, undo_changed, &lo, &hi)) {
+        say(redo ? "NOTHING TO REDO" : "NOTHING TO UNDO", 0);
+        return;
+    }
+    if (undo_lanes)
+        engine_motion_reset();
+    engine_brk_loops();
+    ui.outline_ok = 0;
+    if (ui.song_sel > song()->len)
+        ui.song_sel = song()->len;
+    build_pages();
+    mark_dirty();
+    undo_name(lo, hi, t);
+    say(redo ? "REDO " : "UNDO ", t);
+}
+
 static void save_project(void)
 {
     int rc = project_save();
@@ -1412,6 +1503,11 @@ static void button_tap(int b)
     }
     switch (b) {
     case B_PLAY:
+        if (ui.btn & (1u << B_HOME)) {               /* HOME + PLAY: redo */
+            ui.btn_used |= 1u << B_HOME;
+            do_undo(1);
+            break;
+        }
         if (seq.playing)
             seq_stop(&seq);
         else {
@@ -1420,6 +1516,11 @@ static void button_tap(int b)
         }
         break;
     case B_REC:
+        if (ui.btn & (1u << B_HOME)) {               /* HOME + REC: undo */
+            ui.btn_used |= 1u << B_HOME;
+            do_undo(0);
+            break;
+        }
         if (ui.btn & (1u << B_SAVE)) {               /* SAVE + REC: clear this part (asks) */
             char t[24];
             ui.btn_used |= 1u << B_SAVE;
@@ -2767,6 +2868,7 @@ void ui_init(void)
     for (i = 0; i < 4; i++)
         blit_hash[i] = 0;
     build_pages();
+    undo_start();                                   /* the project as loaded is where undo stops */
 }
 
 /* AUTOSAVE: changes are saved by themselves while the pattern is stopped and nothing has been touched
@@ -2792,6 +2894,7 @@ void ui_frame(void)
 {
     uint32_t i;
     input();
+    undo_tick();
     autosave();
     perf_test_tick();
     if (ui.view == V_PERF && !perf_testing())

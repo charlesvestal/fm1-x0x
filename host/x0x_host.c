@@ -624,6 +624,8 @@ static int expect(const char *what, const char *val)
     }
     else if (!strcmp(what, "part"))
         got = ui.part;
+    else if (!strcmp(what, "rec"))
+        got = ui.rec;
     else if (!strcmp(what, "sel"))                  /* the selected track of the part on screen */
         got = ui.sel[ui.part];
     else if (!strcmp(what, "view"))

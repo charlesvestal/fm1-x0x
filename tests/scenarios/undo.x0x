@@ -1,0 +1,66 @@
+# Undo / redo (HOME + REC / HOME + PLAY): a step is one gesture, what changed between quiet moments.
+wait 300
+expect sound0.0.0 34
+# gesture 1: kick on steps 1 and 5; gesture 2: step 9; gesture 3: BD tune up
+tapkey b0
+tapkey w0
+tapkey w4
+wait 600
+tapkey w8
+wait 600
+turn K1 5
+wait 600
+expect hit0.0.8 1
+expect sound0.0.0 39
+# undo the tune, then step 9, then steps 1 and 5
+press HOME
+tap REC
+release HOME
+expect sound0.0.0 34
+press HOME
+tap REC
+release HOME
+expect hit0.0.8 0
+expect hit0.0.4 1
+press HOME
+tap REC
+release HOME
+expect hit0.0.0 0
+expect hit0.0.4 0
+expect playing 0
+expect rec 0
+# redo two: steps 1, 5 and 9 back, the tune still undone
+press HOME
+tap PLAY
+release HOME
+press HOME
+tap PLAY
+release HOME
+expect hit0.0.0 1
+expect hit0.0.8 1
+expect sound0.0.0 34
+expect playing 0
+# a new edit after an undo drops the redo
+press HOME
+tap REC
+release HOME
+expect hit0.0.8 0
+tapkey w12
+wait 600
+press HOME
+tap PLAY
+release HOME
+expect hit0.0.8 0
+expect hit0.0.12 1
+# FACTORY RESET (GLO, the eleventh row, asks) can be undone too
+tap GLO
+turn SELECT 10
+tap SEL
+tap SEL
+wait 600
+expect hit0.0.12 0
+press HOME
+tap REC
+release HOME
+expect hit0.0.12 1
+expect hit0.0.0 1

@@ -113,8 +113,8 @@ These controls do the same thing on every screen:
 | LFO | Opens the mixer and master. |
 | GLO | Opens the settings. |
 | SEQ | On a 303, switches the keys between steps and keyboard. On HOME, opens the song. |
-| PLAY | Starts and stops. |
-| REC | Turns recording on and off. |
+| PLAY | Starts and stops. Hold HOME and press PLAY to redo. |
+| REC | Turns recording on and off. Hold HOME and press REC to undo. |
 | SAVE | Saves everything. |
 | ENV, LFO | Hold one of these while pressing keys to add an accent (ENV) or a slide (LFO). |
 | OCT-, OCT+ | Show steps 1–16 or 17–32. On the 303 keyboard they change the octave. In TB-3PO they mutate the line or write a new one. |
@@ -126,6 +126,14 @@ The second button is printed SEL on the panel. Felucca calls it SCL.
 
 In a list, turn ALGORITHM to change the highlighted value. Rows with a return arrow are
 actions: press SEL to run them. Before doing anything that would lose notes, X0X asks first.
+
+**Undo:** hold HOME and press REC to take back the last change; the screen says what it undid,
+for example UNDO 909 P1. Hold HOME and press PLAY to redo it. You can go back up to 32 steps
+(fewer after very large changes). One step is one gesture: everything you did before pausing
+for a moment, such as a few steps tapped in a row or one turn of a knob, or a whole recording
+pass. Undo covers the sounds, the patterns, the song and the knob motion, including CLEAR
+PATTERN and FACTORY RESET. It doesn't cover the tempo or the settings, and the history starts
+again when you switch the FM-1 on.
 
 ![A list](img/screen-list.png)
 ![A question](img/screen-ask.png)

@@ -34,6 +34,7 @@ extern seq_t seq;                      /* the sequencer (its pattern pointer is 
 enum { PR_909, PR_808, PR_303A, PR_303B, PR_BRK, PR_FX, PR_MST, PR_SEQ, ENG_PROF_N };
 extern volatile uint32_t eng_prof[ENG_PROF_N], eng_prof_frames;
 void engine_motion_enable(int on);                          /* off: lanes do not play (the PERF test) */
+void engine_motion_reset(void);                             /* lanes replaced (undo): knobs to their own values */
 extern volatile uint8_t eng_step[NTRACKS];   /* playheads for the UI */
 extern volatile uint16_t eng_peak[NPARTS];   /* part meters, Q15, decaying (UI) */
 #define SCOPE_N 256u

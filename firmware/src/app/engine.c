@@ -40,6 +40,8 @@ static uint8_t mot_playing;
 static volatile uint8_t mot_on = 1;
 static uint8_t mot_was_on = 1;
 void engine_motion_enable(int on) { mot_on = (uint8_t)(on != 0); }   /* the ISR releases the knobs */
+static volatile uint8_t mot_release_req;
+void engine_motion_reset(void) { mot_release_req = 1; }   /* lanes changed under it (undo): knobs back */
 
 /* mixer: per part Level, Rev send, Dly send (a drum machine's add to its voices' own sends) */
 enum { MX_LEVEL, MX_REV, MX_DLY, MX_NPARAMS };
@@ -447,8 +449,10 @@ void engine_render(int32_t *out_lr, uint32_t n)
     if (n > 256u)
         n = 256u;
     eng_prof_frames += n;
-    if (mot_was_on && !mot_on)                             /* motion switched off: knobs to their own values */
+    if ((mot_was_on && !mot_on) || mot_release_req) {   /* motion off, or its lanes replaced: knobs back */
+        mot_release_req = 0;
         motion_release(&mot);
+    }
     mot_was_on = mot_on;
     {
         PROF_T(pt);
