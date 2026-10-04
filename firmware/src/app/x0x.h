@@ -12,7 +12,9 @@
 #include "../dsp/breaks.h"
 #include "../dsp/fxbus.h"            /* FX_* param indices (the send pages) */
 
-#define X0X_VERSION "0.1"
+#ifndef X0X_VERSION                     /* a release build passes its own (tools/build.py --release) */
+#define X0X_VERSION "DEV"
+#endif
 #define PROJ_MAGIC 0x50305830u           /* "0X0P" */
 #define PROJ_FORMAT 1u
 
