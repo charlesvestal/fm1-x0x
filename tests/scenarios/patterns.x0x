@@ -7,9 +7,7 @@ tapkey w8
 press SAVE
 tapkey w1
 release SAVE
-# pattern 2 holds the factory TB-3PO lines: the copy asks first; SEL = yes
-expect view 1
-tap SEL
+# pattern 2 is empty (the factory patterns are): the copy needs no question
 tap HOME
 tapkey w1
 expect pattern 2

@@ -1,19 +1,21 @@
 # The manual's Getting started, step by step: each step as the manual words it, checked.
 wait 300
-# 1. X0X opens on the 909. PLAY: the two 303s play their factory lines (no drums yet)
+# 1. X0X opens on the 909, every part empty. A kick: black key 1 (heard), white keys 1, 5, 9, 13
 expect view 1
 expect part 0
-tap PLAY
-wait 500
-expect playing 1
-# 2. a kick: black key 1, then white keys 1, 5, 9, 13
+peakreset
 tapkey b0
+expect peak_db_min -40
 tapkey w0
 tapkey w4
 tapkey w8
 tapkey w12
 expect hit0.0.0 1
 expect hit0.0.12 1
+# 2. PLAY
+tap PLAY
+wait 500
+expect playing 1
 # 3. a clap: black key 7, white keys 5 and 13
 tapkey b6
 tapkey w4
@@ -28,7 +30,7 @@ tapkey w10
 tapkey w14
 expect hit0.8.2 1
 expect hit0.8.14 1
-# 5. a new 303 line: ALGORITHM two clicks clockwise to 303A, ARP, OCT+
+# 5. write a 303 line: ALGORITHM two clicks clockwise to 303A, ARP, OCT+
 turn ALGO 2
 expect part 2
 tap ARP
@@ -62,11 +64,13 @@ tapkey w14
 tapkey w15
 expect brk0 1
 expect brk15 1
-# 8. quiet 303B: HOME, black key 4
+# 8. mute the break: HOME, black key 5 (and again to bring it back)
 tap HOME
 expect view 0
-tapkey b3
-expect mute 8388608
+tapkey b4
+expect mute 16777216
+tapkey b4
+expect mute 0
 # 9. record a filter sweep: ALGORITHM back to 303A, REC, turn KNOB 1, REC
 turn ALGO -2
 expect part 2

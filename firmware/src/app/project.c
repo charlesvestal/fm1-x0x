@@ -25,11 +25,9 @@ void project_defaults(void)
     proj.set.accent_q7 = 88;
     engine_sound_defaults(&proj.sound);
     arrange_defaults();
-    for (i = 0; i < NPAT; i++) {
+    /* the 303 lines start empty, like the drums: OCT+ on TB-3PO (or keyboard mode) writes one */
+    for (i = 0; i < NPAT; i++)
         pattern_init(&proj.pat[i], 0x3B0u + (uint32_t)i * 977u, 0x5A1u + (uint32_t)i * 613u);
-        tb3po_generate(&proj.pat[i].bass[0]);
-        tb3po_generate(&proj.pat[i].bass[1]);
-    }
 }
 
 /* object payload: format word + body */
@@ -90,8 +88,6 @@ int project_load(void)
         load_obj(OBJ_PAT1, &proj.pat[PAT_PER_OBJ], sizeof(pattern_t) * PAT_PER_OBJ)) {
         for (i = 0; i < NPAT; i++) {                  /* half a set is no set: the defaults */
             pattern_init(&proj.pat[i], 0x3B0u + (uint32_t)i * 977u, 0x5A1u + (uint32_t)i * 613u);
-            tb3po_generate(&proj.pat[i].bass[0]);
-            tb3po_generate(&proj.pat[i].bass[1]);
         }
         bad = 1;
     }

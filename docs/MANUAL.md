@@ -65,20 +65,22 @@ third-party firmware is at your own risk.
 ## 2. Getting started
 
 Here's a five-minute tour, from switching on to saving your first beat. When X0X starts,
-the screen shows the 909, the drum patterns are empty, and both 303s already have a line.
+the screen shows the 909, and every part is empty.
 
-1. **Press PLAY.** You hear the two 303s playing their factory lines.
-2. **Add a kick.** Press black key 1 to select the bass drum, then press white keys 1, 5, 9
-   and 13. The kick now plays on every beat.
-3. **Add a clap.** Press black key 7, then white keys 5 and 13.
+1. **Add a kick.** Press black key 1 to select the bass drum; you hear it. Then press white keys
+   1, 5, 9 and 13.
+2. **Press PLAY.** The kick plays on every beat.
+3. **Add a clap.** Press black key 7, then white keys 5 and 13. While the pattern plays,
+   selecting a drum is silent, so it doesn't add a stray hit.
 4. **Add open hats.** Press black key 9, then white keys 3, 7, 11 and 15.
-5. **Get a new 303 line.** Turn ALGORITHM two clicks clockwise to 303A, press ARP, then press
+5. **Write a 303 line.** Turn ALGORITHM two clicks clockwise to 303A, press ARP, then press
    OCT+. Each press writes a new line; keep pressing until you like one.
 6. **Shape the 303.** Press EDIT to show the FILTER page. Turn KNOB 1 to open or close the
    filter, and KNOB 2 to change the resonance.
 7. **Add the break.** Turn ALGORITHM two more clicks to BREAK, then press all 16 white keys so
    the break plays the whole bar.
-8. **Quiet the second 303.** Press HOME, then black key 4 to mute 303B.
+8. **Mute a part.** Press HOME, then black key 5 to mute the break. Press it again to bring it
+   back.
 9. **Record a filter sweep.** Turn ALGORITHM back to 303A. Press REC, slowly turn KNOB 1 for a
    bar or two, then press REC again. The sweep now plays every time the pattern comes round.
 10. **Save.** Press SAVE. Everything you've done is kept when you switch off.
@@ -461,7 +463,7 @@ Press GLO for these settings:
 | MODE | PATTERN, or SONG to play the song. |
 | SAVE PROJECT | Saves everything. |
 | CLEAR PATTERN | Clears all five parts of the current pattern. |
-| FACTORY RESET | Restores the factory sounds and patterns, with no song and no knob motion. Your saved project stays in memory until you save over it. |
+| FACTORY RESET | Restores the factory sounds and empty patterns, with no song and no knob motion. Your saved project stays in memory until you save over it. |
 | PERFORMANCE | Opens the performance page (below). |
 | ABOUT X0X | Shows the version and the audio load. |
 
