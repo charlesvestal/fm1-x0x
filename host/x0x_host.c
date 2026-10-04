@@ -18,6 +18,7 @@
  *   slotimg K F.hdr F.bin       slot K from tools/upload_breaks.py --dry-run's image (the device format)
  *   midi B0 B1 B2                incoming USB MIDI message (hex bytes)
  *   wav FILE | wavstop           start / stop recording the output
+ *   peakreset                    restart the output peak (expect peak_db_min / peak_db_max)
  *   shot FILE.png                save the screen
  *   leds                         print the lit buttons and keys
  *   expect WHAT VALUE            check state (playing, pattern, cue, view-part, ...): exit 1 on mismatch;
@@ -623,6 +624,8 @@ static int expect(const char *what, const char *val)
     }
     else if (!strcmp(what, "part"))
         got = ui.part;
+    else if (!strcmp(what, "sel"))                  /* the selected track of the part on screen */
+        got = ui.sel[ui.part];
     else if (!strcmp(what, "view"))
         got = ui.view;
     else if (!strcmp(what, "tempo"))
@@ -631,7 +634,15 @@ static int expect(const char *what, const char *val)
         got = (int)clock_out_count;
     else if (!strcmp(what, "store_writes"))
         got = (int)store_writes;
-    else if (!strcmp(what, "peak_db_min")) {
+    else if (!strcmp(what, "peak_db_max")) {
+        double db = 20.0 * log10(peak_out > 1e-9f ? peak_out : 1e-9f);
+        if (db > atof(val)) {
+            printf("FAIL expect peak <= %s dBFS, got %.1f\n", val, db);
+            return 1;
+        }
+        printf("  ok peak %.1f dBFS\n", db);
+        return 0;
+    } else if (!strcmp(what, "peak_db_min")) {
         double db = 20.0 * log10(peak_out > 1e-9f ? peak_out : 1e-9f);
         if (db < atof(val)) {
             printf("FAIL expect peak >= %s dBFS, got %.1f\n", val, db);
@@ -815,7 +826,9 @@ int main(int argc, char **argv)
         } else if (!strcmp(cmd, "wav")) {
             snprintf(out, sizeof out, "%s/%s", dir, a);
             wav_open(out);
-        } else if (!strcmp(cmd, "wavstop"))
+        } else if (!strcmp(cmd, "peakreset"))
+            peak_out = 0.0f;
+        else if (!strcmp(cmd, "wavstop"))
             wav_close();
         else if (!strcmp(cmd, "shot")) {
             snprintf(out, sizeof out, "%s/%s", dir, a);

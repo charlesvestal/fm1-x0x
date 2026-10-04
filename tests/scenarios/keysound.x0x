@@ -1,0 +1,37 @@
+# GLO > KEY SOUND: by default a black drum key selects silently while the pattern plays; stopped,
+# or with REC on, it plays. ALWAYS plays it every time.
+wait 300
+# only the (empty) 909 heard: mute 303A, 303B and the break on HOME
+tap HOME
+tapkey b2
+tapkey b3
+tapkey b4
+expect mute 29360128
+tap HOME
+expect part 0
+# stopped: the key plays its drum
+peakreset
+tapkey b0
+wait 300
+expect peak_db_min -40
+wait 1500
+# playing an empty pattern: silent, and a black key only selects
+tap PLAY
+expect playing 1
+wait 500
+peakreset
+wait 400
+expect peak_db_max -70
+tapkey b1
+wait 400
+expect peak_db_max -70
+expect sel 1
+# REC on: the key plays (and records)
+tap REC
+peakreset
+tapkey b0
+wait 300
+expect peak_db_min -40
+tap REC
+tap PLAY
+wait 1500

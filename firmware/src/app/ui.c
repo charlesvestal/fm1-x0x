@@ -138,7 +138,7 @@ static void say(const char *a, const char *b)
 
 /* =============================================================== param refs === */
 enum { R_NONE, R_ENG, R_SWING, R_DLEN, R_DRATE, R_BLEN, R_BRATE, R_BDIR, R_BTRANS, R_GEN, R_BRKSET,
-       R_BRKSLOT, R_TEMPO, R_ACCENT, R_CLKOUT, R_NOTEOUT, R_PALETTE, R_KEYLED, R_ACT, R_SBAR, R_SPAT, R_SMODE,
+       R_BRKSLOT, R_TEMPO, R_ACCENT, R_CLKOUT, R_NOTEOUT, R_PALETTE, R_KEYLED, R_KEYSOUND, R_ACT, R_SBAR, R_SPAT, R_SMODE,
        R_SLEN, R_STALLS };
 typedef struct { uint8_t kind, a, b, c; } pref_t;
 #define PR(k, a, b, c) ((pref_t){(k), (a), (b), (c)})
@@ -156,12 +156,13 @@ static const x0x_param_t GEN_P[NGEN] = {
     {"MUTATE", 16, 0, 0},
 };
 enum { SQ_SWING, SQ_DLEN, SQ_DRATE, SQ_BLEN, SQ_BRATE, SQ_BDIR, SQ_BTRANS, SQ_TEMPO, SQ_ACCENT, SQ_CLK, SQ_NOTES,
-       SQ_THEME, SQ_KEYLED, NSQ };
+       SQ_THEME, SQ_KEYLED, SQ_KEYSOUND, NSQ };
+static const char *const KEYSOUND_N[] = {"STOPPED", "ALWAYS"};
 static const x0x_param_t SEQ_P[NSQ] = {
     {"SWING", 100, 0, 0}, {"LENGTH", 31, 15, 0}, {"RATE", 3, 0, RATE_N}, {"LENGTH", 31, 15, 0},
     {"RATE", 3, 0, RATE_N}, {"DIR", 3, 0, DIR_N}, {"TRANSP", 48, 24, 0}, {"TEMPO", 255, 105, 0},
     {"ACCENT", 127, 88, 0}, {"CLOCK OUT", 1, 1, ONOFF_N}, {"NOTES OUT", 1, 0, ONOFF_N}, {"THEME", 4, 1, THEME_N},
-    {"KEY LIGHTS", 1, 1, ONOFF_N},
+    {"KEY LIGHTS", 1, 1, ONOFF_N}, {"KEY SOUND", 1, 0, KEYSOUND_N},
 };
 static const x0x_param_t ACT_P[] = {
     {"", 0, 0, 0}, {"SAVE PROJECT", 0, 0, 0}, {"CLEAR THIS PART", 0, 0, 0}, {"CLEAR PATTERN", 0, 0, 0},
@@ -218,6 +219,7 @@ static const x0x_param_t *pref_desc(pref_t r)
     case R_NOTEOUT: return &SEQ_P[SQ_NOTES];
     case R_PALETTE: return &SEQ_P[SQ_THEME];
     case R_KEYLED: return &SEQ_P[SQ_KEYLED];
+    case R_KEYSOUND: return &SEQ_P[SQ_KEYSOUND];
     case R_ACT: return &ACT_P[r.a];
     case R_SBAR: {
         static x0x_param_t d = {"BAR", 0, 0, 0};
@@ -265,6 +267,7 @@ static int pref_get(pref_t r)
     case R_NOTEOUT: return seq.send_notes;
     case R_PALETTE: return proj.set.palette;
     case R_KEYLED: return proj.set.keyled;
+    case R_KEYSOUND: return proj.set.keysound;
     case R_SBAR: return ui.song_sel;
     case R_SPAT: {
         const song_t *sg = song();
@@ -329,6 +332,7 @@ static void pref_set(pref_t r, int v)
     case R_NOTEOUT: seq.send_notes = (uint8_t)v; break;
     case R_PALETTE: proj.set.palette = (uint8_t)v; palette_set((uint32_t)v); break;
     case R_KEYLED: proj.set.keyled = (uint8_t)v; break;
+    case R_KEYSOUND: proj.set.keysound = (uint8_t)v; break;
     case R_SBAR: ui.song_sel = (uint8_t)v; break;
     case R_SPAT:
         song_fill(ui.song_sel);
@@ -634,6 +638,7 @@ static void open_global(void)
     list_add(PR(R_CLKOUT, 0, 0, 0));
     list_add(PR(R_NOTEOUT, 0, 0, 0));
     list_add(PR(R_KEYLED, 0, 0, 0));
+    list_add(PR(R_KEYSOUND, 0, 0, 0));
     list_add(PR(R_PALETTE, 0, 0, 0));
     list_add(PR(R_ACCENT, 0, 0, 0));
     list_add(PR(R_SMODE, 0, 0, 0));
@@ -1130,7 +1135,11 @@ static void drum_key(int v, int down)
         return;
     ui.sel[k] = (uint8_t)v;
     build_pages();
-    engine_drum(k, v, (ui.btn & (1u << B_ENV)) ? 1.0f : 0.75f);
+    /* KEY SOUND STOPPED (the default): while the pattern plays a black key only selects its track,
+     * so choosing one to edit does not add a hit to the groove; stopped, it plays it, and with REC
+     * on it always does (that is how drums are recorded) */
+    if (proj.set.keysound || !seq.playing || ui.rec)
+        engine_drum(k, v, (ui.btn & (1u << B_ENV)) ? 1.0f : 0.75f);
     if (ui.btn & (1u << B_ENV))
         ui.btn_used |= 1u << B_ENV;
     if (ui.rec && seq.playing) {

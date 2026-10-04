@@ -85,7 +85,7 @@ shot t16_list_edit.png
 tap HOME
 tap GLO
 shot t17_global.png
-turn SELECT 6
+turn SELECT 7
 shot t18_global_reset.png
 tap SEL
 shot t19_ask.png

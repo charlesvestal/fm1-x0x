@@ -174,8 +174,9 @@ On the 808, the SOUND setting of a track switches it between tom and conga, rim 
 or clap and maracas. The 909's hats and cymbals are samples, as on the original machine.
 Every other sound on both machines is synthesized.
 
-Press a black key to hear its track and select it. Then press white keys to turn the selected
-track on or off at those steps. To set accents instead, hold ENV while pressing white keys.
+Press a black key to select its track. When the pattern is stopped you also hear it; while it
+plays, selecting is silent, so it doesn't add a hit to the groove (GLO > KEY SOUND set to ALWAYS
+plays it every time). Then press white keys to turn the selected track on or off at those steps. To set accents instead, hold ENV while pressing white keys.
 An accent makes every drum on that step louder.
 
 A pattern can be up to 32 steps long. The white keys show 16 steps at a time: press OCT- for
@@ -333,7 +334,8 @@ On HOME, the knobs are TEMPO, SWING, PUMP and CUTOFF.
 
 Press REC to turn recording on, and press it again to turn it off.
 
-- **Drums:** while the pattern plays, press black keys to record hits. Hold ENV to record
+- **Drums:** while the pattern plays, press black keys to record hits (with REC on they always
+  sound). Hold ENV to record
   accented hits.
 - **303, live:** switch the 303 to keyboard mode and play while the pattern runs.
 - **303, one step at a time:** switch the 303 to keyboard mode and stop playback. Each key you
@@ -453,6 +455,7 @@ Press GLO for these settings:
 | CLOCK OUT | Sends MIDI clock and start/stop messages. |
 | NOTES OUT | Sends the patterns out as MIDI notes. |
 | KEY LIGHTS | Shows the steps on the key lights. |
+| KEY SOUND | STOPPED (the default): the black drum keys play their sound only when the pattern is stopped, or with REC on; while it plays they only select. ALWAYS: they always play. |
 | THEME | The screen colour: green, amber, cyan, red or mono. |
 | ACCENT | How loud an unaccented drum hit is compared with an accented one. |
 | MODE | PATTERN, or SONG to play the song. |

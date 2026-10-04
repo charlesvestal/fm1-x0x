@@ -18,6 +18,7 @@ void project_defaults(void)
     proj.set.format = PROJ_FORMAT;
     proj.set.palette = 1;                /* amber */
     proj.set.keyled = 1;
+    proj.set.keysound = 0;
     proj.set.clk_out = 1;
     proj.set.notes_out = 0;
     proj.set.bpm_x10 = 1250;

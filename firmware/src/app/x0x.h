@@ -20,7 +20,7 @@ typedef struct {
     uint32_t magic, format;
     uint8_t palette, keyled, clk_out, notes_out;
     uint16_t bpm_x10;
-    uint8_t accent_q7, rsv;
+    uint8_t accent_q7, keysound;         /* black drum keys sound: 0 = only when stopped or recording, 1 = always */
 } settings_t;
 
 /* the song and the motion lanes: one blob, split across OBJ_SONG and OBJ_MOTION */
