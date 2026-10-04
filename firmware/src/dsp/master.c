@@ -201,7 +201,11 @@ void master_process(master_t *m, float *x, int n, float volume)
             if (a >= m->env) {
                 m->env = a;
                 m->hold = MST_LA;
-                m->inv_env = a > 0.8f ? 1.0f / a : 0.0f;    /* a divide only for a new peak over the ceiling */
+                /* a divide only for a new peak over the ceiling. The compiler computes the divide
+                 * before the test, so it must be safe on its own: a clamp INSIDE the branch is folded
+                 * away (a > 0.8 there) and 0.2-beta crashed here on 1 / 0 (firmware/hal/fm1_irq.h). */
+                float r = 1.0f / fm_maxf(a, 0.8f);
+                m->inv_env = a > 0.8f ? r : 0.0f;
             } else if (m->hold) {
                 m->hold--;
             } else {

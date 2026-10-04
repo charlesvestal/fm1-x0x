@@ -5,7 +5,7 @@
  *   fm1_irq_init()        first thing in cstart: all ICFG off, pendings and
  *                         exception causes cleared, all 128 vectors -> fatal
  *                         stubs (fm1_vec.S), vector 1 (CPU
- *                         exception) enabled at prio 7, div0 trap + ETM on.
+ *                         exception) enabled at prio 7, ETM on (X0X: no div0 trap, see fm1_irq_init).
  *   fm1_irq_attach(n, h, prio)   h = asm wrapper (fm1_isr.S), prio 0..7
  *   fm1_irq_enable_all()  icfg bit 8 + sti, after every source is set up
  *
@@ -64,7 +64,13 @@ static void fm1_irq_init(void)
     for (i = 0; i < 128u; i++)
         FM1_VEC[i] = (uint32_t)(uintptr_t)(fm1_fatal_stubs + 6u * i);
     FM1_ICFG(1) = (FM1_ICFG(1) & ~0xF0u) | 0xF0u;           /* exception: enable, prio 7 */
-    FM1_EMU_CON |= 1u << 2;                                 /* div0 traps */
+    /* X0X: no divide-by-zero trap. On the AC79 it fires on FLOAT divides too, and clang assumes float
+     * maths does not trap: it evaluates a divide before the test that guards it (x > 0.8 ? 1 / x : 0
+     * becomes "r = 1 / x; if (x <= 0.8) r = 0") and throws the infinity away. With the trap on, that
+     * is a crash: the first one seen on hardware (0.2-beta, master_process, EMU_MSG bit 2 at the
+     * first silent sample). An integer divide is never hoisted that way, so the trap caught nothing
+     * else; IEEE infinities are what the compiled code expects. */
+    FM1_EMU_CON &= ~(1u << 2);
     FM1_ETM_CON |= 1u;                                      /* branch trace for the report */
 }
 
