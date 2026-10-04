@@ -1873,6 +1873,70 @@ static void cv_commit(int region, uint32_t x, uint32_t y)
     }
 }
 
+/* the main area sends only the rectangle that changed: the panel has no tearing-effect line the
+ * FM-1 can see, so a transfer the panel's refresh overtakes shows half old, half new. The whole
+ * area is 69 KB, 18 ms at 30 MHz, longer than a refresh, so every playhead step sheared; the two
+ * columns a step changes are ~3 ms. Rows and 8-pixel column blocks are hashed against the last
+ * frame sent; the changed rectangle is packed to the front of the canvas (it is rebuilt every
+ * frame) and sent as one transfer. blit_hash[region] == 0 (a reset) sends it all. */
+#define MAIN_ROWS (2 * BAND_H)
+#define MAIN_COLB (240 / 8)
+static uint32_t main_rowh[MAIN_ROWS], main_colh[MAIN_COLB];
+static void cv_commit_rect(int region, uint32_t x, uint32_t y)
+{
+    uint32_t rowh[MAIN_ROWS], colh[MAIN_COLB], r, c, r0 = MAIN_ROWS, r1 = 0, c0 = MAIN_COLB, c1 = 0, w, h, k;
+    for (c = 0; c < MAIN_COLB; c++)
+        colh[c] = 2166136261u;
+    for (r = 0; r < MAIN_ROWS; r++) {
+        const uint16_t *q = cv_px + r * 240u;
+        uint32_t hr = 2166136261u;
+        for (c = 0; c < MAIN_COLB; c++) {
+            uint32_t hc = colh[c];
+            for (k = 0; k < 8u; k++) {
+                hr = (hr ^ q[k]) * 16777619u;
+                hc = (hc ^ q[k]) * 16777619u;
+            }
+            colh[c] = hc;
+            q += 8;
+        }
+        rowh[r] = hr;
+    }
+    if (!blit_hash[region]) {                         /* after a reset: all of it */
+        r0 = c0 = 0;
+        r1 = MAIN_ROWS - 1;
+        c1 = MAIN_COLB - 1;
+    } else {
+        for (r = 0; r < MAIN_ROWS; r++)
+            if (rowh[r] != main_rowh[r]) {
+                if (r0 == MAIN_ROWS)
+                    r0 = r;
+                r1 = r;
+            }
+        for (c = 0; c < MAIN_COLB; c++)
+            if (colh[c] != main_colh[c]) {
+                if (c0 == MAIN_COLB)
+                    c0 = c;
+                c1 = c;
+            }
+        if (r0 == MAIN_ROWS || c0 == MAIN_COLB)
+            return;                                     /* nothing changed */
+    }
+    blit_hash[region] = 1;
+    for (r = 0; r < MAIN_ROWS; r++)
+        main_rowh[r] = rowh[r];
+    for (c = 0; c < MAIN_COLB; c++)
+        main_colh[c] = colh[c];
+    w = (c1 - c0 + 1u) * 8u;
+    h = r1 - r0 + 1u;
+    for (r = 0; r < h; r++) {                         /* pack: the destination never passes the source */
+        const uint16_t *src = cv_px + (r0 + r) * 240u + c0 * 8u;
+        uint16_t *dst = cv_px + r * w;
+        for (k = 0; k < w; k++)
+            dst[k] = src[k];
+    }
+    lcd_blit(x + c0 * 8u, y + r0, w, h, cv_px);
+}
+
 static uint16_t blend(uint16_t a, uint16_t b, int t)  /* a..b, t of 16 */
 {
     int r = ((a >> 11) * (16 - t) + (b >> 11) * t) >> 4, g = (((a >> 5) & 63) * (16 - t) + ((b >> 5) & 63) * t) >> 4,
@@ -2813,7 +2877,7 @@ static void draw_main(void)
             draw_readout();
     }
     cv_band(0, 2 * BAND_H);
-    cv_commit(1, 0, MAIN_Y);
+    cv_commit_rect(1, 0, MAIN_Y);
 }
 
 /* -------------------------------------------------------------- knob strip --- */
