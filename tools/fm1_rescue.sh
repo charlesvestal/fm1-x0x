@@ -23,17 +23,19 @@ if [ ! -x env/bin/python ] || ! env/bin/python -c "import usb, libusb_package" 2
 fi
 curl -fsSL -o fm1_rescue.py "$RAW/fm1_rescue.py"
 PKG=""
-for f in "$DIR"/*.fwsc "$HOME"/Downloads/*.fwsc "$HOME"/Desktop/*.fwsc "$HOME"/Downloads/*/*.fwsc; do
+for f in "$DIR"/*.fwsc "$HOME"/Downloads/*.fwsc "$HOME"/Desktop/*.fwsc; do
     [ -f "$f" ] || continue
     if [ "$(shasum -a 256 "$f" | cut -d' ' -f1)" = "$STOCK" ]; then PKG="$f"; break; fi
 done
 if [ -z "$PKG" ]; then
-    echo
-    echo "The stock firmware file was not found in Downloads or on the Desktop."
-    echo "Download it from M-VAVE (PC Firmware -> FM-1 V15; unzip it if it is a zip),"
-    echo "then run this same command again. Opening the download page ..."
-    open "https://www.m-vave.com/download" || true
-    exit 1
+    echo "Downloading the stock firmware (M-VAVE's FM-1 V15) ..."
+    curl -fsSL -o "$DIR/FM-1.download" "https://yms-file-store.oss-cn-hongkong.aliyuncs.com/software/firmware/FM-1.fwsc"
+    if [ "$(shasum -a 256 "$DIR/FM-1.download" | cut -d' ' -f1)" != "$STOCK" ]; then
+        echo "The downloaded file is not the expected V15 firmware. Nothing was done; send this output."
+        exit 1
+    fi
+    mv "$DIR/FM-1.download" "$DIR/FM-1.fwsc"
+    PKG="$DIR/FM-1.fwsc"
 fi
 cp "$PKG" "$DIR/FM-1.fwsc" 2>/dev/null || true
 echo "Stock firmware: $PKG"
