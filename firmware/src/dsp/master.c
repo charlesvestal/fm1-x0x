@@ -69,7 +69,15 @@ static void comp_coefs(master_t *m)
     m->mix = (float)m->pot[MST_MIX] / 127.0f;
     m->pump_db = pump_db(m->pot[MST_PUMP]);
     m->a_pump = coef_ms(MASTER_PUMP_RISE_MS);
-    m->comp_on = m->pot[MST_RATIO] != 0 || m->pot[MST_PUMP] != 0;
+    {
+        uint8_t was = m->comp_on;
+        m->comp_on = m->pot[MST_RATIO] != 0 || m->pot[MST_PUMP] != 0;
+        if (m->comp_on && !was) {                        /* switched on: the ramp starts at the makeup */
+            m->g_lin = m->makeup;
+            m->g_step = 0.0f;
+            m->cr = 0;
+        }
+    }
 }
 
 static void filt_coefs(master_t *m)
@@ -78,6 +86,7 @@ static void filt_coefs(master_t *m)
     float q = 0.5f + (float)m->pot[MST_RESO] * (11.5f / 127.0f);
     m->g_t = fm_tanf(FM_PI * fm_minf(fc, 19000.0f) / FS);
     m->k = 1.0f / q;
+    m->a1 = 1.0f / (1.0f + m->g * (m->g + m->k));       /* the resonance may have changed */
 }
 
 void master_init(master_t *m)
@@ -90,8 +99,10 @@ void master_init(master_t *m)
         m->pot[i] = MST_P[i].def;
     m->gain = 1.0f;
     comp_coefs(m);
+    m->g = m->g_t = 0.0f;
     filt_coefs(m);
     m->g = m->g_t;
+    m->a1 = 1.0f / (1.0f + m->g * (m->g + m->k));
 }
 
 void master_set(master_t *m, int i, int v)
@@ -139,8 +150,11 @@ void master_process(master_t *m, float *x, int n, float volume)
              * (|x|), the reduction chased every cycle of a bass note and grabbed each kick within a
              * millisecond: audio-rate gain movement, heard as clicks */
             m->ms = fm_flush(m->a_det * m->ms + (1.0f - m->a_det) * s * s);
-            lv = 2.0f * m->ms;
-            want = (lv > 1e-12f && m->slope > 0.0f) ? gr_of(m, 3.0103f * fm_log2f(lv)) : 0.0f;
+            if (m->cr == 0) {                                /* the static curve, every MST_CR samples */
+                lv = 2.0f * m->ms;
+                m->want = (lv > 1e-12f && m->slope > 0.0f) ? gr_of(m, 3.0103f * fm_log2f(lv)) : 0.0f;
+            }
+            want = m->want;
             m->gr = want > m->gr ? m->a_att * m->gr + (1.0f - m->a_att) * want
                                  : m->a_rel * m->gr + (1.0f - m->a_rel) * want;
             if (m->pump_tgt > m->pump) {                     /* PUMP: rise to the kick's depth ... */
@@ -153,12 +167,24 @@ void master_process(master_t *m, float *x, int n, float volume)
             total = m->gr + m->pump;
             if (total > grmax)
                 grmax = total;
-            wet = s * m->makeup * fm_db2lin(-total);
+            if (m->cr == 0) {                                /* the gain, linear, ramped over MST_CR samples */
+                m->g_step = (m->makeup * fm_db2lin(-total) - m->g_lin) * (1.0f / MST_CR);
+                m->cr = MST_CR;
+            }
+            m->cr--;
+            m->g_lin += m->g_step;
+            wet = s * m->g_lin;
             s = s + (wet - s) * m->mix;
         }
         if (mode) {
-            float g = m->g += (m->g_t - m->g) * 0.0625f;
-            float a1 = 1.0f / (1.0f + g * (g + k));
+            float g = m->g, a1;
+            if (g != m->g_t) {                               /* the cutoff moving: its coefficient too */
+                g = m->g += (m->g_t - m->g) * 0.0625f;
+                if (fm_fabsf(m->g_t - g) < 1e-6f * m->g_t)
+                    g = m->g = m->g_t;
+                m->a1 = 1.0f / (1.0f + g * (g + k));
+            }
+            a1 = m->a1;
             float v3 = s - m->ic2;
             float v1 = a1 * m->ic1 + g * a1 * v3;
             float v2 = m->ic2 + g * v1;
@@ -175,13 +201,15 @@ void master_process(master_t *m, float *x, int n, float volume)
             if (a >= m->env) {
                 m->env = a;
                 m->hold = MST_LA;
+                m->inv_env = a > 0.8f ? 1.0f / a : 0.0f;    /* a divide only for a new peak over the ceiling */
             } else if (m->hold) {
                 m->hold--;
             } else {
                 m->env *= 0.99985f;
+                m->inv_env *= 1.0001500225f;                 /* 1 / 0.99985 */
             }
             {
-                float want = m->env > 0.8f ? 0.8f / m->env : 1.0f;
+                float want = m->env > 0.8f ? 0.8f * m->inv_env : 1.0f;
                 m->gain += (want - m->gain) * (want < m->gain ? (5.0f / MST_LA) : 0.002f);
             }
             d = m->la[m->la_pos];

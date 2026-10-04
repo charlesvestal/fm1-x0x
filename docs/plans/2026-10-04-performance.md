@@ -77,6 +77,23 @@ So: the factory sound is probably fine, all five parts at once is fine only if t
    divide off the per-sample path: an estimated 10-14 of its 25 ns.
 3. **Idle early-outs in the 808 and 909**: their idle 9 and 6 ns.
 
+### Done (77607cc's follow-up)
+
+Silent parts are no longer cleared, mixed or metered (909, 808, 303s, break; exact); the break stops
+decoding when it cannot be heard (muted, no steps on: it comes back at its next slice); the master
+computes its compressor gain every 4 samples and keeps a running reciprocal in the limiter (no
+divide a sample). Host instructions per sample, mean (±0.1 % run to run; the worst-block figure
+moves ±8 % and is not used):
+
+| | Before | After |
+|---|---|---|
+| Factory loop | 1356 | 1263 (-6.9 %) |
+| All five | 2581 | 2509 (-2.8 %) |
+| Worst case | 3756 | 3692 (-1.7 %) |
+
+**These make the quiet cases cheaper; they barely touch the worst case**, which is the 808 (about
+45 %), the 303s (about 35 %) and the 909 (about 13 %) doing real work.
+
 ## Savings that change the sound (need ears)
 
 4. **303 drive**: 21 ns per 303. The factory mix could drive 303A only, or use a cheaper shaper.

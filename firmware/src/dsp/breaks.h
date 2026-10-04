@@ -100,6 +100,8 @@ typedef struct breaks {
 
     /* gate: the step mask, ramped */
     float gate, gate_to;
+    uint8_t quiet;                    /* X0X: the part cannot be heard (muted, no steps on): while the gate
+                                       * is shut its voices stop; the next trigger starts them again */
 
     /* live keys: written by breaks_live, applied by the ISR side */
     volatile uint16_t keys;
@@ -118,6 +120,8 @@ void breaks_step(breaks_t *b, int step16, int bar, float samples_per_16th, int e
 void breaks_stop(breaks_t *b);
 void breaks_live(breaks_t *b, int key, int down);  /* 0-7 hold slice of A, 8 reverse, 9 half speed, 10 stutter */
 void breaks_render(breaks_t *b, float *out, int n);  /* WRITES mono, n <= 256 */
+void breaks_set_quiet(breaks_t *b, int quiet);
+int breaks_silent(const breaks_t *b);               /* the next render writes zeros */
 int breaks_nparams(void);
 const x0x_param_t *breaks_param(int i);
 void breaks_set(breaks_t *b, int i, int value);

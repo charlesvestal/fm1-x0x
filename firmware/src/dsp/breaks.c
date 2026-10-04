@@ -534,10 +534,27 @@ void breaks_init(breaks_t *b)
 
 /* ---- render ----------------------------------------------------------------------------- */
 
+void breaks_set_quiet(breaks_t *b, int quiet) { b->quiet = (uint8_t)(quiet != 0); }
+
+/* X0X: nothing can sound this block: no voice, the gate shut and staying shut, no trigger or
+ * retrigger due inside it. The render would write zeros and change nothing else. */
+int breaks_silent(const breaks_t *b)
+{
+    return !b->v[0].on && !b->v[1].on && b->gate == 0.0f && b->gate_to == 0.0f && b->trig_left == 0 &&
+           b->sub_count + 1 >= b->sub_div && b->keys == b->keys_seen;
+}
+
 void breaks_render(breaks_t *b, float *out, int n)
 {
     float inc[2], lvl, gstep = 1.0f / (float)BRK_FADE;
     int i, j;
+    if (b->quiet && b->gate == 0.0f && b->gate_to == 0.0f)
+        b->v[0].on = b->v[1].on = 0;                       /* X0X: unheard: stop decoding */
+    if (breaks_silent(b)) {                                /* X0X: skip a block that writes zeros */
+        for (i = 0; i < n; i++)
+            out[i] = 0.0f;
+        return;
+    }
     perf_sync(b);
     for (j = 0; j < 2; j++) {
         brk_voice_t *v = &b->v[j];

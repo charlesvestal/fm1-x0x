@@ -21,16 +21,21 @@ typedef struct {
     float makeup, mix;                /* linear makeup gain, wet share */
     float gr;                         /* smoothed gain reduction, dB (>= 0) */
     float ms, a_det;                  /* the level it reads: mean square over ~8 ms (not each sample) */
+    float want;                       /* the static curve's reduction, dB: read every MST_CR samples */
+    float g_lin, g_step;              /* makeup x the reduction, linear: set every MST_CR samples, ramped */
+    uint8_t cr;                       /* samples to the next control-rate update */
+#define MST_CR 4
     float pump_db, pump, pump_tgt;    /* PUMP depth; its envelope (dB) and the target it rises to */
     float a_pump;                     /* PUMP rise: MASTER_PUMP_RISE_MS */
     uint8_t comp_on;                  /* ratio > 1:1 or PUMP: else bypassed, sample for sample */
     float gr_view;                    /* gain reduction for the screen, dB, peak-held */
     /* filter */
     float g, g_t, k;
+    float a1;                         /* 1 / (1 + g (g + k)): recomputed only while g moves */
     float ic1, ic2;
     /* limiter: looks MST_LA samples ahead, so it can lower the gain before a peak arrives */
 #define MST_LA 64
-    float env, gain;
+    float env, gain, inv_env;         /* inv_env = 1 / env, kept up as env moves (no divide a sample) */
     float la[MST_LA];
     int la_pos, hold;
 } master_t;

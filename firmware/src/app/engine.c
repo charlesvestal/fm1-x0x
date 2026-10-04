@@ -241,6 +241,7 @@ static void s_brk(void *x, int s16, int bar, float spb, int en)
     (void)x;
     if (brk_hold)
         return;
+    breaks_set_quiet(&brk, bp->steps == 0 || (seq.mute & (1u << MUTE_BRK)));   /* unheard: stop decoding */
     for (i = 0; i < BRK_NSET; i++)       /* follow the playing pattern's settings (12 compares) */
         if (bp->set[i] != brk_applied[i]) {
             brk_applied[i] = bp->set[i];
@@ -380,10 +381,18 @@ static void render_sub(float *out, uint32_t n)
     int b;
     for (i = 0; i < n; i++)
         dry[i] = rev[i] = dly[i] = 0.0f;
-    /* drum machines: their own per-voice sends; the part level scales all three buses */
+    /* drum machines: their own per-voice sends; the part level scales all three buses. A silent
+     * part is not cleared, mixed or metered (it would add zeros): the 909 is still called, for its
+     * shared noise; the 808 does nothing while silent, so it is skipped. Exact either way. */
     for (b = 0; b < NKIT; b++) {
         PROF_T(pt);
         float g = mix_level[b];
+        if (!(b == 0 ? drum909_active(&d909) : drum808_active(&d808))) {
+            if (b == 0)
+                drum909_render(&d909, t0, t1, t2, (int)n);   /* writes nothing; advances the noise */
+            PROF_ADD(b, pt);
+            continue;
+        }
         for (i = 0; i < n; i++)
             t0[i] = t1[i] = t2[i] = 0.0f;
         if (b == 0)
@@ -401,7 +410,12 @@ static void render_sub(float *out, uint32_t n)
     for (b = 0; b < NBASS; b++) {
         int p = PART_303A + b;
         PROF_T(pt);
+        int was_idle = b303[b].idle;                      /* idle: the render writes zeros */
         bass303_render(&b303[b], t0, (int)n);
+        if (was_idle) {
+            PROF_ADD(2 + b, pt);
+            continue;
+        }
         add_scaled(dry, t0, mix_level[p], n);
         add_scaled(rev, t0, mix_level[p] * mix_rev[p], n);
         add_scaled(dly, t0, mix_level[p] * mix_dly[p], n);
@@ -411,11 +425,14 @@ static void render_sub(float *out, uint32_t n)
     if (!brk_hold) {
         PROF_T(pt);
         float g = mix_level[PART_BRK];
+        int silent = breaks_silent(&brk);              /* the render writes zeros: nothing to mix */
         breaks_render(&brk, t0, (int)n);
-        add_scaled(dry, t0, g, n);
-        add_scaled(rev, t0, g * mix_rev[PART_BRK], n);
-        add_scaled(dly, t0, g * mix_dly[PART_BRK], n);
-        meter(PART_BRK, t0, g, n);
+        if (!silent) {
+            add_scaled(dry, t0, g, n);
+            add_scaled(rev, t0, g * mix_rev[PART_BRK], n);
+            add_scaled(dly, t0, g * mix_dly[PART_BRK], n);
+            meter(PART_BRK, t0, g, n);
+        }
         PROF_ADD(4, pt);
     }
     {
