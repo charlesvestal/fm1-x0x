@@ -15,7 +15,9 @@ static int32_t abuf[2u * HALF_WORDS] __attribute__((aligned(4)));
 struct x0x_dbg {
     uint32_t magic, halves, max_us, nested, in_audio, late, timer_irqs, ui_frames;
     uint32_t last_us, cpu_q8, boots, stage;
+    uint32_t crash_seen;                            /* the crash count already reported at a boot */
 } x0x_dbg __attribute__((section(".noinit")));
+static uint8_t safe_mode;                           /* two failed boots: no audio, USB on (safe_main) */
 
 void fm1_alnk0_irq(void)                            /* via isr_alnk0 (hal/fm1_isr.S) */
 {
@@ -134,6 +136,60 @@ static void enter_uboot(const char *why)
     fm1_enter_uboot();
 }
 
+/* SAFE MODE: X0X crashed (or hung) twice while starting. Nothing that makes sound runs: no audio,
+ * no engine, no UI; USB is on, so the web installer (X0X, or the stock firmware) and M-UPGRADE can
+ * reach it. PLAY tries X0X again. The chip's own update mode stays the last resort (fm1_cstart). */
+static void safe_main(void)
+{
+    char b[24];
+    uint32_t t0, play;
+    lcd_fill(0, 0, 240, 240, C_BLACK);
+    draw_text_box(0, 18, 240, &FONT_B, "X0X SAFE MODE", C_HI, 1);
+    draw_text_box(0, 52, 240, &FONT_S, "IT CRASHED TWICE", C_WHITE, 1);
+    draw_text_box(0, 72, 240, &FONT_S, "WHILE STARTING.", C_WHITE, 1);
+    draw_text_box(0, 102, 240, &FONT_S, "NO SOUND. USB IS ON:", C_WHITE, 1);
+    draw_text_box(0, 122, 240, &FONT_S, "REINSTALL FROM THE", C_WHITE, 1);
+    draw_text_box(0, 142, 240, &FONT_S, "WEB INSTALLER.", C_WHITE, 1);
+    draw_text_box(0, 172, 240, &FONT_S, "PLAY: TRY AGAIN", C_HI, 1);
+    if (fm1_crash.magic == FM1_CRASH_MAGIC) {
+        b[0] = 'P';
+        b[1] = 'C';
+        b[2] = ' ';
+        hexs(b + 3, fm1_crash.pc);
+        draw_text_box(0, 208, 240, &FONT_S, b, C_GRAY, 1);
+    }
+    fm1_input_init();
+    panel_init();
+    usb_start();
+    fm1_timer5_start(isr_timer5, 1);
+    fm1_guard_lock_top();
+    fm1_irq_enable_all();
+    play = 1u << panel.btn[B_PLAY];
+    t0 = fm1_ms;
+    for (;;) {
+        fm1_wdt_feed();
+        usb_retry(fm1_ms);
+        if (bootguard.pending && fm1_ms - t0 > 10000u)
+            bootguard.pending = 0;                  /* safe mode itself is up: not another failed boot */
+        if ((fm1_in.buttons & play) && fm1_ms - t0 > 500u) {
+            bootguard.failed = 0;                   /* try X0X again, from scratch */
+            bootguard.pending = 0;
+            draw_text_box(0, 172, 240, &FONT_S, "STARTING X0X...", C_HI, 1);
+            usb_detach();
+            fm1_delay_ms(30);
+            fm1_reboot();
+        }
+        ota_service();
+        if (usb.ota_req) {
+            usb.ota_req = 0;
+            if (flash_ok)
+                ota_session();                      /* an install commits and resets; else back here */
+        }
+        if (usb.uboot_req)
+            enter_uboot("UBOOT (USB)");
+    }
+}
+
 static void fm1_main(void)
 {
     int32_t knob = 512 * 16;
@@ -157,6 +213,21 @@ static void fm1_main(void)
     if (x0x_dbg.magic != DBG_MAGIC) {
         memset(&x0x_dbg, 0, sizeof x0x_dbg);
         x0x_dbg.magic = DBG_MAGIC;
+    }
+    if (safe_mode)
+        safe_main();                                /* never returns */
+    if (fm1_crash.magic == FM1_CRASH_MAGIC && fm1_crash.count != x0x_dbg.crash_seen) {
+        char b[16];                                 /* a crash since the last boot: say so, a moment */
+        x0x_dbg.crash_seen = fm1_crash.count;
+        b[0] = 'P';
+        b[1] = 'C';
+        b[2] = ' ';
+        hexs(b + 3, fm1_crash.pc);
+        draw_text_box(0, 176, 240, &FONT_S, "RESTARTED AFTER A CRASH", RGB(255, 80, 60), 1);
+        draw_text_box(0, 196, 240, &FONT_S, b, C_GRAY, 1);
+        fm1_wdt_feed();
+        fm1_delay_ms(2500);
+        fm1_wdt_feed();
     }
     x0x_dbg.boots++;
     x0x_dbg.max_us = 0;
@@ -267,11 +338,12 @@ void fm1_cstart(void)
     if (bootguard.pending)
         bootguard.failed++;
     bootguard.pending = 1;
-    if (bootguard.failed >= 2u) {                   /* two failed boots: wait in UBOOT for an update */
+    if (bootguard.failed >= 4u) {                   /* safe mode failed too: the chip's own update mode */
         bootguard.failed = 0;
         bootguard.pending = 0;
         fm1_enter_uboot();
     }
+    p3 |= (bootguard.failed >= 2u) << 8;            /* two failed boots: safe mode (kept past the .bss clear) */
     fm1_irq_init();
     for (d = _bss_start; d < _bss_end; d++)
         *d = 0;
@@ -283,6 +355,7 @@ void fm1_cstart(void)
         *d = *s;
     fm1_mailbox_clear();
     fm1_guard_enable(FM1_GUARD_STACK | FM1_GUARD_WRITE | FM1_GUARD_BUS | FM1_GUARD_PC);
+    safe_mode = (uint8_t)(p3 >> 8);
     fm1_boot.p3_rst = (uint8_t)p3;
     fm1_boot.rst_src = src;
     fm1_boot.wdt_con = (uint8_t)wdt;

@@ -56,8 +56,10 @@ python3 tools/fm1_install.py x0x-0.4-beta.fwsc
 
 Note that the web installer on hugelton.github.io installs Felucca, not X0X.
 
-To go back to the original firmware, use M-VAVE's own updater. If the FM-1 no longer starts,
-see [Recovering an FM-1 that won't start](#recovering-an-fm-1-that-won-t-start). Installing
+To go back to the original firmware, use "Back to the stock firmware" at the bottom of the
+web installer: download M-VAVE's FM-1 V15 file from the link there, choose it, and press the
+button. (M-VAVE's own updater, M-UPGRADE, works too.) If the FM-1 no longer starts, see
+[Recovering an FM-1 that won't start](#recovering-an-fm-1-that-won-t-start). Installing
 third-party firmware is at your own risk.
 
 ---
@@ -540,11 +542,22 @@ before it ends to cancel.
 **Calibration:** if a button or knob does the wrong thing, hold OCT- and OCT+ while you switch
 the FM-1 on. The screen then asks you to press each button and turn each knob in turn.
 
+**After a crash:** X0X shows a red CRASH screen and restarts by itself a few seconds later. The
+next start shows RESTARTED AFTER A CRASH and an address (PC ...) for a moment. If you report the
+problem, include that address and what you were doing.
+
+**Safe mode:** if X0X crashes twice in a row while starting, it starts in SAFE MODE instead: no
+sound, but USB works, so the web installer can reach it. Reinstall X0X from the installer, or
+put the stock firmware back from the same page. Press PLAY to try starting X0X normally again.
+If even safe mode fails twice, the FM-1 goes into the chip's own update mode, which only the
+rescue below can reach.
+
 ### Recovering an FM-1 that won't start
 
-If the FM-1 crashes every time it starts (X0X 0.2-beta did: the X0X screen, a red X0X CRASH
-screen, then a blank screen), the web installer and M-VAVE's updater can't see it. After two
-crashes in a row it goes into the chip's own update mode, which they don't use. A script can put
+From version 0.5-beta, an FM-1 that keeps crashing starts in safe mode (above), and the web
+installer can fix it. Older versions (0.2-beta did: the X0X screen, a red X0X CRASH screen, then a
+blank screen) went into the chip's own update mode after two crashes, which neither the web
+installer nor M-VAVE's updater can see. A script can put
 M-VAVE's stock firmware back from there, on a Mac, with the USB cable you already have:
 
 Open Terminal, paste this line and press Return:
