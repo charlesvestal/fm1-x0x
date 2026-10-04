@@ -65,9 +65,9 @@ a { color: var(--accent); }
 <p class="lede">Groovebox firmware for the M-VAVE FM-1. A 909, an 808, two 303s with the TB-3PO
 line generator, and a breakbeat player, all running at once, with patterns, a song mode and
 recorded knob moves.</p>
-<div class="status"><strong>Version __VERSION__.</strong> X0X has not been run on a real FM-1 yet.
-It runs in a simulator using the same code, and it installs and uninstalls the way Felucca does,
-but the first people to install it are the first test. Installing is at your own risk.</div>
+<div class="status"><strong>Version __VERSION__, a beta.</strong> X0X runs on the FM-1; with every part
+playing a dense pattern at once it can still overload. It installs and uninstalls the way Felucca
+does, and the installer can put M-VAVE's own firmware back. Installing is at your own risk.</div>
 <nav class="ways" aria-label="Get X0X">
   <a href="emu/"><strong>Try it in the browser</strong><span>The same code the FM-1 runs, with sound. Mouse, touch or keyboard; no FM-1 needed.</span></a>
   <a href="install/"><strong>Install</strong><span>From Chrome or Edge, with the FM-1 connected by USB. Nothing to install on the computer.</span></a>

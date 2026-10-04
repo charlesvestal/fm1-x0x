@@ -14,11 +14,10 @@ X0X is a fork of [Felucca](https://github.com/hugelton/Felucca) by Leo Kuroshita
 Instruments). It keeps Felucca's platform — the hardware layer, USB MIDI, the update loader,
 the web installer and the flash storage — and replaces the instrument.
 
-> **Status: not yet run on hardware.** Everything below is built and tested on a computer
-> (the whole app runs in a simulator), and the firmware package builds with JieLi's
-> toolchain. Boot, CPU headroom, the key lights and USB have to be checked on a device.
-> Installing is at your own risk; M-VAVE's updater returns the FM-1 to its official
-> firmware, and Felucca's recovery tool covers a failed install.
+> **Status: beta.** X0X runs on the FM-1. With every part playing a dense pattern at once it
+> can still run out of processor time (PERF TEST's worst case is ~102 %); an overload guard is
+> planned. Installing is at your own risk: the web installer can put M-VAVE's firmware back, an
+> FM-1 that keeps crashing starts in safe mode, and the manual's Troubleshooting covers the rest.
 
 ## The instrument
 

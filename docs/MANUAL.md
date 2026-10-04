@@ -4,8 +4,8 @@ X0X is groovebox firmware for the M-VAVE FM-1, version 0.1. It turns the FM-1 in
 808, two 303s and a breakbeat player, all running at the same time. Each part can play its own
 pattern, you can arrange patterns into a song, and you can record knob moves.
 
-**Status.** X0X has only been run in a simulator on a computer, using the same code as the
-FM-1. Nobody has run it on an FM-1 yet.
+**Status.** X0X is a beta. It runs on the FM-1, but with every part playing a dense pattern at
+once it can still run out of processor time and drop out (see Performance).
 
 ---
 
@@ -508,8 +508,8 @@ on the factory sound for about 15 seconds: a simple loop, all five parts, and ev
 as it gets. Then it puts back your patterns, sound and tempo, and shows a table. Your project
 isn't changed. HOME or PLAY stops the test early.
 
-X0X hasn't been run on an FM-1 before, so a photo of that table is the most useful thing you can
-send us: it decides how X0X uses the FM-1's processor from here.
+If X0X drops out on your patterns, a photo of that table, and of the pattern, is the most useful
+thing you can send.
 
 KNOB 1 switches on extra counters (STALLS). They're experimental: if the FM-1 misbehaves with
 them on, switch it off and on again.

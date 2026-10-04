@@ -74,6 +74,7 @@ static volatile struct {
     uint8_t enc_rest[FM1_NENC];  /* learned rest (detent) states, bit per state */
     uint8_t enc_still[FM1_NENC]; /* frames since the last state change */
     int8_t enc_sub[FM1_NENC];    /* net transitions since the last rest state */
+    int8_t enc_dir[FM1_NENC];    /* the last valid transition: +1 / -1 (0: none yet) */
     int16_t enc_steps[FM1_NENC]; /* + = clockwise */
     uint32_t frames;
 } fm1_in;
@@ -212,10 +213,13 @@ static void fm1__frame(void)
         uint32_t cur = ((fm1_in.raw[m[0]] >> m[1]) & 1u) << 1 | ((fm1_in.raw[m[2]] >> m[3]) & 1u);
         uint32_t idx;
         volatile int8_t *sub = &fm1_in.enc_sub[e];
+        /* X0X: no two-scan filter. A state had to be seen on two scans running (2.2 ms) to count,
+         * so a fast turn, whose states last less than that, did not move the knob at all. The
+         * 1.1 ms between scans is longer than a contact bounce, and a step still needs >= 2 net
+         * transitions between detents, so a glitch cannot make one. */
         if (cur != fm1_in.enc_last[e]) {
             fm1_in.enc_last[e] = (uint8_t)cur;
             fm1_in.enc_still[e] = 0;
-            continue;
         }
         if (fm1_in.enc_prev[e] == 0xFF) {          /* first frame: the knob rests here */
             fm1_in.enc_prev[e] = (uint8_t)cur;
@@ -232,10 +236,15 @@ static void fm1__frame(void)
         if (cur == fm1_in.enc_prev[e])
             continue;
         idx = (uint32_t)fm1_in.enc_prev[e] << 2 | cur;
-        if ((0x4182u >> idx) & 1u)
+        if ((0x4182u >> idx) & 1u) {
             (*sub)++;
-        else if ((0x2814u >> idx) & 1u)
+            fm1_in.enc_dir[e] = 1;
+        } else if ((0x2814u >> idx) & 1u) {
             (*sub)--;
+            fm1_in.enc_dir[e] = -1;
+        } else {                                   /* both lines changed: a state skipped (a flick) */
+            *sub = (int8_t)(*sub + 2 * fm1_in.enc_dir[e]);   /* two more the way it was going */
+        }
         fm1_in.enc_prev[e] = (uint8_t)cur;
         if ((fm1_in.enc_rest[e] >> cur) & 1u) {    /* back on a detent */
             if (*sub >= 2)
