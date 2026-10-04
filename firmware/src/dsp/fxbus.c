@@ -67,7 +67,8 @@ static void fx_retime(fxbus_t *f)
     const float bpm = f->bpm > 20.0f ? f->bpm : 120.0f;
     float ms = fx_beats[i] * 60000.0f / bpm;
     const float max_ms = (float)(f->dlen - 256) / D9_SR * 1000.0f;
-    if (ms > max_ms) ms = max_ms;
+    while (ms > max_ms)                 /* longer than the line (1/2. under 90 BPM): half of it, */
+        ms *= 0.5f;                     /* which is still on the beat; cutting it short is not */
     f->dl_time_ms = ms;
 }
 

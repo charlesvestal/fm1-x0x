@@ -599,6 +599,10 @@ PDIST, FOLD or CRUSH.
 | TAPE | Type (DIGI or TAPE), Wear, HPF |
 | KIT DRIVE | Volume, Dist, Drive, Comp |
 
+The delay follows the tempo, including an external MIDI clock. A delay time longer than two
+seconds (1/2. below 90 BPM, 1/2 below 60) plays at half that length, which is still on the beat.
+TAPE's Wear sets how much the echoes wow and flutter around the beat.
+
 ---
 
 ## 19. Credits
