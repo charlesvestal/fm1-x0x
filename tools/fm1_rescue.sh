@@ -40,7 +40,8 @@ fi
 cp "$PKG" "$DIR/FM-1.fwsc" 2>/dev/null || true
 echo "Stock firmware: $PKG"
 echo
-echo "Next: your Mac password (nothing shows while you type it)."
-echo "Then plug the FM-1 in and switch it on. It will crash and go blank; that is when it is caught."
+echo "If it asks for a password, type your Mac password (nothing shows while you type) and press Return."
+echo "When it says it is waiting: plug the FM-1 in and switch it on."
+echo "It will crash and go blank; that is when it is caught. (Ctrl-C stops it.)"
 echo
 exec sudo "$DIR/env/bin/python" "$DIR/fm1_rescue.py" "$DIR/FM-1.fwsc" --ask --wait 300
