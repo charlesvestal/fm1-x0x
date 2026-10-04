@@ -233,7 +233,7 @@ class Uboot:
 
 
 # ------------------------------------------------------------------- flow ---
-def rescue(dev, image, loader, write, backup_dir, say=print):
+def rescue(dev, image, loader, write, backup_dir, say=print, confirm=None):
     """Everything in one session: the FM-1 leaves UBOOT (and crashes again) as soon as it is let go."""
     vendor, product = dev.inquiry()
     say(f"  device: {vendor} {product}")
@@ -257,6 +257,8 @@ def rescue(dev, image, loader, write, backup_dir, say=print):
         raise Fail("the protected head of the flash differs from V15 (sectors "
                    + " ".join(f"{a:#06x}" for a in low) + "): not writing; send this output and the backup")
     say(f"  {len(diff)} of {APP_END // SECTOR} firmware sectors differ from V15")
+    if not write and confirm is not None:
+        write = keep_alive(dev, confirm)
     if not write:
         say("  check passed. Nothing written: run again with --write to put V15 back.")
         return False
@@ -282,6 +284,30 @@ def rescue(dev, image, loader, write, backup_dir, say=print):
     say("  flash now holds V15. Restarting the FM-1 ...")
     dev.run_app()
     return True
+
+
+def keep_alive(dev, confirm):
+    """Ask while the loader is kept busy (it resets the chip after ~3 s without a command)."""
+    import threading
+    stop, lost = threading.Event(), []
+
+    def run():
+        while not stop.wait(1.0):
+            try:
+                dev.cmd(CMD_GET_ONLINE_DEVICE)
+            except Exception as e:
+                lost.append(e)
+                return
+    t = threading.Thread(target=run, daemon=True)
+    t.start()
+    try:
+        answer = confirm()
+    finally:
+        stop.set()
+        t.join()
+    if lost:
+        raise Fail(f"the FM-1 dropped out while waiting ({lost[0]}); run it again")
+    return answer
 
 
 def get_loader(path):
@@ -344,10 +370,19 @@ def open_device(usb, timeout):
     raise Fail("the FM-1 did not appear in update mode")
 
 
+def ask():
+    print("\n  Everything checks out, and the backup is saved.")
+    try:
+        return input("  Type yes and press Return to put the stock firmware back: ").strip().lower() == "yes"
+    except EOFError:
+        return False
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("package", help="M-VAVE's FM-1 V15 .fwsc")
     ap.add_argument("--write", action="store_true", help="write V15 (without it: check and back up only)")
+    ap.add_argument("--ask", action="store_true", help="after the check and the backup, ask before writing")
     ap.add_argument("--loader", help="a local wl82loader.bin instead of downloading it")
     ap.add_argument("--wait", type=float, default=120, help="seconds to wait for the FM-1 (default 120)")
     ap.add_argument("--tries", type=int, default=5, help="attempts if it drops out mid-way (default 5)")
@@ -372,7 +407,8 @@ def main():
             bot = open_device(usb, args.wait)
             try:
                 rescue(Uboot(bot), image, loader, args.write, backup_dir,
-                       say=lambda *a, **k: print(*a, **k, flush=True))
+                       say=lambda *a, **k: print(*a, **k, flush=True),
+                       confirm=ask if args.ask else None)
                 return 0
             except (Fail, usb.core.USBError) as e:
                 print(f"\n  attempt {attempt}: {e}")
