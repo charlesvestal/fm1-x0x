@@ -317,6 +317,11 @@ static double render_ns_total, render_budget_ns_total;
 /* instructions the kernel counted in engine_render (Felucca's tests/regress.c measure: the same
  * on every run, unlike wall time): per sample overall, and the worst block */
 static uint64_t ins_total, ins_frames, ins_block_max;
+#ifdef X0X_PROFILE
+#include <time.h>
+extern uint64_t x0x_prof_ns[8];
+uint64_t x0x_prof_now(void) { return clock_gettime_nsec_np(CLOCK_UPTIME_RAW); }
+#endif
 static uint64_t instr_now(void)
 {
 #ifdef __APPLE__
@@ -810,6 +815,20 @@ int main(int argc, char **argv)
     printf("host: %u ms simulated, %u blits, render %.1f%% of real time (host CPU)%s\n", now_ms, blits,
            render_budget_ns_total > 0 ? 100.0 * render_ns_total / render_budget_ns_total : 0.0,
            fails ? ", EXPECTATIONS FAILED" : "");
+#ifdef X0X_PROFILE
+    {
+        static const char *const N[8] = {"909", "808", "303A", "303B", "BREAK", "FX", "MASTER", "SEQ"};
+        uint64_t tot = 0;
+        int k;
+        for (k = 0; k < 8; k++)
+            tot += x0x_prof_ns[k];
+        printf("profile (share of the render, ns per sample):");
+        for (k = 0; k < 8; k++)
+            printf(" %s %.1f%% (%.1f)", N[k], tot ? 100.0 * (double)x0x_prof_ns[k] / (double)tot : 0.0,
+                   ins_frames ? (double)x0x_prof_ns[k] / (double)ins_frames : 0.0);
+        printf("\n");
+    }
+#endif
     if (ins_frames && ins_total)
         printf("host: playing, %.0f instructions / sample (mean), %.0f in the worst block\n",
                (double)ins_total / (double)ins_frames, (double)ins_block_max / 256.0);

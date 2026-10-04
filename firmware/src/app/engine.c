@@ -12,6 +12,20 @@
 
 #define POOL X0X_POOL
 
+/* host profiling (host/build_host.sh with X0X_PROFILE=1): time per stage of the render. Nothing on
+ * the device: the macros are empty. Stages: 909, 808, 303 A, 303 B, BREAK, FX (sends + kit drive),
+ * MASTER, SEQ (sequencer, motion, the command queue) */
+#ifdef X0X_PROFILE
+enum { PR_909, PR_808, PR_303A, PR_303B, PR_BRK, PR_FX, PR_MST, PR_SEQ, PR_N };
+uint64_t x0x_prof_ns[PR_N];
+uint64_t x0x_prof_now(void);
+#define PROF_T(v) uint64_t v = x0x_prof_now()
+#define PROF_ADD(k, t0) (x0x_prof_ns[k] += x0x_prof_now() - (t0))
+#else
+#define PROF_T(v)
+#define PROF_ADD(k, t0)
+#endif
+
 /* ---------------------------------------------------------------- state --- */
 seq_t seq;
 volatile uint8_t eng_step[NTRACKS];
@@ -368,6 +382,7 @@ static void render_sub(float *out, uint32_t n)
         dry[i] = rev[i] = dly[i] = 0.0f;
     /* drum machines: their own per-voice sends; the part level scales all three buses */
     for (b = 0; b < NKIT; b++) {
+        PROF_T(pt);
         float g = mix_level[b];
         for (i = 0; i < n; i++)
             t0[i] = t1[i] = t2[i] = 0.0f;
@@ -381,24 +396,33 @@ static void render_sub(float *out, uint32_t n)
         add_scaled(rev, t0, g * mix_rev[b], n);        /* the kit send: the whole machine */
         add_scaled(dly, t0, g * mix_dly[b], n);
         meter(b, t0, g, n);
+        PROF_ADD(b, pt);
     }
     for (b = 0; b < NBASS; b++) {
         int p = PART_303A + b;
+        PROF_T(pt);
         bass303_render(&b303[b], t0, (int)n);
         add_scaled(dry, t0, mix_level[p], n);
         add_scaled(rev, t0, mix_level[p] * mix_rev[p], n);
         add_scaled(dly, t0, mix_level[p] * mix_dly[p], n);
         meter(p, t0, mix_level[p], n);
+        PROF_ADD(2 + b, pt);
     }
     if (!brk_hold) {
+        PROF_T(pt);
         float g = mix_level[PART_BRK];
         breaks_render(&brk, t0, (int)n);
         add_scaled(dry, t0, g, n);
         add_scaled(rev, t0, g * mix_rev[PART_BRK], n);
         add_scaled(dly, t0, g * mix_dly[PART_BRK], n);
         meter(PART_BRK, t0, g, n);
+        PROF_ADD(4, pt);
     }
-    fxbus_process(&fx, dry, rev, dly, out, (int)n);
+    {
+        PROF_T(pt);
+        fxbus_process(&fx, dry, rev, dly, out, (int)n);
+        PROF_ADD(5, pt);
+    }
 }
 
 void engine_render(int32_t *out_lr, uint32_t n)
@@ -409,20 +433,32 @@ void engine_render(int32_t *out_lr, uint32_t n)
     int p;
     if (n > 256u)
         n = 256u;
-    drain();
-    motion_tick(&mot, n);
-    fxbus_set_bpm(&fx, seq_tempo(&seq));
-    seq_advance(&seq, 0, &SINK);
+    {
+        PROF_T(pt);
+        drain();
+        motion_tick(&mot, n);
+        fxbus_set_bpm(&fx, seq_tempo(&seq));
+        seq_advance(&seq, 0, &SINK);
+        PROF_ADD(7, pt);
+    }
     while (done < n) {
         uint32_t k = seq_until_event(&seq, n - done);
         render_sub(mono + done, k);
-        seq_advance(&seq, k, &SINK);
+        {
+            PROF_T(pt);
+            seq_advance(&seq, k, &SINK);
+            PROF_ADD(7, pt);
+        }
         done += k;
     }
     if (mot_playing && !seq.playing)                     /* stopped: every knob back to its own value */
         motion_release(&mot);
     mot_playing = seq.playing;
-    master_process(&mst, mono, (int)n, vol);
+    {
+        PROF_T(pt);
+        master_process(&mst, mono, (int)n, vol);
+        PROF_ADD(6, pt);
+    }
     for (i = 0; i < n; i++) {
         int32_t s = (int32_t)(mono[i] * 4194303.0f);     /* 2^22: Felucca's -6 dBFS ceiling of the 24-bit codec */
         out_lr[2u * i] = s;
