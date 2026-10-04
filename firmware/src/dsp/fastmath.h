@@ -128,6 +128,11 @@ static inline float fm_tanhf(float x)
     float a = fm_fabsf(x), e, r;
     if (a < 0.0004f)
         return x;                                /* tanh x = x - x^3/3: below float resolution here */
+    if (a < 0.5f) {                              /* Taylor to x^13: the next term is 4e-8 at 0.5. No exp2, */
+        float z = x * x;                         /* no divide: most clippers spend most samples here */
+        return x * (1.0f + z * (-0.333333333f + z * (0.133333333f + z * (-0.0539682540f + z * (0.0218694885f +
+                    z * (-0.00886323552f + z * 0.00359212803f))))));
+    }
     if (a > 9.0f)
         return x > 0.0f ? 1.0f : -1.0f;
     e = fm_exp2f(2.0f * FM_LOG2E * a);
@@ -191,6 +196,19 @@ static inline float fm_sqrtf(float x)
     y = y * (1.5f - 0.5f * x * y * y);
     y = y * (1.5f - 0.5f * x * y * y);
     return x * y;
+}
+
+/* 1 / sqrt(x), x > 0: the seed and two Newton steps (rel 5e-6). For gains, not for values that are
+ * shown or compared: fm_sqrtf keeps three. */
+static inline float fm_rsqrtf(float x)
+{
+    fm_bits_t b;
+    float y;
+    b.f = x;
+    b.u = 0x5F375A86u - (b.u >> 1);
+    y = b.f;
+    y = y * (1.5f - 0.5f * x * y * y);
+    return y * (1.5f - 0.5f * x * y * y);
 }
 
 /* denormal / tiny-value flush for filter states */

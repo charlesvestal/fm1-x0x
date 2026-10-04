@@ -94,6 +94,26 @@ moves ±8 % and is not used):
 **These make the quiet cases cheaper; they barely touch the worst case**, which is the 808 (about
 45 %), the 303s (about 35 %) and the 909 (about 13 %) doing real work.
 
+### Done: cheaper maths in the engines (worst case)
+
+Profiled per engine (worst-case patterns, `sample` on a no-inline build), measured in kernel-counted
+instructions (stable; wall time on the Mac is not), checked against each engine's reference test:
+
+- `fm_tanhf` takes a Taylor polynomial below |x| = 0.5 (exact to float: no exp2, no divide); the op-amp
+  clippers and drives spend most samples there. The 808: 1514 -> 1414 instructions per sample.
+- The 303's RAT clipper, x / (1 + x^4)^(1/4) twice a sample, used two `fm_sqrtf` and a divide each: now
+  `x s t` with `s = fm_rsqrtf(1 + x^4)`, `t = fm_rsqrtf(s)` (two Newton steps, 5e-6). The 303: 465 -> 433.
+  (The pi32v2 FPU divides in one instruction but has no square root: `__builtin_sqrtf` calls libm.)
+- Tried and dropped: a tanh table for the 808 above 0.5 (no change: few samples there).
+
+The whole app, mean host instructions per sample, from the start of this work: factory loop 1356 -> 1221
+(-10 %), all five 2581 -> 2413 (-6.5 %), worst case 3756 -> 3521 (-6.3 %). The 808's reference worst
+rel moved 4.0e-4 -> 6.1e-4 (its BD feedback loop amplifies rounding), under the 1e-3 limit. Image
++2 KB (the inlined polynomial).
+
+What remains is each model's core work (the 808's metal bank and cymbal filters, the 303's filter
+loop and 2x decimator, the 909's drive table and envelopes): no expensive call left to replace.
+
 ## Savings that change the sound (need ears)
 
 4. **303 drive**: 21 ns per 303. The factory mix could drive 303A only, or use a cheaper shaper.

@@ -480,10 +480,15 @@ static void drive_block(bass303_t *b, float *out, int n)
             v = b->r_corr_z * 1.877f;
             u0 = 2.0f * bq_run(&b->up_lp, v);
             u1 = 2.0f * bq_run(&b->up_lp, 0.0f);
-            x2 = u0 * u0;                              /* x / (1 + x^4)^(1/4) */
-            u0 = u0 / fm_sqrtf(fm_sqrtf(1.0f + x2 * x2));
-            x2 = u1 * u1;
-            u1 = u1 / fm_sqrtf(fm_sqrtf(1.0f + x2 * x2));
+            {   /* x / (1 + x^4)^(1/4) = x s t, s = y^(-1/2), t = s^(-1/2) = y^(1/4): no divide */
+                float s0, s1;
+                x2 = u0 * u0;
+                s0 = fm_rsqrtf(1.0f + x2 * x2);
+                u0 *= s0 * fm_rsqrtf(s0);
+                x2 = u1 * u1;
+                s1 = fm_rsqrtf(1.0f + x2 * x2);
+                u1 *= s1 * fm_rsqrtf(s1);
+            }
             bq_run(&b->down_lp, u0);
             y = bq_run(&b->down_lp, u1) * 0.3204805f;
             b->r_tone_z = y * (1.0f - tb1) + b->r_tone_z * tb1;
