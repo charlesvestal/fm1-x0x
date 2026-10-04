@@ -22,7 +22,11 @@ h1 { font: 700 2rem/1.1 "Barlow Semi Condensed", "Barlow", sans-serif; margin: 0
 header p { margin: 0; color: var(--muted); }
 header nav { margin-left: auto; display: flex; gap: 1rem; }
 a { color: var(--accent); }
-.device { position: relative; width: 100%; aspect-ratio: 1000 / 640; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; }
+.device { position: relative; width: 100%; aspect-ratio: 1000 / 640; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+.device svg { pointer-events: none; }
+.hit { position: absolute; touch-action: none; cursor: pointer; -webkit-tap-highlight-color: transparent; border-radius: 12px; }
+.hit.knob { cursor: ns-resize; border-radius: 50%; }
+.hit:focus-visible { outline: 2px solid #f0a043; outline-offset: 2px; }
 .device svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 .device canvas { position: absolute; left: 31.8%; top: 9.6875%; width: 20%; height: 31.25%; image-rendering: pixelated; background: #000; border-radius: 2px; }
 .ctl { cursor: pointer; }
@@ -176,6 +180,26 @@ const keys = [];
   });
 })(36, 340, 928, 270);
 
+// ---------------------------------------------------------------- touch targets
+// The drawing is only a picture (pointer-events: none). Each control gets an invisible HTML target
+// over it: browsers (iOS Safari above all) honour touch-action and touchstart on HTML elements but
+// not on SVG ones, so the controls keep their touches while a finger anywhere else on the device
+// scrolls the page natively.
+const device = document.getElementById("device");
+function hit(c, cls) {
+  const b = c.g.getBBox(), d = document.createElement("div");
+  d.className = "hit" + (cls ? " " + cls : "");
+  Object.assign(d.style, { left: `${b.x / 10}%`, top: `${b.y / 6.4}%`, width: `${b.width / 10}%`, height: `${b.height / 6.4}%` });
+  for (const a of ["role", "aria-label", "tabindex"]) if (c.g.hasAttribute(a)) { d.setAttribute(a, c.g.getAttribute(a)); c.g.removeAttribute(a); }
+  c.g.setAttribute("aria-hidden", "true");
+  d.addEventListener("touchstart", (e) => e.preventDefault(), { passive: false });
+  device.insertBefore(d, document.getElementById("start"));
+  c.hit = d;
+}
+for (const k of Object.values(knobs)) hit(k, "knob");
+for (const b of Object.values(buttons)) hit(b);
+keys.forEach((k) => hit(k));
+
 // ---------------------------------------------------------------- state and input
 let node = null, btnMask = 0, keyMask = 0, latched = 0, master = 2800;
 const btnHeldBy = new Map(), keyHeldBy = new Map();      // pointer / key id -> bit
@@ -187,6 +211,8 @@ function syncButtons() {
   for (const b of Object.values(buttons)) {
     b.g.classList.toggle("held", !!(m & (1 << b.bit)));
     b.g.classList.toggle("latched", !!(latched & (1 << b.bit)));
+    b.hit.classList.toggle("latched", !!(latched & (1 << b.bit)));
+    b.hit.setAttribute("aria-pressed", m & (1 << b.bit) ? "true" : "false");
   }
 }
 function syncKeys() {
@@ -197,20 +223,20 @@ function syncKeys() {
 }
 
 for (const b of Object.values(buttons)) {
-  b.g.addEventListener("contextmenu", (e) => e.preventDefault());
-  b.g.addEventListener("pointerdown", (e) => {
+  b.hit.addEventListener("contextmenu", (e) => e.preventDefault());
+  b.hit.addEventListener("pointerdown", (e) => {
     e.preventDefault();
     if (e.shiftKey || e.button === 2) { latched ^= 1 << b.bit; syncButtons(); return; }
     if (latched & (1 << b.bit)) { latched &= ~(1 << b.bit); syncButtons(); return; }
-    b.g.setPointerCapture(e.pointerId);
+    b.hit.setPointerCapture(e.pointerId);
     btnHeldBy.set("p" + e.pointerId, b.bit);
     syncButtons();
   });
 }
 keys.forEach((k, i) => {
-  k.g.addEventListener("pointerdown", (e) => {
+  k.hit.addEventListener("pointerdown", (e) => {
     e.preventDefault();
-    k.g.setPointerCapture(e.pointerId);
+    k.hit.setPointerCapture(e.pointerId);
     keyHeldBy.set("p" + e.pointerId, i);
     syncKeys();
   });
@@ -220,46 +246,9 @@ function pointerUp(e) {
   if (btnHeldBy.delete(id)) syncButtons();
   if (keyHeldBy.delete(id)) syncKeys();
 }
-// Scrolling. Browsers ignore touch-action on SVG elements, so the device as a whole takes every
-// touch (touch-action: none) and a finger that starts anywhere but a control scrolls the page
-// here, with a little momentum, as the browser would.
-(function scrollFromBody() {
-  const device = document.getElementById("device");
-  let drag = null, coast = 0;
-  device.addEventListener("pointerdown", (e) => {
-    cancelAnimationFrame(coast);                         // a touch anywhere stops the coasting
-    if (e.pointerType !== "touch" || e.target.closest(".ctl, .start")) return;
-    drag = { id: e.pointerId, y: e.clientY, t: e.timeStamp, v: 0 };
-    device.setPointerCapture(e.pointerId);
-  });
-  device.addEventListener("pointermove", (e) => {
-    if (!drag || e.pointerId !== drag.id) return;
-    const dy = e.clientY - drag.y, dt = Math.max(1, e.timeStamp - drag.t);
-    scrollBy(0, -dy);
-    drag.v = 0.8 * drag.v + 0.2 * (-dy / dt);           // px per ms, smoothed
-    drag.y = e.clientY;
-    drag.t = e.timeStamp;
-  });
-  const end = (e) => {
-    if (!drag || e.pointerId !== drag.id) return;
-    let v = drag.v, last = performance.now();
-    drag = null;
-    const step = (now) => {
-      const dt = now - last;
-      last = now;
-      if (Math.abs(v) < 0.02) return;
-      scrollBy(0, v * dt);
-      v *= Math.pow(0.995, dt);
-      coast = requestAnimationFrame(step);
-    };
-    coast = requestAnimationFrame(step);
-  };
-  device.addEventListener("pointerup", end);
-  device.addEventListener("pointercancel", end);
-})();
-svg.addEventListener("pointerup", pointerUp);
-svg.addEventListener("pointercancel", pointerUp);
-svg.addEventListener("lostpointercapture", pointerUp);
+device.addEventListener("pointerup", pointerUp);
+device.addEventListener("pointercancel", pointerUp);
+device.addEventListener("lostpointercapture", pointerUp);
 
 function drawKnob(k) {
   k.ind.setAttribute("transform", `rotate(${k.angle} ${k.x} ${k.y})`);
@@ -279,12 +268,12 @@ function turn(k, n) {
 for (const k of Object.values(knobs)) {
   if (k.role === "master") { k.angle = -135 + 270 * master / 4096; drawKnob(k); }
   let drag = null, wheel = 0;
-  k.g.addEventListener("pointerdown", (e) => {
+  k.hit.addEventListener("pointerdown", (e) => {
     e.preventDefault();
-    k.g.setPointerCapture(e.pointerId);
+    k.hit.setPointerCapture(e.pointerId);
     drag = { y: e.clientY, acc: 0 };
   });
-  k.g.addEventListener("pointermove", (e) => {
+  k.hit.addEventListener("pointermove", (e) => {
     if (!drag) return;
     drag.acc += drag.y - e.clientY;
     drag.y = e.clientY;
@@ -293,9 +282,9 @@ for (const k of Object.values(knobs)) {
     if (n) { drag.acc -= n * step; turn(k, n); }
   });
   const end = () => { drag = null; };
-  k.g.addEventListener("pointerup", end);
-  k.g.addEventListener("pointercancel", end);
-  k.g.addEventListener("wheel", (e) => {
+  k.hit.addEventListener("pointerup", end);
+  k.hit.addEventListener("pointercancel", end);
+  k.hit.addEventListener("wheel", (e) => {
     e.preventDefault();
     const dy = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaY;
     if (Math.abs(dy) >= 50) { turn(k, dy < 0 ? 1 : -1); wheel = 0; return; }   // a mouse wheel notch: one detent
@@ -303,7 +292,7 @@ for (const k of Object.values(knobs)) {
     const n = Math.trunc(wheel / 25);
     if (n) { wheel -= n * 25; turn(k, n); }
   }, { passive: false });
-  k.g.addEventListener("keydown", (e) => {
+  k.hit.addEventListener("keydown", (e) => {
     if (e.key === "ArrowUp" || e.key === "ArrowRight") { turn(k, 1); e.preventDefault(); e.stopPropagation(); }
     if (e.key === "ArrowDown" || e.key === "ArrowLeft") { turn(k, -1); e.preventDefault(); e.stopPropagation(); }
   });
