@@ -624,6 +624,10 @@ static int expect(const char *what, const char *val)
     }
     else if (!strcmp(what, "part"))
         got = ui.part;
+    else if (!strcmp(what, "help"))                 /* the help card's button + 1, 0 none */
+        got = ui.help;
+    else if (!strcmp(what, "helpfits"))
+        got = help_fits();
     else if (!strcmp(what, "rec"))
         got = ui.rec;
     else if (!strcmp(what, "sel"))                  /* the selected track of the part on screen */

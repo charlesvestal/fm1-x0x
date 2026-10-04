@@ -127,6 +127,12 @@ The second button is printed SEL on the panel. Felucca calls it SCL.
 In a list, turn ALGORITHM to change the highlighted value. Rows with a return arrow are
 actions: press SEL to run them. Before doing anything that would lose notes, X0X asks first.
 
+**Help on the FM-1:** hold any button for a second without pressing anything else, and a card
+shows what it does on the screen you're on, with its combinations (HOME's card, for example,
+lists tempo, patterns, undo and redo). Let go and nothing else happens. The card goes away as
+soon as you press a key, turn a knob or press another button, so holding a button to combine
+it works as always.
+
 **Undo:** hold HOME and press REC to take back the last change; the screen says what it undid,
 for example UNDO 909 P1. Hold HOME and press PLAY to redo it. You can go back up to 32 steps
 (fewer after very large changes). One step is one gesture: everything you did before pausing

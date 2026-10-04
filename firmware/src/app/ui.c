@@ -59,6 +59,9 @@ typedef struct {
     uint32_t act_t;                    /* the last time anything was touched (autosave waits for quiet) */
     uint32_t saved_t;                  /* the last autosave */
     uint8_t last_autosave;             /* AUTOSAVE was just switched off: one more, which keeps that */
+    uint8_t help;                      /* the help card on screen: its button + 1, 0 none */
+    uint32_t down_t[NB];               /* when each button went down */
+    uint32_t turn_t;                   /* the last encoder turn */
     uint8_t outline[232];              /* the break loop's outline */
     uint8_t outline_ok, outline_slot;
     uint8_t song_sel;                  /* the SONG screen's bar */
@@ -73,7 +76,7 @@ static int32_t enc(int role)
 {
     int32_t v = plat_enc(role);
     if (v)
-        ui.act_t = plat_ms();
+        ui.act_t = ui.turn_t = plat_ms();
     return v;
 }
 
@@ -751,12 +754,94 @@ static void clear_part(pattern_t *p, int part)
     }
 }
 
+/* ============================================================ help cards === */
+/* Hold one button for HELP_HOLD ms without using it with anything: a card says what it does here,
+ * its combinations included. A key, a turn or another button puts the card away (and the
+ * combination works as always); letting go of the button after its card does nothing else. */
+#define HELP_HOLD 900u
+static int perf_testing(void);
+#define HELP_LINES 6
+static const char *const BTN_LABEL[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
+                                          "PLAY / STOP", "REC", "OCT-", "OCT+"};
+
+static int help_lines(int b, const char *l[HELP_LINES])
+{
+    int n = 0, gen = ui.view == V_GEN, kbd = is_303() && ui.kbd[bidx()];
+#define L(s) (l[n++] = (s))
+    switch (b) {
+    case B_FX: L("THE EFFECTS: REVERB, DELAY,"); L("TAPE AND KIT DRIVE"); L("AGAIN: THE NEXT PAGE"); break;
+    case B_SEL: L("THIS SCREEN AS A LIST"); L("IN A LIST: RUN THE ACTION"); L("IN A QUESTION: YES"); break;
+    case B_ENV:
+        if (is_303()) { L("HOLD + KEY: AN ACCENT"); if (kbd) L("STEP WRITE: TAP FOR A REST"); }
+        else if (is_drum()) { L("HOLD + WHITE KEY: ACCENT"); L("HOLD + BLACK KEY: LOUD HIT"); }
+        else L("HOLD + KEY: AN ACCENT");
+        break;
+    case B_LFO:
+        L("THE MIXER AND THE MASTER"); L("AGAIN: THE NEXT PAGE");
+        if (is_303()) { L("HOLD + KEY: A SLIDE"); if (kbd) L("HOLD + OCT: A TIE"); }
+        break;
+    case B_EDIT: L("THE PART'S OWN SCREEN"); L("AGAIN: THE NEXT PAGE"); break;
+    case B_GLO: L("SETTINGS, SAVE, CLEAR,"); L("FACTORY RESET, PERFORMANCE"); L("AGAIN: CLOSE"); break;
+    case B_HOME:
+        L("HOME: ALL FIVE PARTS"); L("+ SELECT: TEMPO"); L("+ WHITE KEY: PATTERN");
+        L("+ REC: UNDO   + PLAY: REDO"); L("LIST: BACK   QUESTION: NO");
+        break;
+    case B_SAVE:
+        L("SAVE EVERYTHING"); L("+ WHITE KEY: COPY PATTERN"); L("+ REC: CLEAR THIS PART");
+        L("+ KNOB: FORGET ITS MOTION"); L(proj.set.autosave_off ? "AUTOSAVE IS OFF" : "STOPPED: SAVES BY ITSELF");
+        break;
+    case B_ARP:
+        L("TB-3PO: THE 303 LINE"); L("GENERATOR (303A, 303B)");
+        if (gen) { L("OCT+: A NEW LINE"); L("OCT-: MUTATE IT"); }
+        L("AGAIN: THE NEXT PAGE");
+        break;
+    case B_SEQ:
+        if (ui.view == V_HOME || ui.view == V_SONG) L("HOME <-> THE SONG");
+        else if (is_303()) { L("KEYS: STEPS OR KEYBOARD"); L(kbd ? "NOW: KEYBOARD" : "NOW: STEPS"); }
+        else L("ON HOME: THE SONG");
+        break;
+    case B_PLAY: L("START / STOP"); L("HOME + PLAY: REDO"); break;
+    case B_REC:
+        L("RECORD ON / OFF:"); L(is_303() ? "THE KEYBOARD, KNOB MOVES" : "BLACK KEYS, KNOB MOVES");
+        L("HOME + REC: UNDO"); L("SAVE + REC: CLEAR PART");
+        break;
+    case B_OCTDN:
+    case B_OCTUP:
+        if (gen) L(b == B_OCTUP ? "A NEW 303 LINE" : "MUTATE THE LINE");
+        else if (kbd) { L("THE KEYBOARD'S OCTAVE"); L("LFO + OCT: A TIE"); }
+        else L(b == B_OCTUP ? "STEPS 17-32" : "STEPS 1-16");
+        break;
+    default: break;
+    }
+#undef L
+    return n;
+}
+
+static void help_tick(uint32_t btn, uint32_t keys)
+{
+    uint32_t now = plat_ms();
+    int i;
+    if (ui.help) {
+        uint32_t m = 1u << (ui.help - 1);
+        if (btn != m || keys || (int32_t)(ui.turn_t - ui.down_t[ui.help - 1]) > 0 || ui.overlay == O_ASK)
+            ui.help = 0;                                 /* used with something, or let go */
+        return;
+    }
+    if (!btn || (btn & (btn - 1u)) || keys || ui.overlay == O_ASK || perf_testing())
+        return;                                          /* exactly one button, nothing else */
+    for (i = 0; i < NB; i++)
+        if (btn == 1u << i && !(ui.btn_used & btn) && now - ui.down_t[i] >= HELP_HOLD &&
+            (int32_t)(ui.turn_t - ui.down_t[i]) <= 0) {
+            ui.help = (uint8_t)(i + 1);
+            ui.btn_used |= btn;                          /* its release now does nothing */
+        }
+}
+
 /* ================================================================ undo === */
 /* HOME + REC undoes, HOME + PLAY redoes (undo.c): everything after the settings is undoable, the
  * sound, the patterns, the song and the knob motion. A step is one gesture: what changed between
  * two quiet moments (UNDO_QUIET ms with nothing touched or held), or a whole recording pass. */
 #define UNDO_QUIET 400u
-static int perf_testing(void);
 #define UNDO_OFF __builtin_offsetof(project_t, sound)
 static undo_t undo X0X_POOL;
 static uint8_t undo_shadow[sizeof(project_t) - UNDO_OFF] X0X_POOL;
@@ -1647,6 +1732,7 @@ static void input(void)
             continue;
         if (btn & m) {
             ui.btn_used &= ~m;
+            ui.down_t[i] = plat_ms();
             if (i == B_REC || i == B_PLAY)             /* transport acts on the press: timing */
                 button_tap((int)i);
         } else if (!(ui.btn_used & m) && i != B_REC && i != B_PLAY) {
@@ -1655,6 +1741,7 @@ static void input(void)
     }
     if (btn || keys || btn != ui.btn || keys != ui.keys)
         ui.act_t = plat_ms();                         /* held or changed: being played */
+    help_tick(btn, keys);
     ui.btn = btn;
     ch = keys ^ ui.keys;
     ui.keys = keys;
@@ -2623,6 +2710,52 @@ static void draw_ask(int band)
     }
 }
 
+static void draw_help(int band)
+{
+    const char *l[HELP_LINES];
+    int n = help_lines(ui.help - 1, l), k;
+    uint16_t c = part_col();
+    if (band == 0) {
+        box(6, 4, 228, 24, c);
+        text_c(120, vc(&FONT_B, 4, 24), &FONT_B, BTN_LABEL[ui.help - 1], C_BLACK);
+    }
+    for (k = 0; k < n; k++) {                            /* evenly spaced; a line across the bands in both */
+        int32_t y = 34 + k * 18 - band * BAND_H;
+        if (y > -18 && y < BAND_H)
+            text_c(120, y, &FONT_XS, l[k], C_WHITE);
+    }
+}
+
+#ifdef X0X_HOST
+/* every card, on every kind of screen, fits the screen: 1 = yes (prints the first that does not) */
+static int help_fits(void)
+{
+    static const uint8_t views[] = {V_PART, V_HOME, V_SONG, V_GEN, V_FX, V_MIX};
+    const char *l[HELP_LINES];
+    ui_t keep = ui;
+    int b, p, v, kb, n, k, ok = 1;
+    for (v = 0; v < (int)sizeof views; v++)
+        for (p = 0; p < NPARTS; p++)
+            for (kb = 0; kb < 2; kb++)
+                for (b = 0; b < NB; b++) {
+                    ui.view = views[v];
+                    ui.part = (uint8_t)p;
+                    ui.kbd[0] = ui.kbd[1] = (uint8_t)kb;
+                    n = help_lines(b, l);
+                    if (n < 1 || n > HELP_LINES)
+                        ok = 0;
+                    for (k = 0; k < n; k++)
+                        if (tw(&FONT_XS, l[k]) > 224) {
+                            if (ok)
+                                printf("help card too wide: %s: \"%s\" (%d px)\n", BTN_LABEL[b], l[k], (int)tw(&FONT_XS, l[k]));
+                            ok = 0;
+                        }
+                }
+    ui = keep;
+    return ok;
+}
+#endif
+
 static void draw_main(void)
 {
     int band, readout = ui.touched >= 0 && (int32_t)(ui.touch_until - plat_ms()) > 0 && ui.overlay == O_NONE;
@@ -2630,7 +2763,9 @@ static void draw_main(void)
         ui.touched = -1;
     for (band = 0; band < 2; band++) {
         cv_begin(240, BAND_H, C_BLACK);
-        if (ui.overlay == O_ASK)
+        if (ui.help)
+            draw_help(band);
+        else if (ui.overlay == O_ASK)
             draw_ask(band);
         else if (ui.overlay == O_LIST)
             draw_list(band);

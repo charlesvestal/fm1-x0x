@@ -1,0 +1,47 @@
+# Help cards: hold one button ~1 s and a card says what it does; letting go after the card does
+# nothing else; a key, a turn or another button puts the card away and the combination works.
+wait 300
+expect helpfits 1
+# SAVE held: the card, and letting go does not save
+expect store_writes 0
+press SAVE
+wait 500
+expect help 0
+wait 600
+expect help 8
+shot h01_save.png
+release SAVE
+wait 100
+expect help 0
+expect store_writes 0
+# a short press of SAVE still saves
+tap SAVE
+expect store_writes 6
+# HOME held, then SELECT turned: the card goes, the tempo moves, HOME does not go home
+press HOME
+wait 1200
+expect help 7
+shot h02_home.png
+turn SELECT 5
+expect help 0
+release HOME
+expect tempo 130
+expect view 1
+# ENV held long, then a white key: the card goes and the key still works (an accent there)
+tapkey b0
+tapkey w0
+press ENV
+wait 1200
+expect help 3
+tapkey w0
+expect help 0
+release ENV
+expect hit0.0.0 1
+# 303A on keyboard: OCT+ held
+turn ALGO 2
+tap SEQ
+press OCT+
+wait 1200
+expect help 14
+shot h03_oct_kbd.png
+release OCT+
