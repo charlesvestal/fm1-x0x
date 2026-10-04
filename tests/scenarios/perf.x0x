@@ -1,0 +1,60 @@
+# PERF: the performance screen, and PERF TEST (three patterns of its own on the factory sound), which
+# must put back everything it changed: the patterns, the sound, the tempo, the mutes, the song mode.
+wait 300
+tapkey b0
+tapkey w0
+tapkey w8
+press HOME
+turn SELECT -5
+release HOME
+expect tempo 120
+tap HOME
+tapkey b2
+expect mute 4194304
+# GLO > PERFORMANCE (the tenth row)
+tap GLO
+turn SELECT 9
+tap SEL
+expect view 7
+tap PLAY
+wait 2500
+shot p01_live.png
+tap PLAY
+# SEL > RUN PERF TEST
+tap SEL
+turn SELECT 1
+tap SEL
+wait 300
+expect perftest 0
+expect patptr 0
+wait 7000
+shot p02_running.png
+wait 9000
+expect perftest 3
+expect perfres0 >0
+expect perfres1 >0
+expect perfres2 >0
+shot p03_results.png
+# everything back
+expect patptr 1
+expect playing 0
+expect tempo 120
+expect mute 4194304
+expect hit0.0.8 1
+expect sound2.0.0 48
+# run it again and stop it halfway with HOME: everything back as well
+expect view 7
+tap SEL
+turn SELECT 1
+tap SEL
+wait 300
+expect perftest 0
+wait 6000
+expect patptr 0
+tap HOME
+wait 300
+expect perftest -1
+expect patptr 1
+expect playing 0
+expect tempo 120
+expect mute 4194304

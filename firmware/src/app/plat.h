@@ -54,3 +54,16 @@ const uint8_t *plat_slot(int k, int z, uint32_t *nsamples, uint32_t *rate, char 
 /* audio load in % of the render budget, and xruns since boot (device: from the ISR) */
 uint32_t plat_cpu_pct(void);
 uint32_t plat_xruns(void);
+
+/* performance (the PERF screen; firmware/hal/fm1_perf.h): a counter for timing stages, the CPU's
+ * clock cycles when its counter runs, else the 24 MHz timer; which one it is; the 24 MHz timer;
+ * the highest half-buffer load since the last call, %; the stall counters (fetch, read, write:
+ * 0 = read, -1 = off), and switching them on (experimental: see fm1_perf.h) */
+void plat_perf_init(void);
+uint32_t plat_cycles(void);
+int plat_cycles_cpu(void);
+uint32_t plat_cycles_hz(void);           /* the counter's rate when it is not the CPU's */
+uint32_t plat_ticks24(void);
+uint32_t plat_cpu_peak_pct(void);
+int plat_stalls(uint32_t s[3]);
+void plat_stalls_enable(int on);

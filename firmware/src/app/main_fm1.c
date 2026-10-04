@@ -31,6 +31,8 @@ void fm1_alnk0_irq(void)                            /* via isr_alnk0 (hal/fm1_is
         us = (fm1_ticks() - t0) / FM1_TICKS_PER_US;
         x0x_dbg.cpu_q8 = (x0x_dbg.cpu_q8 * 15u + (us * 256u) / budget) / 16u;
         audio_cpu_pct = (x0x_dbg.cpu_q8 * 100u) >> 8;
+        if (us * 100u / budget > audio_peak_pct)
+            audio_peak_pct = us * 100u / budget;            /* the PERF screen's peak (read and reset) */
         if (fm1_audio_free_half() != half) {
             x0x_dbg.late++;                         /* the DMA moved on while we rendered */
             audio_xruns++;
@@ -162,6 +164,7 @@ static void fm1_main(void)
     fm1_adc_init();
     panel_init();
     led_pos_init();
+    plat_perf_init();
     engine_init(proj.pat, &proj.arr.song, proj.arr.lane, &proj.sound);
     if (project_load() != 0)
         project_defaults();                         /* nothing saved yet (or another format) */

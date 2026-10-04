@@ -30,6 +30,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <math.h>
+#include <time.h>
 #ifdef __APPLE__
 #include <libproc.h>
 #include <unistd.h>
@@ -180,9 +181,29 @@ const uint8_t *plat_slot(int k, int z, uint32_t *ns, uint32_t *rate, char name[9
     return slot_data[k][z];
 }
 
-static uint32_t cpu_pct;
+static uint32_t cpu_pct, cpu_peak;
 uint32_t plat_cpu_pct(void) { return cpu_pct; }
 uint32_t plat_xruns(void) { return 0; }
+/* performance: no CPU counter here: the "cycles" are nanoseconds (plat_cycles_hz) */
+static uint64_t host_ns(void)
+{
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return (uint64_t)t.tv_sec * 1000000000u + (uint64_t)t.tv_nsec;
+}
+void plat_perf_init(void) {}
+uint32_t plat_cycles(void) { return (uint32_t)host_ns(); }
+uint32_t plat_cycles_hz(void) { return 1000000000u; }
+int plat_cycles_cpu(void) { return 0; }
+uint32_t plat_ticks24(void) { return (uint32_t)(host_ns() * 24u / 1000u); }
+uint32_t plat_cpu_peak_pct(void)
+{
+    uint32_t p = cpu_peak;
+    cpu_peak = 0;
+    return p;
+}
+int plat_stalls(uint32_t s[3]) { (void)s; return -1; }
+void plat_stalls_enable(int on) { (void)on; }
 
 /* -------------------------------------------------------------- app --- */
 #include "../firmware/src/app/x0x.h"
@@ -317,11 +338,9 @@ static double render_ns_total, render_budget_ns_total;
 /* instructions the kernel counted in engine_render (Felucca's tests/regress.c measure: the same
  * on every run, unlike wall time): per sample overall, and the worst block */
 static uint64_t ins_total, ins_frames, ins_block_max;
-#ifdef X0X_PROFILE
-#include <time.h>
-extern uint64_t x0x_prof_ns[8];
-uint64_t x0x_prof_now(void) { return clock_gettime_nsec_np(CLOCK_UPTIME_RAW); }
-#endif
+/* the engine's stage timing (eng_prof, in plat_cycles() units: here nanoseconds), summed per block
+ * while playing; printed with X0X_PROFILE=1 in the environment */
+static uint64_t prof_tot[ENG_PROF_N];
 static uint64_t instr_now(void)
 {
 #ifdef __APPLE__
@@ -366,10 +385,15 @@ static void run_ms(uint32_t ms)
             double t0 = now_ns(), dt;
             uint32_t k;
             uint64_t i0 = instr_now(), di;
+            uint32_t pr0[ENG_PROF_N];
+            for (k = 0; k < ENG_PROF_N; k++)
+                pr0[k] = eng_prof[k];
             engine_render(blk, 256);
             di = instr_now() - i0;
             dt = now_ns() - t0;
             if (seq.playing) {                           /* the cost that matters: while it plays */
+                for (k = 0; k < ENG_PROF_N; k++)
+                    prof_tot[k] += (uint32_t)(eng_prof[k] - pr0[k]);
                 ins_total += di;
                 ins_frames += 256;
                 if (di > ins_block_max)
@@ -378,6 +402,8 @@ static void run_ms(uint32_t ms)
             render_ns_total += dt;
             render_budget_ns_total += 256.0 * 1e9 / 44100.0;
             cpu_pct = (uint32_t)(100.0 * dt / (256.0 * 1e9 / 44100.0));
+            if (cpu_pct > cpu_peak)
+                cpu_peak = cpu_pct;
             for (k = 0; k < 256; k++) {
                 float l = (float)blk[2 * k] / 8388608.0f;
                 int16_t s[2];
@@ -556,6 +582,12 @@ static int expect(const char *what, const char *val)
         got = seq_cue_of(&seq, PART_909) + 1;
     else if (!strncmp(what, "ppat", 4))            /* ppatP: part P's pattern, 1-based */
         got = seq.ppat[atoi(what + 4) % NPARTS] + 1;
+    else if (!strcmp(what, "perftest"))            /* -1 idle, 0..2 running, 3 done */
+        got = perf.test;
+    else if (!strncmp(what, "perfres", 7))         /* perfresK: scenario K's share of the CPU x 10 */
+        got = perf.res_load[atoi(what + 7) % 3];
+    else if (!strcmp(what, "patptr"))              /* 1: the sequencer plays the project's patterns */
+        got = seq.pat == proj.pat;
     else if (!strcmp(what, "songon"))
         got = seq.song_on;
     else if (!strcmp(what, "songlen"))
@@ -815,20 +847,18 @@ int main(int argc, char **argv)
     printf("host: %u ms simulated, %u blits, render %.1f%% of real time (host CPU)%s\n", now_ms, blits,
            render_budget_ns_total > 0 ? 100.0 * render_ns_total / render_budget_ns_total : 0.0,
            fails ? ", EXPECTATIONS FAILED" : "");
-#ifdef X0X_PROFILE
-    {
-        static const char *const N[8] = {"909", "808", "303A", "303B", "BREAK", "FX", "MASTER", "SEQ"};
+    if (getenv("X0X_PROFILE")) {
+        static const char *const N[ENG_PROF_N] = {"909", "808", "303A", "303B", "BREAK", "FX", "MASTER", "SEQ"};
         uint64_t tot = 0;
         int k;
-        for (k = 0; k < 8; k++)
-            tot += x0x_prof_ns[k];
+        for (k = 0; k < ENG_PROF_N; k++)
+            tot += prof_tot[k];
         printf("profile (share of the render, ns per sample):");
-        for (k = 0; k < 8; k++)
-            printf(" %s %.1f%% (%.1f)", N[k], tot ? 100.0 * (double)x0x_prof_ns[k] / (double)tot : 0.0,
-                   ins_frames ? (double)x0x_prof_ns[k] / (double)ins_frames : 0.0);
+        for (k = 0; k < ENG_PROF_N; k++)
+            printf(" %s %.1f%% (%.1f)", N[k], tot ? 100.0 * (double)prof_tot[k] / (double)tot : 0.0,
+                   ins_frames ? (double)prof_tot[k] / (double)ins_frames : 0.0);
         printf("\n");
     }
-#endif
     if (ins_frames && ins_total)
         printf("host: playing, %.0f instructions / sample (mean), %.0f in the worst block\n",
                (double)ins_total / (double)ins_frames, (double)ins_block_max / 256.0);

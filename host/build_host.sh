@@ -17,9 +17,3 @@ U="firmware/src/dsp/drum909.c firmware/src/dsp/drum808.c firmware/src/dsp/bass30
 $CC -O2 -ffp-contract=off -std=c99 -Wall -Wextra -Wno-unused-function -Wno-unused-parameter \
     -DX0X_HOST -Ifirmware/src -Ifirmware/src/dsp -Ibuild/gen -o build/host/x0x_host host/x0x_host.c $U -lm
 echo "host: build/host/x0x_host"
-if [ -n "${X0X_PROFILE:-}" ]; then              # a second binary that times each stage of the render
-    # shellcheck disable=SC2086
-    $CC -O2 -ffp-contract=off -std=gnu99 -Wall -Wextra -Wno-unused-function -Wno-unused-parameter \
-        -DX0X_HOST -DX0X_PROFILE -Ifirmware/src -Ifirmware/src/dsp -Ibuild/gen -o build/host/x0x_host_prof host/x0x_host.c $U -lm
-    echo "host: build/host/x0x_host_prof"
-fi

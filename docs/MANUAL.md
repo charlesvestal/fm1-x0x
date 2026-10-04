@@ -456,10 +456,27 @@ Press GLO for these settings:
 | SAVE PROJECT | Saves everything. |
 | CLEAR PATTERN | Clears all five parts of the current pattern. |
 | FACTORY RESET | Restores the factory sounds and patterns, with no song and no knob motion. Your saved project stays in memory until you save over it. |
+| PERFORMANCE | Opens the performance page (below). |
 | ABOUT X0X | Shows the version and the audio load. |
 
 Press **SAVE** to save the sounds, all 16 patterns, the song, the knob motion, the tempo and
 the settings. Anything you haven't saved is lost when you switch the FM-1 off.
+
+### Performance
+
+GLO > PERFORMANCE shows how hard the FM-1 is working, updated every second: its clock speed, the
+audio load and its peak, any dropouts, and how much of the processor each part uses.
+
+To measure it properly, press SEL and choose RUN PERF TEST. X0X plays three patterns of its own
+on the factory sound for about 15 seconds: a simple loop, all five parts, and everything as busy
+as it gets. Then it puts back your patterns, sound and tempo, and shows a table. Your project
+isn't changed. HOME or PLAY stops the test early.
+
+X0X hasn't been run on an FM-1 before, so a photo of that table is the most useful thing you can
+send us: it decides how X0X uses the FM-1's processor from here.
+
+KNOB 1 switches on extra counters (STALLS). They're experimental: if the FM-1 misbehaves with
+them on, switch it off and on again.
 
 ---
 

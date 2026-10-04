@@ -12,19 +12,11 @@
 
 #define POOL X0X_POOL
 
-/* host profiling (host/build_host.sh with X0X_PROFILE=1): time per stage of the render. Nothing on
- * the device: the macros are empty. Stages: 909, 808, 303 A, 303 B, BREAK, FX (sends + kit drive),
- * MASTER, SEQ (sequencer, motion, the command queue) */
-#ifdef X0X_PROFILE
-enum { PR_909, PR_808, PR_303A, PR_303B, PR_BRK, PR_FX, PR_MST, PR_SEQ, PR_N };
-uint64_t x0x_prof_ns[PR_N];
-uint64_t x0x_prof_now(void);
-#define PROF_T(v) uint64_t v = x0x_prof_now()
-#define PROF_ADD(k, t0) (x0x_prof_ns[k] += x0x_prof_now() - (t0))
-#else
-#define PROF_T(v)
-#define PROF_ADD(k, t0)
-#endif
+/* time per stage of the render, in plat_cycles() units (the CPU's cycles, or the 24 MHz timer):
+ * running totals (wrapping; the PERF screen takes differences) and the frames rendered. */
+volatile uint32_t eng_prof[ENG_PROF_N], eng_prof_frames;
+#define PROF_T(v) uint32_t v = plat_cycles()
+#define PROF_ADD(k, t0) (eng_prof[k] += plat_cycles() - (t0))
 
 /* ---------------------------------------------------------------- state --- */
 seq_t seq;
@@ -45,6 +37,9 @@ static volatile uint8_t brk_hold;      /* main loop is rewriting the break loops
 static motion_t mot;
 static const sound_t *mot_base_snd;    /* the knobs' own values (the project's mirror) */
 static uint8_t mot_playing;
+static volatile uint8_t mot_on = 1;
+static uint8_t mot_was_on = 1;
+void engine_motion_enable(int on) { mot_on = (uint8_t)(on != 0); }   /* the ISR releases the knobs */
 
 /* mixer: per part Level, Rev send, Dly send (a drum machine's add to its voices' own sends) */
 enum { MX_LEVEL, MX_REV, MX_DLY, MX_NPARAMS };
@@ -260,7 +255,8 @@ static void s_step(void *x, int t, int p)
 {
     (void)x;
     eng_step[t] = (uint8_t)p;
-    motion_step(&mot, t, seq.ppat[t], p, seq_next_step(&seq, t, p), seq_part_len(&seq, t));
+    if (mot_on)
+        motion_step(&mot, t, seq.ppat[t], p, seq_next_step(&seq, t, p), seq_part_len(&seq, t));
 }
 
 /* --------------------------------------------------------------- motion --- */
@@ -450,10 +446,15 @@ void engine_render(int32_t *out_lr, uint32_t n)
     int p;
     if (n > 256u)
         n = 256u;
+    eng_prof_frames += n;
+    if (mot_was_on && !mot_on)                             /* motion switched off: knobs to their own values */
+        motion_release(&mot);
+    mot_was_on = mot_on;
     {
         PROF_T(pt);
         drain();
-        motion_tick(&mot, n);
+        if (mot_on)
+            motion_tick(&mot, n);
         fxbus_set_bpm(&fx, seq_tempo(&seq));
         seq_advance(&seq, 0, &SINK);
         PROF_ADD(7, pt);

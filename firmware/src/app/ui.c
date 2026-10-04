@@ -19,8 +19,8 @@ static const int8_t KEY_WHITE[NKEYS] = {0, -1, 1, -1, 2, -1, 3, 4, -1, 5, -1, 6,
 static const int8_t KEY_BLACK[NKEYS] = {-1, 0, -1, 1, -1, 2, -1, -1, 3, -1, 4, -1, -1, 5, -1, 6, -1, 7, -1, -1, 8, -1, 9, -1, -1, 10, -1};
 static uint8_t WHITE_KEY[16], BLACK_KEY[11];
 
-enum { V_HOME, V_PART, V_GEN, V_FX, V_MIX, V_GLO, V_SONG, NVIEWS };
-static const char *const VIEW_N[NVIEWS] = {"HOME", "", "TB-3PO", "FX", "MIX", "GLOBAL", "SONG"};
+enum { V_HOME, V_PART, V_GEN, V_FX, V_MIX, V_GLO, V_SONG, V_PERF, NVIEWS };
+static const char *const VIEW_N[NVIEWS] = {"HOME", "", "TB-3PO", "FX", "MIX", "GLOBAL", "SONG", "PERF"};
 static const uint16_t PART_COL[NPARTS] = {RGB(255, 150, 40), RGB(255, 72, 64), RGB(130, 240, 90), RGB(70, 205, 255),
                                           RGB(214, 120, 255)};
 static const char *const PART_N[NPARTS] = {"909", "808", "303A", "303B", "BREAK"};
@@ -29,7 +29,7 @@ static const char *const PART_S[NPARTS] = {"909", "808", "303A", "303B", "BRK"};
 /* overlays drawn over the main area */
 enum { O_NONE, O_LIST, O_ASK };
 enum { ACT_NONE, ACT_SAVE, ACT_CLEAR_PART, ACT_CLEAR_PAT, ACT_COPY, ACT_RESET, ACT_ABOUT, ACT_SONG_INS,
-       ACT_SONG_DEL, ACT_SONG_CLR };
+       ACT_SONG_DEL, ACT_SONG_CLR, ACT_PERF, ACT_PERF_TEST };
 
 typedef struct {
     uint8_t view, part, prev_view;
@@ -60,6 +60,26 @@ typedef struct {
     uint8_t song_sel;                  /* the SONG screen's bar */
 } ui_t;
 static ui_t ui;
+
+/* PERF (the performance screen and its test; see "performance" below) */
+enum { PT_IDLE = -1, PT_DONE = 3 };
+static struct {
+    uint32_t t_ms, ticks, cyc, frames, prof[ENG_PROF_N], st[3];
+    uint16_t mhz10;                    /* the CPU clock x 10; 0 = not known (no cycle counter) */
+    uint8_t load, peak, stalls_on, have;
+    uint16_t stage[ENG_PROF_N];        /* each stage's share of the CPU, x 10 (%) */
+    uint16_t cps;                      /* the render's cycles per sample (cycle counter only) */
+    uint8_t stall[3];                  /* fetch / read / write stall cycles, % */
+    int8_t test, phase;                /* test: PT_IDLE, a scenario 0..2, PT_DONE (when phase is 4);
+                                        * phase: 0 stop, 1 settle, 2 measure, 3 put back, 4 done */
+    uint32_t test_t0;
+    uint16_t res_load[3], res_cps[3];  /* per scenario: the render's share x 10, cycles per sample */
+    uint8_t res_peak[3];
+    pattern_t *pat;                    /* what the test changes, to put back */
+    uint8_t ppat[NPARTS], song_on, ca, cb;
+    uint32_t mute;
+    float bpm;
+} perf = {.test = PT_IDLE};
 
 static pattern_t *pat_of(int part) { return &proj.pat[seq.ppat[part]]; }
 static pattern_t *cur_pat(void) { return pat_of(ui.part); }    /* the pattern the part on screen plays */
@@ -119,7 +139,7 @@ static void say(const char *a, const char *b)
 /* =============================================================== param refs === */
 enum { R_NONE, R_ENG, R_SWING, R_DLEN, R_DRATE, R_BLEN, R_BRATE, R_BDIR, R_BTRANS, R_GEN, R_BRKSET,
        R_BRKSLOT, R_TEMPO, R_ACCENT, R_CLKOUT, R_NOTEOUT, R_PALETTE, R_KEYLED, R_ACT, R_SBAR, R_SPAT, R_SMODE,
-       R_SLEN };
+       R_SLEN, R_STALLS };
 typedef struct { uint8_t kind, a, b, c; } pref_t;
 #define PR(k, a, b, c) ((pref_t){(k), (a), (b), (c)})
 #define NONE PR(R_NONE, 0, 0, 0)
@@ -146,8 +166,9 @@ static const x0x_param_t SEQ_P[NSQ] = {
 static const x0x_param_t ACT_P[] = {
     {"", 0, 0, 0}, {"SAVE PROJECT", 0, 0, 0}, {"CLEAR THIS PART", 0, 0, 0}, {"CLEAR PATTERN", 0, 0, 0},
     {"COPY PATTERN", 0, 0, 0}, {"FACTORY RESET", 0, 0, 0}, {"ABOUT X0X", 0, 0, 0}, {"INSERT BAR", 0, 0, 0},
-    {"DELETE BAR", 0, 0, 0}, {"CLEAR SONG", 0, 0, 0},
+    {"DELETE BAR", 0, 0, 0}, {"CLEAR SONG", 0, 0, 0}, {"PERFORMANCE", 0, 0, 0}, {"RUN PERF TEST", 0, 0, 0},
 };
+static const x0x_param_t STALLS_P = {"STALLS", 1, 0, ONOFF_N};
 static const char *const MODE_N[] = {"PATTERN", "SONG"};
 static const x0x_param_t SONG_P[] = {
     {"909", 15, 0, 0}, {"808", 15, 0, 0}, {"303A", 15, 0, 0}, {"303B", 15, 0, 0}, {"BREAK", 15, 0, 0},
@@ -206,6 +227,7 @@ static const x0x_param_t *pref_desc(pref_t r)
     case R_SPAT: return &SONG_P[r.a % NPARTS];
     case R_SMODE: return &SONG_P[5];
     case R_SLEN: return &SONG_P[6];
+    case R_STALLS: return &STALLS_P;
     default: return 0;
     }
 }
@@ -251,6 +273,7 @@ static int pref_get(pref_t r)
     }
     case R_SMODE: return seq.song_on;
     case R_SLEN: return song()->len;
+    case R_STALLS: return perf.stalls_on;
     default: return 0;
     }
 }
@@ -312,6 +335,11 @@ static void pref_set(pref_t r, int v)
         song()->bar[ui.song_sel].pat[r.a] = (uint8_t)v;
         break;
     case R_SMODE: seq.song_on = (uint8_t)v; break;
+    case R_STALLS:
+        perf.stalls_on = (uint8_t)v;
+        plat_stalls_enable(v);
+        perf.have = 0;                                /* the next window starts the counts again */
+        break;
     case R_SLEN:
         if (v > song()->len)
             song_fill(v - 1);
@@ -543,6 +571,9 @@ static void build_pages(void)
         add_page("MORE", PR(R_ENG, T_MIX, PART_BRK, 0), PR(R_SWING, 0, 0, 0), PR(R_TEMPO, 0, 0, 0),
                  PR(R_ACCENT, 0, 0, 0));
         break;
+    case V_PERF:
+        add_page("PERF", PR(R_STALLS, 0, 0, 0), NONE, NONE, NONE);
+        break;
     case V_SONG:
         add_page("BAR", PR(R_SBAR, 0, 0, 0), PR(R_SPAT, PART_909, 0, 0), PR(R_SPAT, PART_808, 0, 0),
                  PR(R_SPAT, PART_303A, 0, 0));
@@ -584,6 +615,8 @@ static void open_list_of_pages(void)
     for (p = 0; p < pg.n; p++)
         for (k = 0; k < 4; k++)
             list_add(pg.r[p][k]);
+    if (ui.view == V_PERF)
+        list_add(PR(R_ACT, ACT_PERF_TEST, 0, 0));
     if (ui.view == V_SONG) {
         list_add(PR(R_SLEN, 0, 0, 0));
         list_add(PR(R_ACT, ACT_SONG_INS, 0, 0));
@@ -607,6 +640,7 @@ static void open_global(void)
     list_add(PR(R_ACT, ACT_SAVE, 0, 0));
     list_add(PR(R_ACT, ACT_CLEAR_PAT, 0, 0));
     list_add(PR(R_ACT, ACT_RESET, 0, 0));
+    list_add(PR(R_ACT, ACT_PERF, 0, 0));
     list_add(PR(R_ACT, ACT_ABOUT, 0, 0));
     put_s(list_title, "GLOBAL");
     ui.list_sel = ui.list_top = 0;
@@ -699,6 +733,224 @@ static void save_project(void)
         ui.dirty = 0;
 }
 
+/* ============================================================ performance === */
+/* PERF: what the FM-1 measures of itself, a window a second: the clock (the core's cycle counter
+ * against the 24 MHz timer), the audio load and its peak, dropouts, stall cycles (when switched on),
+ * and each stage's share of the CPU (the engine times them: engine.h ENG_PROF_N). PERF TEST plays
+ * three patterns of its own (the factory loop, all five parts, a dense worst case) on the factory
+ * sound, 1 s to settle and 3 s measured each, and keeps the table; then it puts back the project's
+ * patterns, sound, tempo, mutes, chain and song mode. The project itself is never written. */
+static const char *const PT_N[3] = {"FACTORY LOOP", "ALL FIVE", "WORST CASE"};
+static pattern_t perf_bench[3];
+static sound_t perf_snd;
+
+static void perf_window(int force)
+{
+    uint32_t now = plat_ms(), t = plat_ticks24(), c = plat_cycles(), f = eng_prof_frames, st[3];
+    uint32_t dt = t - perf.ticks, dc = c - perf.cyc, df = f - perf.frames, sum = 0;
+    float ups;
+    int k;
+    if (!force && now - perf.t_ms < 1000u)
+        return;
+    perf.t_ms = now;
+    if (perf.have && df) {
+        if (plat_cycles_cpu() && dt >= 240u)
+            perf.mhz10 = (uint16_t)(dc / (dt / 240u));          /* cycles per (dt / 24) us, x 10 */
+        ups = plat_cycles_cpu() ? (float)perf.mhz10 * (100000.0f / 44100.0f) : (float)plat_cycles_hz() / 44100.0f;
+        for (k = 0; k < ENG_PROF_N; k++) {
+            uint32_t d = eng_prof[k] - perf.prof[k];
+            sum += d;
+            perf.stage[k] = (uint16_t)((float)d * 1000.0f / ((float)df * ups) + 0.5f);
+        }
+        perf.cps = plat_cycles_cpu() ? (uint16_t)(sum / df) : 0;
+        perf.load = (uint8_t)plat_cpu_pct();
+        perf.peak = (uint8_t)plat_cpu_peak_pct();
+        if (plat_stalls(st) == 0 && dc)
+            for (k = 0; k < 3; k++)
+                perf.stall[k] = (uint8_t)((float)(st[k] - perf.st[k]) * 100.0f / (float)dc + 0.5f);
+    } else {
+        plat_cpu_peak_pct();
+    }
+    perf.ticks = t;
+    perf.cyc = c;
+    perf.frames = f;
+    for (k = 0; k < ENG_PROF_N; k++)
+        perf.prof[k] = eng_prof[k];
+    if (plat_stalls(st) == 0)
+        for (k = 0; k < 3; k++)
+            perf.st[k] = st[k];
+    perf.have = 1;
+}
+
+/* the test's patterns: 0 the factory loop (909 kick, clap, open hats; 303 A; the break), 1 all five,
+ * 2 everything dense */
+static void perf_build(void)
+{
+    /* the tracks in key order (pattern.h): 909 BD SD LT MT HT RS CP CH OH CR RD, 808 ... CB CY OH CH */
+    enum { DR_BD, DR_SD, DR_LT, DR_MT, DR_HT, DR_RS, DR_CP, DR_CH, DR_OH, DR_CR, DR_RD };
+    enum { D8_BD, D8_SD, D8_LT, D8_MT, D8_HT, D8_RS, D8_CP, D8_CB, D8_CY, D8_OH, D8_CH };
+    int i;
+    for (i = 0; i < 3; i++) {
+        pattern_t *p = &perf_bench[i];
+        dpart_t *a = &p->drum[0], *b = &p->drum[1];
+        pattern_init(p, 0x3B0u + 977u * (uint32_t)i, 0x5A1u + 613u * (uint32_t)i);
+        tb3po_generate(&p->bass[0]);
+        if (i)
+            tb3po_generate(&p->bass[1]);
+        p->brk.steps = 0xFFFFu;
+        a->hit[DR_BD] = 0x1111u;
+        a->hit[DR_CP] = 0x1010u;
+        a->hit[DR_OH] = 0x4444u;
+        a->accent = 0x0101u;
+        if (i >= 1) {
+            b->hit[D8_BD] = 0x1111u;
+            b->hit[D8_CP] = 0x1010u;
+            b->hit[D8_CH] = 0x1111u;
+            b->hit[D8_OH] = 0x4444u;
+            b->hit[D8_CB] = 0x0808u;
+        }
+        if (i == 2) {
+            a->hit[DR_SD] = 0x1010u;
+            a->hit[DR_CH] = 0xFFFFu;
+            a->hit[DR_CR] = 0x0001u;
+            a->hit[DR_RD] = 0x1111u;
+            a->hit[DR_LT] = 0x4000u;
+            a->accent = 0x1111u;
+            b->hit[D8_SD] = 0x1010u;
+            b->hit[D8_CH] = 0xFFFFu;
+            b->hit[D8_CY] = 0x0101u;
+            b->hit[D8_LT] = 0x8080u;
+        }
+    }
+}
+
+static void perf_restore(void)
+{
+    int p;
+    seq.pat = perf.pat;
+    for (p = 0; p < NPARTS; p++) {
+        seq.ppat[p] = perf.ppat[p];
+        seq.pcue[p] = 0xFF;
+    }
+    seq.mute = perf.mute;
+    seq.song_on = perf.song_on;
+    seq_chain(&seq, perf.ca, perf.cb);
+    seq.bpm = perf.bpm;
+    engine_apply_sound(&proj.sound);
+    engine_motion_enable(1);
+    engine_brk_loops();
+}
+
+static void perf_test_start(void)
+{
+    int p;
+    if (perf.test >= 0 && perf.phase != 4)
+        return;
+    perf.pat = seq.pat;
+    for (p = 0; p < NPARTS; p++)
+        perf.ppat[p] = seq.ppat[p];
+    perf.mute = seq.mute;
+    perf.song_on = seq.song_on;
+    perf.ca = seq.chain_a;
+    perf.cb = seq.chain_b;
+    perf.bpm = seq.bpm;
+    perf_build();
+    if (seq.playing)
+        seq_stop(&seq);
+    perf.test = 0;
+    perf.phase = 0;
+    for (p = 0; p < 3; p++)
+        perf.res_load[p] = perf.res_cps[p] = perf.res_peak[p] = 0;
+}
+
+static void perf_test_abort(void)
+{
+    seq_stop(&seq);
+    perf.phase = 3;
+    perf.test = 0;
+    say("PERF TEST STOPPED", 0);
+}
+
+/* the test, one step a frame (the main loop): the transport changes take a block to land */
+static void perf_test_tick(void)
+{
+    uint32_t now = plat_ms();
+    int p;
+    if (perf.test < 0 || perf.phase == 4)
+        return;
+    switch (perf.phase) {
+    case 0:                                           /* stopped: swap in the test's patterns and sound */
+        if (seq.playing || seq.req_stop)              /* (a pending stop would cancel the start below) */
+            return;
+        for (p = 0; p < NPARTS; p++) {
+            seq.ppat[p] = 0;
+            seq.pcue[p] = 0xFF;
+        }
+        seq.pat = perf_bench;
+        seq.mute = 0;
+        seq.song_on = 0;
+        seq_chain(&seq, 0, 0);
+        seq.bpm = 125.0f;
+        engine_sound_defaults(&perf_snd);
+        engine_apply_sound(&perf_snd);
+        engine_motion_enable(0);
+        engine_brk_loops();
+        seq_start(&seq);
+        perf.phase = 1;
+        perf.test_t0 = now;
+        break;
+    case 1:                                           /* settle on the scenario's pattern */
+        if (!seq.playing && now - perf.test_t0 > 200u) {
+            perf_test_abort();
+            return;
+        }
+        if (now - perf.test_t0 >= 1000u && seq.ppat[PART_909] == perf.test) {
+            perf_window(1);
+            perf.phase = 2;
+            perf.test_t0 = now;
+        }
+        break;
+    case 2:                                           /* measure 3 s */
+        if (!seq.playing) {
+            perf_test_abort();
+            return;
+        }
+        if (now - perf.test_t0 >= 3000u) {
+            int k;
+            uint32_t sum = 0;
+            perf_window(1);
+            for (k = 0; k < ENG_PROF_N; k++)
+                sum += perf.stage[k];
+            perf.res_load[perf.test] = (uint16_t)sum;
+            perf.res_peak[perf.test] = perf.peak;
+            perf.res_cps[perf.test] = perf.cps;
+            if (++perf.test < 3) {
+                seq_cue(&seq, perf.test);
+                perf.phase = 1;
+                perf.test_t0 = now;
+            } else {
+                seq_stop(&seq);
+                perf.phase = 3;
+            }
+        }
+        break;
+    default:                                          /* put everything back once stopped */
+        if (seq.playing || seq.req_stop)
+            return;
+        perf_restore();
+        perf.phase = 4;
+        if (perf.test == 3) {
+            perf.test = PT_DONE;
+            say("PERF TEST DONE", 0);
+        } else {
+            perf.test = PT_IDLE;
+        }
+        break;
+    }
+}
+
+static void set_view(int v);
+
 static void run_action(int act, int arg)
 {
     char t[28], *q;
@@ -763,6 +1015,14 @@ static void run_action(int act, int arg)
         ui.dirty = 1;
         ui.outline_ok = 0;
         say("FACTORY SOUND + PATTERNS", 0);
+        break;
+    case ACT_PERF:
+        set_view(V_PERF);
+        break;
+    case ACT_PERF_TEST:
+        ui.overlay = O_NONE;                          /* the table is under the list */
+        perf_test_start();
+        say("PERF TEST: 15 SECONDS", 0);
         break;
     case ACT_ABOUT:
         q = put_s(t, "X0X " X0X_VERSION "  AUDIO ");
@@ -976,10 +1236,12 @@ static const uint32_t MUTE_MASK[NPARTS] = {(1u << NDRUM) - 1u, ((1u << NDRUM) - 
                                            1u << (MUTE_BASS0 + 1), 1u << MUTE_BRK};
 static int part_muted(int p) { return (seq.mute & MUTE_MASK[p]) == MUTE_MASK[p]; }
 
+static int perf_testing(void) { return perf.test >= 0 && perf.phase != 4; }
+
 static void key_event(int k, int down)
 {
     int w = KEY_WHITE[k], bl = KEY_BLACK[k];
-    if (ui.overlay == O_ASK)
+    if (ui.overlay == O_ASK || ui.view == V_PERF || perf_testing())
         return;
     if (down && w >= 0 && (ui.btn & (1u << B_SAVE))) {     /* SAVE held + white key: copy here */
         int part = part_view() ? ui.part : -1, arg = w | (part + 1) << 4;   /* a part's screen: that part */
@@ -1101,6 +1363,11 @@ static void close_overlay(void)
 
 static void button_tap(int b)
 {
+    if (perf_testing()) {                             /* the test owns the transport: HOME or PLAY stop it */
+        if ((b == B_HOME || b == B_PLAY) && perf.phase != 3)
+            perf_test_abort();
+        return;
+    }
     if (ui.overlay == O_ASK) {                        /* a question takes SEL or HOME only */
         if (b == B_SEL) {
             ui.overlay = O_NONE;
@@ -1265,6 +1532,11 @@ static void input(void)
     build_pages();
     seq.song_rec = (uint8_t)(seq.song_on && ui.rec);  /* SONG mode + REC: the song is being written */
     if (ui.overlay == O_ASK) {                         /* a question: the knobs wait */
+        for (i = 0; i < NE; i++)
+            plat_enc((int)i);
+        return;
+    }
+    if (perf_testing()) {                              /* the test owns the knobs too */
         for (i = 0; i < NE; i++)
             plat_enc((int)i);
         return;
@@ -2036,6 +2308,96 @@ static void draw_mix(int band)
     }
 }
 
+/* PERF: the live window, or the test's progress and table */
+static char *put_pct10(char *q, int v)                /* 123 -> "12.3%" */
+{
+    q = put_i(q, v / 10);
+    *q++ = '.';
+    q = put_i(q, v % 10);
+    return put_s(q, "%");
+}
+static void draw_perf(int band)
+{
+    static const char *const SN[ENG_PROF_N] = {"909", "808", "303A", "303B", "BREAK", "FX", "MASTER", "SEQ"};
+    char t[40], *q;
+    int k;
+    if (band == 0) {
+        q = put_s(t, "CLOCK ");
+        if (perf.mhz10) {
+            q = put_i(q, perf.mhz10 / 10);
+            put_s(q, " MHz");
+        } else
+            put_s(q, plat_cycles_cpu() ? "..." : "? (NO CYCLE COUNTER)");
+        cv_text(4, 2, &FONT_B, t, C_WHITE);
+        if (perf.test >= 0) {
+            int done = perf.phase == 4;
+            q = put_s(t, done ? "PERF TEST DONE" : "PERF TEST ");
+            if (!done) {
+                q = put_i(q, perf.test + 1);
+                q = put_s(q, "/3  ");
+                put_s(q, PT_N[perf.test < 3 ? perf.test : 2]);
+            }
+            cv_text(4, 24, &FONT_S, t, done ? C_HI : C_AMB);
+            if (!done)
+                cv_text(4, 46, &FONT_XS, "HOME OR PLAY: STOP", C_DIM);
+            else
+                cv_text(4, 46, &FONT_XS, "SHARE OF THE CPU (PEAK)  CYCLES / SAMPLE", C_DIM);
+            return;
+        }
+        q = put_s(t, "LOAD ");
+        q = put_i(q, perf.load);
+        q = put_s(q, "%  PEAK ");
+        q = put_i(q, perf.peak);
+        q = put_s(q, "%  DROPOUTS ");
+        put_i(q, (int)plat_xruns());
+        cv_text(4, 24, &FONT_S, t, C_HI);
+        if (perf.stalls_on) {
+            q = put_s(t, "STALLS  FETCH ");
+            q = put_i(q, perf.stall[0]);
+            q = put_s(q, "%  READ ");
+            q = put_i(q, perf.stall[1]);
+            q = put_s(q, "%  WRITE ");
+            put_s(put_i(q, perf.stall[2]), "%");
+        } else
+            put_s(t, "STALL COUNTERS OFF (KNOB 1)");
+        cv_text(4, 46, &FONT_XS, t, perf.stalls_on ? C_GRAY : C_DIM);
+        return;
+    }
+    if (perf.test >= 0) {                             /* the table, so far */
+        for (k = 0; k < 3; k++) {
+            int y = k * 14 + 2;
+            cv_text(4, y, &FONT_S, PT_N[k], perf.test == k && perf.phase != 4 ? C_AMB : C_GRAY);
+            if (!perf.res_load[k])
+                continue;
+            q = put_pct10(t, perf.res_load[k]);
+            q = put_s(q, " (");
+            q = put_i(q, perf.res_peak[k]);
+            put_s(q, "%)");
+            cv_text(112, y, &FONT_S, t, C_WHITE);
+            if (perf.res_cps[k]) {
+                put_i(t, perf.res_cps[k]);
+                text_r(236, y, &FONT_S, t, C_HI);
+            }
+        }
+        if (perf.phase == 4)
+            cv_text(4, 50, &FONT_XS, "SEL: RUN IT AGAIN", C_DIM);
+        return;
+    }
+    for (k = 0; k < ENG_PROF_N; k++) {                /* each stage's share of the CPU */
+        int x = (k & 1) * 118 + 4, y = (k >> 1) * 12;
+        cv_text(x, y, &FONT_XS, SN[k], C_GRAY);
+        put_pct10(t, perf.stage[k]);
+        text_r(x + 108, y, &FONT_XS, t, C_WHITE);
+    }
+    if (perf.cps) {
+        q = put_s(t, "RENDER ");
+        q = put_i(q, perf.cps);
+        put_s(q, " CYCLES / SAMPLE");
+        cv_text(4, 50, &FONT_XS, t, C_GRAY);
+    }
+    cv_text(4, 60, &FONT_XS, "SEL: RUN PERF TEST", C_DIM);
+}
+
 /* the readout: the knob being turned, large, across the bottom band */
 static void draw_readout(void)
 {
@@ -2148,6 +2510,8 @@ static void draw_main(void)
             draw_mix(band);
         else if (ui.view == V_SONG)
             draw_song(band);
+        else if (ui.view == V_PERF)
+            draw_perf(band);
         else if (is_drum())
             draw_drum(band);
         else if (is_303())
@@ -2378,6 +2742,9 @@ void ui_frame(void)
 {
     uint32_t i;
     input();
+    perf_test_tick();
+    if (ui.view == V_PERF && !perf_testing())
+        perf_window(0);
     for (i = 0; i < NPARTS; i++)
         eng_peak[i] = (uint16_t)(eng_peak[i] - (eng_peak[i] >> 3));
     draw_header();

@@ -30,6 +30,10 @@ typedef struct {
 } sound_t;
 
 extern seq_t seq;                      /* the sequencer (its pattern pointer is the project's) */
+/* render stages (the PERF screen): 909, 808, 303 A, 303 B, BREAK, FX, MASTER, SEQ */
+enum { PR_909, PR_808, PR_303A, PR_303B, PR_BRK, PR_FX, PR_MST, PR_SEQ, ENG_PROF_N };
+extern volatile uint32_t eng_prof[ENG_PROF_N], eng_prof_frames;
+void engine_motion_enable(int on);                          /* off: lanes do not play (the PERF test) */
 extern volatile uint8_t eng_step[NTRACKS];   /* playheads for the UI */
 extern volatile uint16_t eng_peak[NPARTS];   /* part meters, Q15, decaying (UI) */
 #define SCOPE_N 256u

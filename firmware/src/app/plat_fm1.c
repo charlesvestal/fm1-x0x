@@ -85,6 +85,31 @@ const uint8_t *plat_slot(int k, int z, uint32_t *nsamples, uint32_t *rate, char 
     return smp_user_xip((uint32_t)k) + SMP_USER_DATA + h->zone[z].off;
 }
 
-static volatile uint32_t audio_cpu_pct, audio_xruns;
+static volatile uint32_t audio_cpu_pct, audio_xruns, audio_peak_pct;
 uint32_t plat_cpu_pct(void) { return audio_cpu_pct; }
 uint32_t plat_xruns(void) { return audio_xruns; }
+
+static int perf_cyc_ok, perf_stalls_on;
+void plat_perf_init(void) { perf_cyc_ok = fm1_perf_cycles_run(); }
+uint32_t plat_cycles(void) { return perf_cyc_ok ? fm1_perf_cycles() : fm1_ticks(); }
+int plat_cycles_cpu(void) { return perf_cyc_ok; }
+uint32_t plat_cycles_hz(void) { return 24000000u; }   /* the timer; the CPU's rate is measured */
+uint32_t plat_ticks24(void) { return fm1_ticks(); }
+uint32_t plat_cpu_peak_pct(void)
+{
+    uint32_t p = audio_peak_pct;
+    audio_peak_pct = 0;
+    return p;
+}
+int plat_stalls(uint32_t s[3])
+{
+    if (!perf_stalls_on)
+        return -1;
+    fm1_perf_stalls(s);
+    return 0;
+}
+void plat_stalls_enable(int on)
+{
+    perf_stalls_on = on;
+    fm1_perf_stalls_enable(on);
+}
