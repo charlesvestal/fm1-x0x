@@ -1956,7 +1956,7 @@ static void px_blend(int32_t x, int32_t y, uint16_t c, uint32_t a)
     uint16_t *q;
     uint32_t bg;
     y += cv_oy;
-    if ((uint32_t)x >= cv_w || (uint32_t)y >= cv_h || !a)
+    if ((uint32_t)x >= cv_w || y < cv_y0 || y >= cv_y1 || !a)
         return;
     q = &cv_px[(uint32_t)y * cv_w + (uint32_t)x];
     if (a >= 16u) {
@@ -2784,8 +2784,9 @@ static void draw_main(void)
     int band, readout = ui.touched >= 0 && (int32_t)(ui.touch_until - plat_ms()) > 0 && ui.overlay == O_NONE;
     if (!readout)
         ui.touched = -1;
+    cv_begin(240, 2 * BAND_H, C_BLACK);           /* both bands, then one transfer: no tear between them */
     for (band = 0; band < 2; band++) {
-        cv_begin(240, BAND_H, C_BLACK);
+        cv_band(band * BAND_H, BAND_H);
         if (ui.help)
             draw_help(band);
         else if (ui.overlay == O_ASK)
@@ -2810,8 +2811,9 @@ static void draw_main(void)
             draw_break(band);
         if (band == 1 && readout)
             draw_readout();
-        cv_commit(1 + band, 0, (uint32_t)(MAIN_Y + band * BAND_H));
     }
+    cv_band(0, 2 * BAND_H);
+    cv_commit(1, 0, MAIN_Y);
 }
 
 /* -------------------------------------------------------------- knob strip --- */
