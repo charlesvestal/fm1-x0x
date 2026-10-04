@@ -1,0 +1,81 @@
+# The manual's Getting started, step by step: each step as the manual words it, checked.
+wait 300
+# 1. X0X opens on the 909. PLAY: the two 303s play their factory lines (no drums yet)
+expect view 1
+expect part 0
+tap PLAY
+wait 500
+expect playing 1
+# 2. a kick: black key 1, then white keys 1, 5, 9, 13
+tapkey b0
+tapkey w0
+tapkey w4
+tapkey w8
+tapkey w12
+expect hit0.0.0 1
+expect hit0.0.12 1
+# 3. a clap: black key 7, white keys 5 and 13
+tapkey b6
+tapkey w4
+tapkey w12
+expect hit0.6.4 1
+expect hit0.6.12 1
+# 4. open hats: black key 9, white keys 3, 7, 11, 15
+tapkey b8
+tapkey w2
+tapkey w6
+tapkey w10
+tapkey w14
+expect hit0.8.2 1
+expect hit0.8.14 1
+# 5. a new 303 line: ALGORITHM two clicks clockwise to 303A, ARP, OCT+
+turn ALGO 2
+expect part 2
+tap ARP
+expect view 2
+tap OCT+
+# 6. shape it: EDIT (FILTER page), KNOB 1 cutoff, KNOB 2 resonance
+tap EDIT
+expect view 1
+turn K1 10
+turn K2 -10
+expect sound2.0.0 58
+expect sound2.0.1 90
+# 7. the break: ALGORITHM two more clicks to BREAK, all sixteen white keys
+turn ALGO 2
+expect part 4
+tapkey w0
+tapkey w1
+tapkey w2
+tapkey w3
+tapkey w4
+tapkey w5
+tapkey w6
+tapkey w7
+tapkey w8
+tapkey w9
+tapkey w10
+tapkey w11
+tapkey w12
+tapkey w13
+tapkey w14
+tapkey w15
+expect brk0 1
+expect brk15 1
+# 8. quiet 303B: HOME, black key 4
+tap HOME
+expect view 0
+tapkey b3
+expect mute 8388608
+# 9. record a filter sweep: ALGORITHM back to 303A, REC, turn KNOB 1, REC
+turn ALGO -2
+expect part 2
+expect view 1
+tap REC
+turn K1 -20
+tap REC
+expect lanes 1
+shot gs_motion.png
+# 10. save
+tap SAVE
+expect store_writes 6

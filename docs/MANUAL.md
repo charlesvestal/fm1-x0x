@@ -12,22 +12,22 @@ FM-1. Nobody has run it on an FM-1 yet.
 ## Contents
 
 1. Install
-2. Controls
-3. The screen
-4. 909 and 808
-5. 303A and 303B
-6. TB-3PO
-7. Break
-8. Patterns
-9. Song
+2. Getting started
+3. Controls
+4. The screen
+5. 909 and 808
+6. 303A and 303B
+7. TB-3PO
+8. Break
+9. Patterns
 10. Recording
 11. Knob motion
-12. Effects
-13. Mix and master
-14. Settings and saving
-15. MIDI
-16. Your own breaks
-17. Update mode and calibration
+12. Song
+13. Effects
+14. Mix and master
+15. Settings and saving
+16. MIDI
+17. Troubleshooting
 18. Parameters
 19. Credits
 
@@ -51,7 +51,33 @@ third-party firmware is at your own risk.
 
 ---
 
-## 2. Controls
+## 2. Getting started
+
+Here's a five-minute tour, from switching on to saving your first beat. When X0X starts,
+the screen shows the 909, the drum patterns are empty, and both 303s already have a line.
+
+1. **Press PLAY.** You hear the two 303s playing their factory lines.
+2. **Add a kick.** Press black key 1 to select the bass drum, then press white keys 1, 5, 9
+   and 13. The kick now plays on every beat.
+3. **Add a clap.** Press black key 7, then white keys 5 and 13.
+4. **Add open hats.** Press black key 9, then white keys 3, 7, 11 and 15.
+5. **Get a new 303 line.** Turn ALGORITHM two clicks clockwise to 303A, press ARP, then press
+   OCT+. Each press writes a new line; keep pressing until you like one.
+6. **Shape the 303.** Press EDIT to show the FILTER page. Turn KNOB 1 to open or close the
+   filter, and KNOB 2 to change the resonance.
+7. **Add the break.** Turn ALGORITHM two more clicks to BREAK, then press all 16 white keys so
+   the break plays the whole bar.
+8. **Quiet the second 303.** Press HOME, then black key 4 to mute 303B.
+9. **Record a filter sweep.** Turn ALGORITHM back to 303A. Press REC, slowly turn KNOB 1 for a
+   bar or two, then press REC again. The sweep now plays every time the pattern comes round.
+10. **Save.** Press SAVE. Everything you've done is kept when you switch off.
+
+From here, Patterns (section 9) explains how to make more patterns and switch between them,
+and Song (section 12) how to arrange them.
+
+---
+
+## 3. Controls
 
 ![The FM-1 (a drawing), running X0X](img/fm1-panel.svg)
 
@@ -92,7 +118,7 @@ actions: press SEL to run them. Before doing anything that would lose notes, X0X
 
 ---
 
-## 3. The screen
+## 4. The screen
 
 The **top line** shows, from left to right:
 
@@ -117,7 +143,7 @@ large type for a second.
 
 ---
 
-## 4. 909 and 808
+## 5. 909 and 808
 
 Each drum machine has eleven tracks, one on each black key:
 
@@ -156,7 +182,7 @@ Press EDIT to step through the selected track's sound settings, followed by thes
 
 ---
 
-## 5. 303A and 303B
+## 6. 303A and 303B
 
 There are two identical 303s. Each has its own sound and its own line.
 
@@ -182,7 +208,7 @@ Press EDIT to step through these pages:
 
 ---
 
-## 6. TB-3PO
+## 7. TB-3PO
 
 TB-3PO writes 303 lines for you. Select a 303 and press ARP.
 
@@ -205,7 +231,7 @@ line, and it is the same line that Schwung's TB-3PO module would write.
 
 ---
 
-## 7. Break
+## 8. Break
 
 The break is a drum loop cut into eight slices, which X0X rearranges as it plays.
 
@@ -230,9 +256,28 @@ These settings are saved with the pattern. The LOOPS page chooses loop A and loo
 a PITCH setting. X0X comes with two loops of its own, 909 GR and 909 FL, played by its 909.
 Loops you upload appear after them. Loops are stretched to fit the tempo.
 
+### Your own breaks
+
+X0X doesn't come with any recorded breaks, but you can load your own. The FM-1 has three
+sample slots of about 7 seconds each. A one-bar loop takes about a third of a slot, so about
+nine loops fit in total. With the FM-1 connected, run:
+
+```
+python3 tools/upload_breaks.py --bars amen.wav think.wav funky.wav ...
+```
+
+The `--bars` option takes one bar from each file; without it, each file is uploaded whole.
+The loops are named BR1.1, BR1.2 and so on, up to BR2.1 and beyond, and they appear after
+X0X's own loops. Uploading to a slot replaces whatever was in it.
+
+To check what will fit without connecting the FM-1, add `--dry-run FOLDER`. If you have
+schwung-breakbeat next to X0X, `--bbgen` uploads BB Gen's classic breaks.
+
+To build loops into the firmware itself instead, see BUILDING.md.
+
 ---
 
-## 8. Patterns
+## 9. Patterns
 
 ![HOME](img/screen-home.png)
 
@@ -270,30 +315,6 @@ the length of a bar, and the 909's pattern sets the swing. Swing delays every se
 note: 50% is straight, and 75% is the most swing.
 
 On HOME, the knobs are TEMPO, SWING, PUMP and CUTOFF.
-
----
-
-## 9. Song
-
-![SONG](img/screen-song.png)
-
-A song is a list of up to 192 bars. Each bar says which pattern each part plays and which
-parts are muted. To open the song, press SEQ on HOME.
-
-- **Write bars:** press a white key. The selected bar gets that pattern for all five parts,
-  and the next bar is selected. Pressing keys at the end of the song adds new bars.
-- **Edit a bar:** turn KNOB 1 to select the bar, then use the other knobs to set each part's
-  pattern for that bar.
-- **Mute parts in a bar:** press black keys 1–5.
-- **Play the song:** set MODE to SONG, either on the second page of the SONG screen or in GLO,
-  then press PLAY. The song starts at the selected bar and loops. While it plays, the top
-  line shows S and the current bar number.
-- **Record the song:** in SONG mode, turn on REC and press PLAY. As it plays, change patterns
-  and mute parts however you like. Each bar is written into the song as it goes by, starting
-  from the bar you started on, and the song grows if you play past its end. Recording
-  replaces what was in those bars before.
-
-Press SEL on the SONG screen for LENGTH, INSERT BAR, DELETE BAR and CLEAR SONG.
 
 ---
 
@@ -337,7 +358,31 @@ top line says MOTION FULL.
 
 ---
 
-## 12. Effects
+## 12. Song
+
+![SONG](img/screen-song.png)
+
+A song is a list of up to 192 bars. Each bar says which pattern each part plays and which
+parts are muted. To open the song, press SEQ on HOME.
+
+- **Write bars:** press a white key. The selected bar gets that pattern for all five parts,
+  and the next bar is selected. Pressing keys at the end of the song adds new bars.
+- **Edit a bar:** turn KNOB 1 to select the bar, then use the other knobs to set each part's
+  pattern for that bar.
+- **Mute parts in a bar:** press black keys 1–5.
+- **Play the song:** set MODE to SONG, either on the second page of the SONG screen or in GLO,
+  then press PLAY. The song starts at the selected bar and loops. While it plays, the top
+  line shows S and the current bar number.
+- **Record the song:** in SONG mode, turn on REC and press PLAY. As it plays, change patterns
+  and mute parts however you like. Each bar is written into the song as it goes by, starting
+  from the bar you started on, and the song grows if you play past its end. Recording
+  replaces what was in those bars before.
+
+Press SEL on the SONG screen for LENGTH, INSERT BAR, DELETE BAR and CLEAR SONG.
+
+---
+
+## 13. Effects
 
 ![FX](img/screen-fx.png)
 
@@ -354,7 +399,7 @@ sends, on that track's own page.
 
 ---
 
-## 13. Mix and master
+## 14. Mix and master
 
 ![MIX, with the compressor pumping](img/screen-mix.png)
 
@@ -386,7 +431,7 @@ prevents clipping; leave it on.
 
 ---
 
-## 14. Settings and saving
+## 15. Settings and saving
 
 ![GLOBAL](img/screen-global.png)
 
@@ -410,7 +455,7 @@ the settings. Anything you haven't saved is lost when you switch the FM-1 off.
 
 ---
 
-## 15. MIDI
+## 16. MIDI
 
 When connected over USB, the FM-1 shows up as a MIDI device called "X0X FM-1".
 
@@ -430,28 +475,7 @@ on the channels above when NOTES OUT is on.
 
 ---
 
-## 16. Your own breaks
-
-X0X doesn't come with any recorded breaks, but you can load your own. The FM-1 has three
-sample slots of about 7 seconds each. A one-bar loop takes about a third of a slot, so about
-nine loops fit in total. With the FM-1 connected, run:
-
-```
-python3 tools/upload_breaks.py --bars amen.wav think.wav funky.wav ...
-```
-
-The `--bars` option takes one bar from each file; without it, each file is uploaded whole.
-The loops are named BR1.1, BR1.2 and so on, up to BR2.1 and beyond, and they appear after
-X0X's own loops. Uploading to a slot replaces whatever was in it.
-
-To check what will fit without connecting the FM-1, add `--dry-run FOLDER`. If you have
-schwung-breakbeat next to X0X, `--bbgen` uploads BB Gen's classic breaks.
-
-To build loops into the firmware itself instead, see BUILDING.md.
-
----
-
-## 17. Update mode and calibration
+## 17. Troubleshooting
 
 **Update mode:** hold OCT- and OCT+ together for five seconds. A countdown appears; let go
 before it ends to cancel.
