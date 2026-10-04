@@ -8,9 +8,9 @@ boots enters UBOOT, which shows up on USB as "WL80UBOOT1.00" (4C4A:8057). macOS 
 disk, upsets it, and it reboots into the crash a few seconds later; this script waits for it,
 takes it away from macOS (hence sudo) and keeps it.
 
-  brew install libusb && pip3 install pyusb
-  sudo python3 fm1_rescue.py FM-1.fwsc            # check and back up, write nothing
-  sudo python3 fm1_rescue.py FM-1.fwsc --write    # then write stock
+  python3 -m venv ~/fm1-rescue && ~/fm1-rescue/bin/pip install pyusb libusb-package
+  sudo ~/fm1-rescue/bin/python fm1_rescue.py FM-1.fwsc            # check and back up, write nothing
+  sudo ~/fm1-rescue/bin/python fm1_rescue.py FM-1.fwsc --write    # then write stock
 
 FM-1.fwsc is M-VAVE's FM-1 V15 (m-vave.com/download, PC Firmware); only that exact file is
 accepted. The protocol and the write policy are FM-1-transporter's (github.com/kurogedelic/
@@ -297,14 +297,21 @@ def get_loader(path):
 
 
 def backend(usb):
-    """libusb, also where sudo's environment cannot point at it (Homebrew's prefixes)"""
+    """libusb: pip's libusb-package (no Homebrew needed), else the system's or Homebrew's"""
+    try:
+        import libusb_package
+        b = libusb_package.get_libusb1_backend()
+        if b is not None:
+            return b
+    except ImportError:
+        pass
     import usb.backend.libusb1 as lb
     for path in (None, "/opt/homebrew/lib/libusb-1.0.dylib", "/usr/local/lib/libusb-1.0.dylib"):
         b = lb.get_backend() if path is None else (lb.get_backend(find_library=lambda _: path)
                                                    if os.path.exists(path) else None)
         if b is not None:
             return b
-    raise Fail("libusb not found: brew install libusb")
+    raise Fail("libusb not found: pip install libusb-package")
 
 
 def open_device(usb, timeout):
@@ -359,7 +366,7 @@ def main():
             import usb.core
             import usb.util
         except ImportError:
-            raise Fail("pyusb is missing: brew install libusb && pip3 install pyusb")
+            raise Fail("pyusb is missing: ~/fm1-rescue/bin/pip install pyusb libusb-package")
         backup_dir = os.path.dirname(os.path.abspath(args.package))
         for attempt in range(1, args.tries + 1):
             bot = open_device(usb, args.wait)
