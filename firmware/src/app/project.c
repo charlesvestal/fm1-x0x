@@ -19,6 +19,7 @@ void project_defaults(void)
     proj.set.palette = 1;                /* amber */
     proj.set.keyled = 1;
     proj.set.keysound = 0;
+    proj.set.autosave_off = 0;
     proj.set.clk_out = 1;
     proj.set.notes_out = 0;
     proj.set.bpm_x10 = 1250;
@@ -33,6 +34,19 @@ void project_defaults(void)
 /* object payload: format word + body */
 static uint8_t io_buf[PLAT_STORE_MAX];
 
+/* what each object last held on the flash (a hash of its payload), so a save writes only the
+ * objects that changed: an autosave usually erases one or two sectors, not six */
+static uint32_t stored_hash[OBJ_NOBJ];
+static uint8_t stored_known[OBJ_NOBJ];
+static uint32_t hash_of(const uint8_t *p, uint32_t n)        /* FNV-1a */
+{
+    uint32_t h = 2166136261u;
+    while (n--)
+        h = (h ^ *p++) * 16777619u;
+    return h;
+}
+
+
 static int load_obj(uint32_t obj, void *dst, uint32_t len)
 {
     int n = plat_store_load(obj, io_buf, sizeof io_buf);
@@ -44,19 +58,45 @@ static int load_obj(uint32_t obj, void *dst, uint32_t len)
         return -1;
     for (i = 0; i < len; i++)
         ((uint8_t *)dst)[i] = io_buf[4u + i];
+    stored_known[obj] = 1;
+    stored_hash[obj] = hash_of(io_buf, len + 4u);
+    return 0;
+}
+
+/* the settings may have grown since they were saved: a shorter payload of this format loads into
+ * the front of dst, and the rest keeps what dst held (zeros: the new settings' defaults) */
+static int load_settings(settings_t *dst)
+{
+    int n = plat_store_load(OBJ_SET, io_buf, sizeof io_buf);
+    uint32_t i;
+    if (n < 20 || (uint32_t)n > sizeof *dst + 4u || io_buf[0] != (uint8_t)PROJ_FORMAT || io_buf[1] || io_buf[2] || io_buf[3])
+        return -1;
+    for (i = 0; i + 4u < (uint32_t)n; i++)
+        ((uint8_t *)dst)[i] = io_buf[4u + i];
+    if ((uint32_t)n == sizeof *dst + 4u) {           /* exactly what a save of these settings writes */
+        stored_known[OBJ_SET] = 1;
+        stored_hash[OBJ_SET] = hash_of(io_buf, (uint32_t)n);
+    }
     return 0;
 }
 
 static int save_obj(uint32_t obj, const void *src, uint32_t len)
 {
-    uint32_t i;
+    uint32_t i, h;
+    int rc;
     if (len + 4u > sizeof io_buf)
         return -1;
     io_buf[0] = (uint8_t)PROJ_FORMAT;
     io_buf[1] = io_buf[2] = io_buf[3] = 0;
     for (i = 0; i < len; i++)
         io_buf[4u + i] = ((const uint8_t *)src)[i];
-    return plat_store_save(obj, io_buf, len + 4u);
+    h = hash_of(io_buf, len + 4u);
+    if (stored_known[obj] && stored_hash[obj] == h)
+        return 0;                                    /* the flash already holds exactly this */
+    rc = plat_store_save(obj, io_buf, len + 4u);
+    stored_known[obj] = rc == 0;
+    stored_hash[obj] = h;
+    return rc;
 }
 
 typedef char pat_fits[(sizeof(pattern_t) * PAT_PER_OBJ + 4u <= PLAT_STORE_MAX) ? 1 : -1];
@@ -78,7 +118,8 @@ int project_load(void)
     int bad = 0, i;
     settings_t set;
     project_defaults();
-    if (load_obj(OBJ_SET, &set, sizeof set) == 0 && set.magic == PROJ_MAGIC)
+    set = proj.set;
+    if (load_settings(&set) == 0 && set.magic == PROJ_MAGIC)
         proj.set = set;
     else
         bad = 1;

@@ -83,7 +83,8 @@ the screen shows the 909, and every part is empty.
    back.
 9. **Record a filter sweep.** Turn ALGORITHM back to 303A. Press REC, slowly turn KNOB 1 for a
    bar or two, then press REC again. The sweep now plays every time the pattern comes round.
-10. **Save.** Press SAVE. Everything you've done is kept when you switch off.
+10. **Save.** Press SAVE. Everything you've done is kept when you switch off. (When the pattern is
+    stopped, X0X also saves by itself after a few seconds; see section 15.)
 
 From here, Patterns (section 9) explains how to make more patterns and switch between them,
 and Song (section 12) how to arrange them.
@@ -462,13 +463,22 @@ Press GLO for these settings:
 | ACCENT | How loud an unaccented drum hit is compared with an accented one. |
 | MODE | PATTERN, or SONG to play the song. |
 | SAVE PROJECT | Saves everything. |
+| AUTOSAVE | ON (the default): while the pattern is stopped, changes are saved by themselves once nothing has been touched for four seconds. OFF: only SAVE saves. |
 | CLEAR PATTERN | Clears all five parts of the current pattern. |
 | FACTORY RESET | Restores the factory sounds and empty patterns, with no song and no knob motion. Your saved project stays in memory until you save over it. |
 | PERFORMANCE | Opens the performance page (below). |
 | ABOUT X0X | Shows the version and the audio load. |
 
 Press **SAVE** to save the sounds, all 16 patterns, the song, the knob motion, the tempo and
-the settings. Anything you haven't saved is lost when you switch the FM-1 off.
+the settings. A small dot at the top right of the screen means there are changes that aren't
+saved yet.
+
+With AUTOSAVE on (the default), you rarely need to: whenever the pattern is stopped and you
+haven't touched anything for four seconds, X0X saves your changes and says AUTOSAVED. It never
+saves while the pattern plays, because writing to the FM-1's memory briefly silences the sound.
+Only the parts that changed are written, so a save is quick. Anything not yet saved is lost when
+you switch the FM-1 off. With AUTOSAVE off, only SAVE saves (turning it off saves once more, so
+the setting is kept).
 
 ### Performance
 

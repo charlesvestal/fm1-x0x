@@ -55,11 +55,26 @@ typedef struct {
     char ask_q[2][28];
     uint32_t frame;
     uint32_t dirty;
+    uint32_t act_t;                    /* the last time anything was touched (autosave waits for quiet) */
+    uint32_t saved_t;                  /* the last autosave */
+    uint8_t last_autosave;             /* AUTOSAVE was just switched off: one more, which keeps that */
     uint8_t outline[232];              /* the break loop's outline */
     uint8_t outline_ok, outline_slot;
     uint8_t song_sel;                  /* the SONG screen's bar */
 } ui_t;
 static ui_t ui;
+
+/* something the project keeps changed: SAVE (or the autosave) has work to do */
+static void mark_dirty(void) { ui.dirty = 1; }
+
+/* the encoders, read for the UI: a turn counts as being touched (the autosave waits for quiet) */
+static int32_t enc(int role)
+{
+    int32_t v = plat_enc(role);
+    if (v)
+        ui.act_t = plat_ms();
+    return v;
+}
 
 /* PERF (the performance screen and its test; see "performance" below) */
 enum { PT_IDLE = -1, PT_DONE = 3 };
@@ -138,7 +153,7 @@ static void say(const char *a, const char *b)
 
 /* =============================================================== param refs === */
 enum { R_NONE, R_ENG, R_SWING, R_DLEN, R_DRATE, R_BLEN, R_BRATE, R_BDIR, R_BTRANS, R_GEN, R_BRKSET,
-       R_BRKSLOT, R_TEMPO, R_ACCENT, R_CLKOUT, R_NOTEOUT, R_PALETTE, R_KEYLED, R_KEYSOUND, R_ACT, R_SBAR, R_SPAT, R_SMODE,
+       R_BRKSLOT, R_TEMPO, R_ACCENT, R_CLKOUT, R_NOTEOUT, R_PALETTE, R_KEYLED, R_KEYSOUND, R_AUTOSAVE, R_ACT, R_SBAR, R_SPAT, R_SMODE,
        R_SLEN, R_STALLS };
 typedef struct { uint8_t kind, a, b, c; } pref_t;
 #define PR(k, a, b, c) ((pref_t){(k), (a), (b), (c)})
@@ -156,13 +171,14 @@ static const x0x_param_t GEN_P[NGEN] = {
     {"MUTATE", 16, 0, 0},
 };
 enum { SQ_SWING, SQ_DLEN, SQ_DRATE, SQ_BLEN, SQ_BRATE, SQ_BDIR, SQ_BTRANS, SQ_TEMPO, SQ_ACCENT, SQ_CLK, SQ_NOTES,
-       SQ_THEME, SQ_KEYLED, SQ_KEYSOUND, NSQ };
+       SQ_THEME, SQ_KEYLED, SQ_KEYSOUND, SQ_AUTOSAVE, NSQ };
 static const char *const KEYSOUND_N[] = {"STOPPED", "ALWAYS"};
 static const x0x_param_t SEQ_P[NSQ] = {
     {"SWING", 100, 0, 0}, {"LENGTH", 31, 15, 0}, {"RATE", 3, 0, RATE_N}, {"LENGTH", 31, 15, 0},
     {"RATE", 3, 0, RATE_N}, {"DIR", 3, 0, DIR_N}, {"TRANSP", 48, 24, 0}, {"TEMPO", 255, 105, 0},
     {"ACCENT", 127, 88, 0}, {"CLOCK OUT", 1, 1, ONOFF_N}, {"NOTES OUT", 1, 0, ONOFF_N}, {"THEME", 4, 1, THEME_N},
     {"KEY LIGHTS", 1, 1, ONOFF_N}, {"KEY SOUND", 1, 0, KEYSOUND_N},
+    {"AUTOSAVE", 1, 1, ONOFF_N},
 };
 static const x0x_param_t ACT_P[] = {
     {"", 0, 0, 0}, {"SAVE PROJECT", 0, 0, 0}, {"CLEAR THIS PART", 0, 0, 0}, {"CLEAR PATTERN", 0, 0, 0},
@@ -220,6 +236,7 @@ static const x0x_param_t *pref_desc(pref_t r)
     case R_PALETTE: return &SEQ_P[SQ_THEME];
     case R_KEYLED: return &SEQ_P[SQ_KEYLED];
     case R_KEYSOUND: return &SEQ_P[SQ_KEYSOUND];
+    case R_AUTOSAVE: return &SEQ_P[SQ_AUTOSAVE];
     case R_ACT: return &ACT_P[r.a];
     case R_SBAR: {
         static x0x_param_t d = {"BAR", 0, 0, 0};
@@ -268,6 +285,7 @@ static int pref_get(pref_t r)
     case R_PALETTE: return proj.set.palette;
     case R_KEYLED: return proj.set.keyled;
     case R_KEYSOUND: return proj.set.keysound;
+    case R_AUTOSAVE: return !proj.set.autosave_off;
     case R_SBAR: return ui.song_sel;
     case R_SPAT: {
         const song_t *sg = song();
@@ -288,7 +306,7 @@ static void pref_set(pref_t r, int v)
     if (!d || r.kind == R_ACT)
         return;
     v = v < 0 ? 0 : v > d->max ? d->max : v;
-    ui.dirty = 1;
+    mark_dirty();
     switch (r.kind) {
     case R_ENG:
         proj.sound.v[r.a][r.b][r.c] = (uint8_t)v;
@@ -333,6 +351,7 @@ static void pref_set(pref_t r, int v)
     case R_PALETTE: proj.set.palette = (uint8_t)v; palette_set((uint32_t)v); break;
     case R_KEYLED: proj.set.keyled = (uint8_t)v; break;
     case R_KEYSOUND: proj.set.keysound = (uint8_t)v; break;
+    case R_AUTOSAVE: proj.set.autosave_off = (uint8_t)!v; ui.last_autosave = (uint8_t)!v; break;
     case R_SBAR: ui.song_sel = (uint8_t)v; break;
     case R_SPAT:
         song_fill(ui.song_sel);
@@ -643,6 +662,7 @@ static void open_global(void)
     list_add(PR(R_ACCENT, 0, 0, 0));
     list_add(PR(R_SMODE, 0, 0, 0));
     list_add(PR(R_ACT, ACT_SAVE, 0, 0));
+    list_add(PR(R_AUTOSAVE, 0, 0, 0));
     list_add(PR(R_ACT, ACT_CLEAR_PAT, 0, 0));
     list_add(PR(R_ACT, ACT_RESET, 0, 0));
     list_add(PR(R_ACT, ACT_PERF, 0, 0));
@@ -964,7 +984,7 @@ static void run_action(int act, int arg)
     case ACT_CLEAR_PART:
         clear_part(pat_of(arg), arg);
         clear_lanes(seq.ppat[arg], arg);
-        ui.dirty = 1;
+        mark_dirty();
         say("CLEARED ", PART_N[arg]);
         break;
     case ACT_CLEAR_PAT: {
@@ -973,7 +993,7 @@ static void run_action(int act, int arg)
             clear_part(pat_of(i), i);
             clear_lanes(seq.ppat[i], i);
         }
-        ui.dirty = 1;
+        mark_dirty();
         say("PATTERN CLEARED", 0);
         break;
     }
@@ -982,7 +1002,7 @@ static void run_action(int act, int arg)
         for (i = 0; i < NPARTS; i++)
             if ((part < 0 || i == part) && seq.ppat[i] != dst)
                 rc |= copy_part(dst, seq.ppat[i], i);
-        ui.dirty = 1;
+        mark_dirty();
         put_i(put_s(t, part < 0 ? "COPIED TO P" : "PART COPIED TO P"), dst + 1);
         say(rc ? "MOTION FULL: NOT ALL COPIED" : t, 0);
         break;
@@ -1002,14 +1022,14 @@ static void run_action(int act, int arg)
                 sg->bar[i] = sg->bar[i + 1];
             sg->len--;
         }
-        ui.dirty = 1;
+        mark_dirty();
         say(act == ACT_SONG_INS ? "BAR INSERTED" : "BAR DELETED", 0);
         break;
     }
     case ACT_SONG_CLR:
         song()->len = 0;
         ui.song_sel = 0;
-        ui.dirty = 1;
+        mark_dirty();
         say("SONG CLEARED", 0);
         break;
     case ACT_RESET:
@@ -1017,7 +1037,7 @@ static void run_action(int act, int arg)
         engine_apply_sound(&proj.sound);
         engine_brk_loops();
         palette_set(proj.set.palette);
-        ui.dirty = 1;
+        mark_dirty();
         ui.outline_ok = 0;
         say("FACTORY SOUND + PATTERNS", 0);
         break;
@@ -1091,7 +1111,7 @@ static void motion_forget(pref_t r)
     }
     motion_clear(proj.arr.lane, k);
     engine_set(r.a, r.b, r.c, proj.sound.v[r.a][r.b][r.c]);
-    ui.dirty = 1;
+    mark_dirty();
     say("MOTION CLEARED: ", pref_name(r));
 }
 
@@ -1147,7 +1167,7 @@ static void drum_key(int v, int down)
         cur_pat()->drum[k].hit[v] |= 1u << s;
         if (ui.btn & (1u << B_ENV))
             cur_pat()->drum[k].accent |= 1u << s;
-        ui.dirty = 1;
+        mark_dirty();
     }
 }
 
@@ -1163,7 +1183,7 @@ static void drum_step(int white)
     } else {
         d->hit[ui.sel[k]] ^= 1u << s;
     }
-    ui.dirty = 1;
+    mark_dirty();
 }
 
 static int kbd_note(int k) { return 41 + k + 12 * ui.oct; }
@@ -1186,7 +1206,7 @@ static void bass_write(int b, int note, int gate)
     }
     bp->step[w].flags = f;
     ui.wpos[b] = (uint8_t)((w + 1) % len);
-    ui.dirty = 1;
+    mark_dirty();
 }
 
 static uint8_t kbd_held_note[NBASS];
@@ -1203,7 +1223,7 @@ static void bass_kbd(int key, int down)
             int s = rec_step(TRK_BASS0 + b);
             bp->step[s].note = (uint8_t)n;
             bp->step[s].flags = (uint8_t)(G_NOTE | ((ui.btn & (1u << B_ENV)) ? BS_ACCENT : 0));
-            ui.dirty = 1;
+            mark_dirty();
         }
     } else if (kbd_held_note[b] == n) {
         engine_bass_off(b);
@@ -1225,7 +1245,7 @@ static void bass_step_key(int white, int down)
     } else if (ui.held_step == s) {
         if (!ui.step_edited) {
             bp->step[s].flags = bstep_gate(&bp->step[s]) == G_REST ? G_NOTE : G_REST;
-            ui.dirty = 1;
+            mark_dirty();
         }
         engine_bass_off(b);
         ui.held_step = -1;
@@ -1279,7 +1299,7 @@ static void key_event(int k, int down)
         } else {
             song()->bar[k].mute ^= (uint8_t)(1u << bl);
         }
-        ui.dirty = 1;
+        mark_dirty();
         return;
     }
     if (w >= 0 && (ui.view == V_HOME || (ui.btn & (1u << B_HOME)))) {
@@ -1329,7 +1349,7 @@ static void key_event(int k, int down)
             engine_brk_live(bl, down);
         else if (down && w >= 0) {
             cur_pat()->brk.steps ^= 1u << w;
-            ui.dirty = 1;
+            mark_dirty();
         }
     }
 }
@@ -1493,7 +1513,7 @@ static void button_tap(int b)
                 tb3po_mutate(bp, &r);
                 say("MUTATED", 0);
             }
-            ui.dirty = 1;
+            mark_dirty();
         } else if (is_303() && ui.kbd[bidx()]) {
             if (ui.btn & (1u << B_LFO)) {
                 ui.btn_used |= 1u << B_LFO;
@@ -1532,6 +1552,8 @@ static void input(void)
             button_tap((int)i);
         }
     }
+    if (btn || keys || btn != ui.btn || keys != ui.keys)
+        ui.act_t = plat_ms();                         /* held or changed: being played */
     ui.btn = btn;
     ch = keys ^ ui.keys;
     ui.keys = keys;
@@ -1542,22 +1564,22 @@ static void input(void)
     seq.song_rec = (uint8_t)(seq.song_on && ui.rec);  /* SONG mode + REC: the song is being written */
     if (ui.overlay == O_ASK) {                         /* a question: the knobs wait */
         for (i = 0; i < NE; i++)
-            plat_enc((int)i);
+            enc((int)i);
         return;
     }
     if (perf_testing()) {                              /* the test owns the knobs too */
         for (i = 0; i < NE; i++)
-            plat_enc((int)i);
+            enc((int)i);
         return;
     }
-    if ((e = plat_enc(EN_SELECT)) != 0) {             /* SELECT: move; with HOME held: tempo */
+    if ((e = enc(EN_SELECT)) != 0) {             /* SELECT: move; with HOME held: tempo */
         if (ui.btn & (1u << B_HOME)) {
             float bpm = seq.bpm + (float)accel(EN_SELECT, e, 200);
             seq.bpm = bpm < 20.0f ? 20.0f : bpm > 275.0f ? 275.0f : bpm;
             ui.btn_used |= 1u << B_HOME;
             ui.touched = 4;
             ui.touch_until = plat_ms() + 900u;
-            ui.dirty = 1;
+            mark_dirty();
         } else if (ui.overlay == O_LIST) {
             list_move(e > 0 ? 1 : -1);
         } else {
@@ -1565,7 +1587,7 @@ static void input(void)
             ui.page[ui.view][ui.part] = (uint8_t)(p < 0 ? 0 : p >= pg.n ? pg.n - 1 : p);
         }
     }
-    if ((e = plat_enc(EN_ALGO)) != 0) {               /* ALGORITHM: the part; in a list, the value */
+    if ((e = enc(EN_ALGO)) != 0) {               /* ALGORITHM: the part; in a list, the value */
         if (ui.overlay == O_LIST) {
             turn_ref(list_rows[ui.list_sel], e, EN_ALGO);
         } else {
@@ -1577,7 +1599,7 @@ static void input(void)
             build_pages();
         }
     }
-    if ((e = plat_enc(EN_PRESET)) != 0) {             /* PRESETS: a part's screen, that part; else all five */
+    if ((e = enc(EN_PRESET)) != 0) {             /* PRESETS: a part's screen, that part; else all five */
         int part = part_view() ? ui.part : PART_909, c = seq_cue_of(&seq, part);
         int p = (c >= 0 ? c : seq.ppat[part]) + (e > 0 ? 1 : -1);
         p = p < 0 ? 0 : p >= NPAT ? NPAT - 1 : p;
@@ -1588,13 +1610,13 @@ static void input(void)
             seq_cue(&seq, p);
     }
     for (i = 0; i < 4; i++) {
-        if ((e = plat_enc(EN_K1 + (int)i)) == 0)
+        if ((e = enc(EN_K1 + (int)i)) == 0)
             continue;
         if (ui.view == V_PART && is_303() && ui.held_step >= 0) {     /* a held step's knobs edit it */
             bpart_t *bp = &cur_pat()->bass[bidx()];
             bstep_t *st = &bp->step[ui.held_step];
             ui.step_edited = 1;
-            ui.dirty = 1;
+            mark_dirty();
             if (i == 0) {
                 int n = st->note + e;
                 st->note = (uint8_t)(n < 12 ? 12 : n > 108 ? 108 : n);
@@ -2747,10 +2769,30 @@ void ui_init(void)
     build_pages();
 }
 
+/* AUTOSAVE: changes are saved by themselves while the pattern is stopped and nothing has been touched
+ * for AUTOSAVE_QUIET ms, at most every AUTOSAVE_GAP ms. Stopped only: a flash erase silences the
+ * audio. Only the objects that changed are written (project.c), usually one or two sectors. */
+#define AUTOSAVE_QUIET 4000u
+#define AUTOSAVE_GAP 20000u
+static void autosave(void)
+{
+    uint32_t now = plat_ms();
+    if (!ui.dirty || (proj.set.autosave_off && !ui.last_autosave) || seq.playing || seq.req_stop || ui.rec || perf_testing() ||
+        ui.overlay == O_ASK || now - ui.act_t < AUTOSAVE_QUIET || (ui.saved_t && now - ui.saved_t < AUTOSAVE_GAP))
+        return;
+    ui.saved_t = now;
+    ui.last_autosave = 0;
+    if (project_save() == 0) {
+        ui.dirty = 0;
+        say("AUTOSAVED", 0);
+    }
+}
+
 void ui_frame(void)
 {
     uint32_t i;
     input();
+    autosave();
     perf_test_tick();
     if (ui.view == V_PERF && !perf_testing())
         perf_window(0);

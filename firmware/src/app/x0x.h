@@ -23,6 +23,8 @@ typedef struct {
     uint8_t palette, keyled, clk_out, notes_out;
     uint16_t bpm_x10;
     uint8_t accent_q7, keysound;         /* black drum keys sound: 0 = only when stopped or recording, 1 = always */
+    uint8_t autosave_off;                /* 0: save by itself while stopped and idle (ui.c autosave) */
+    uint8_t rsv[7];                      /* room to grow: an older, shorter object loads (zeros here) */
 } settings_t;
 
 /* the song and the motion lanes: one blob, split across OBJ_SONG and OBJ_MOTION */
