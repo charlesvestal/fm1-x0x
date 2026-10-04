@@ -7,8 +7,11 @@
  * while the last strip of a frame goes out. */
 /* pins and SPI1: hal/fm1_lcd_hw.h */
 #ifndef LCD_BAUD
-#define LCD_BAUD 1u                /* lsb/(BAUD+1): 1 = 30 MHz (Felucca: 4 = 12 MHz, a 240x72 strip took 23 ms,
-                                    * longer than the panel's 16.7 ms refresh: tearing). ST7789: <= ~62 MHz */
+#define LCD_BAUD 0u                /* lsb/(BAUD+1): 0 = 60 MHz (~44 MHz effective, measured). Felucca's
+                                    * 4 (12 MHz) took 23 ms for a 240x72 strip, longer than the panel's
+                                    * 16.7 ms refresh: tearing. ST7789: <= ~62 MHz. The FM-1 has no TE
+                                    * line; the panel's scanline can be read (RDSCL on the data wire), but
+                                    * timing writes to it did not stop the tearing on hardware. */
 #endif
 
 static uint8_t lcd_small[64];

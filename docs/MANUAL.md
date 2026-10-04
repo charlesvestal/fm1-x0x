@@ -47,13 +47,13 @@ cable, open the page and press Install. Don't unplug the cable while it's writin
 finishes, the FM-1 restarts into X0X.
 
 You can also install from the command line. Download the firmware file (for example
-`x0x-0.7-beta.fwsc`) from the
+`x0x-0.8-beta.fwsc`) from the
 [releases page](https://github.com/charlesvestal/fm1-x0x/releases), get the X0X source code from
 GitHub, install Python 3 with the `mido` and `python-rtmidi` packages
 (`pip3 install mido python-rtmidi`), and run:
 
 ```
-python3 tools/fm1_install.py x0x-0.7-beta.fwsc
+python3 tools/fm1_install.py x0x-0.8-beta.fwsc
 ```
 
 Note that the web installer on hugelton.github.io installs Felucca, not X0X.
