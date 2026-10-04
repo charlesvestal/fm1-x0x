@@ -55,6 +55,21 @@ class X0X extends AudioWorkletProcessor {
       this.ex.web_enc(m.role, m.n | 0);
     } else if (m.type === "master") {
       this.ex.web_master(m.value | 0);
+    } else if (m.type === "slot") {                // a user break slot: {k, name, zones: [{pcm, rate}]}
+      const ex = this.ex, name = new Uint8Array(this.mem.buffer, ex.web_slot_namebuf(), 9);
+      name.fill(0);
+      const nm = (m.name || "").slice(0, 8);         // (no TextEncoder in an AudioWorklet)
+      for (let i = 0; i < nm.length; i++) name[i] = nm.charCodeAt(i) & 0x7F;
+      ex.web_slot_clear(m.k);
+      let used = 0;
+      const max = ex.web_slot_max();
+      (m.zones || []).forEach((zn, z) => {
+        const n = Math.min(zn.pcm.length, max - used);
+        if (n <= 0) return;
+        new Int16Array(this.mem.buffer, ex.web_slot_pcm(), n).set(zn.pcm.subarray(0, n));
+        if (ex.web_slot_zone(m.k, z, n, zn.rate) === 0) used += n;
+      });
+      ex.web_slots_changed();
     }
   }
 

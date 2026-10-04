@@ -49,6 +49,19 @@ a { color: var(--accent); }
 .bar { display: flex; flex-wrap: wrap; gap: .5rem 1.2rem; align-items: center; margin: .9rem 0 0; color: var(--muted); font-size: .92rem; }
 .bar button { font: inherit; color: var(--ink); background: var(--card); border: 1px solid var(--rule); border-radius: 8px; padding: .3em .8em; cursor: pointer; }
 .bar .cpu { font-variant-numeric: tabular-nums; }
+.breaks { margin: 1.6rem 0 0; }
+.breaks h2, .help h2 { font: 600 1.1rem "Barlow Semi Condensed", "Barlow", sans-serif; margin: 0 0 .3rem; }
+.breaks > p { margin: 0 0 .8rem; color: var(--muted); max-width: 70ch; }
+.slots { display: grid; gap: .5rem; }
+.slot { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem 1rem; padding: .55rem .8rem; border: 1px solid var(--rule);
+        border-radius: 8px; background: var(--card); }
+.slot.over { border-color: var(--accent); }
+.slot b { font-weight: 600; min-width: 3.5rem; }
+.slot .sname { flex: 1 1 12rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.slot .sname strong { color: var(--ink); font-weight: 600; }
+.slot label, .slot button { font: inherit; font-size: .92rem; color: var(--ink); background: transparent; border: 1px solid var(--rule);
+        border-radius: 8px; padding: .25em .8em; cursor: pointer; }
+.slot input[type=file] { display: none; }
 .help { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1rem 2rem; margin: 1.6rem 0 0; }
 .help h2 { font: 600 1.1rem "Barlow Semi Condensed", "Barlow", sans-serif; margin: 0 0 .3rem; }
 .help p, .help ul { margin: 0; color: var(--muted); max-width: 60ch; }
@@ -76,6 +89,15 @@ kbd { font: 600 .85em ui-monospace, Menlo, monospace; background: var(--card); b
   <span class="cpu" id="cpu"></span>
   <button id="reset" type="button" title="Forget the saved patterns and sound, and start again from the factory settings">Factory reset</button>
 </div>
+
+<section class="breaks" aria-labelledby="breaks-h">
+  <h2 id="breaks-h">Your breaks</h2>
+  <p>Load your own loops into the three slots, as you would upload them to the FM-1: one file per
+    loop (WAV, AIFF or MP3), up to 16 in a slot, about 7 seconds per slot. X0X works out whether a
+    loop is 1, 2 or 4 bars. To play one, choose BREAK with ALGORITHM, press EDIT until the LOOPS page,
+    and turn KNOB 1. Your loops stay in this browser.</p>
+  <div class="slots" id="slots"></div>
+</section>
 
 <section class="help">
   <div>
@@ -361,6 +383,101 @@ function saveStore(store) {
   } catch { /* storage unavailable: this session only */ }
 }
 
+// ---------------------------------------------------------------- your breaks
+// A file becomes mono 22050 Hz 16-bit here (the browser decodes and resamples it), peak 0.95 as
+// tools/import_breaks.py leaves it, and goes to the worklet, which IMA-encodes it into the slot as
+// an upload to the FM-1 would. Slots are kept in IndexedDB (they are too big for localStorage).
+const SLOT_RATE = 22050, SLOT_MAX = 2 * (0x14000 - 512), SLOT_ZONES = 16;
+const slots = [null, null, null];                 // {name, zones: [{pcm: Int16Array, rate}]}
+function idb() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open("x0x-emu", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("slots");
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+async function slotsLoad() {
+  try {
+    const db = await idb();
+    await Promise.all([0, 1, 2].map((k) => new Promise((res) => {
+      const q = db.transaction("slots").objectStore("slots").get(k);
+      q.onsuccess = () => { if (q.result) slots[k] = { name: q.result.name, zones: q.result.zones.map((z) => ({ pcm: new Int16Array(z.pcm), rate: z.rate })) }; res(); };
+      q.onerror = () => res();
+    })));
+  } catch { /* no IndexedDB: this session only */ }
+}
+async function slotSave(k) {
+  try {
+    const db = await idb(), st = db.transaction("slots", "readwrite").objectStore("slots");
+    if (slots[k]) st.put({ name: slots[k].name, zones: slots[k].zones.map((z) => ({ pcm: z.pcm.buffer.slice(0), rate: z.rate })) }, k);
+    else st.delete(k);
+  } catch { /* this session only */ }
+}
+function slotSend(k) { send({ type: "slot", k, name: slots[k] ? slots[k].name : "", zones: slots[k] ? slots[k].zones : [] }); }
+async function decode(file) {
+  const ctx = new OfflineAudioContext(1, 1, SLOT_RATE);
+  const buf = await ctx.decodeAudioData(await file.arrayBuffer());
+  const off = new OfflineAudioContext(1, Math.max(1, Math.ceil(buf.duration * SLOT_RATE)), SLOT_RATE);
+  const src = off.createBufferSource();
+  src.buffer = buf;
+  src.connect(off.destination);
+  src.start();
+  const x = (await off.startRendering()).getChannelData(0);
+  let pk = 1e-9;
+  for (const v of x) pk = Math.max(pk, Math.abs(v));
+  const g = 0.95 / pk, pcm = new Int16Array(x.length);
+  for (let i = 0; i < x.length; i++) pcm[i] = Math.round(Math.max(-1, Math.min(1, x[i] * g)) * 32767);
+  return pcm;
+}
+const slotName = (file) => (file.name.replace(/\.[^.]*$/, "").toUpperCase().replace(/[^A-Z0-9]/g, "") || "LOOP").slice(0, 8);
+async function slotFill(k, files) {
+  files = [...files].filter((f) => f && f.size).slice(0, SLOT_ZONES);
+  if (!files.length) return;
+  const row = document.querySelectorAll(".slot")[k];
+  row.querySelector(".sname").textContent = "Reading...";
+  const zones = [];
+  let used = 0, skipped = 0;
+  for (const f of files) {
+    try {
+      const pcm = await decode(f);
+      if (used + pcm.length > SLOT_MAX) { skipped++; continue; }
+      zones.push({ pcm, rate: SLOT_RATE });
+      used += pcm.length;
+    } catch { skipped++; }
+  }
+  slots[k] = zones.length ? { name: slotName(files[0]), zones } : null;
+  slotDraw(k, skipped);
+  slotSend(k);
+  slotSave(k);
+}
+function slotDraw(k, skipped = 0) {
+  const row = document.querySelectorAll(".slot")[k], s = slots[k], n = row.querySelector(".sname");
+  if (!s) { n.textContent = skipped ? "Could not read that file" : "Empty"; return; }
+  const sec = s.zones.reduce((a, z) => a + z.pcm.length, 0) / SLOT_RATE;
+  n.innerHTML = "";
+  const b = document.createElement("strong");
+  b.textContent = s.name;
+  n.append(b, ` · ${s.zones.length} loop${s.zones.length > 1 ? "s" : ""} · ${sec.toFixed(1)} of ${(SLOT_MAX / SLOT_RATE).toFixed(1)} s` +
+           (skipped ? ` · ${skipped} did not fit or could not be read` : ""));
+}
+(function slotsUi() {
+  const box = document.getElementById("slots");
+  for (let k = 0; k < 3; k++) {
+    const row = document.createElement("div");
+    row.className = "slot";
+    row.innerHTML = `<b>Slot ${k + 1}</b><span class="sname">Empty</span>` +
+      `<label>Choose files<input type="file" multiple accept="audio/*,.wav,.aif,.aiff,.mp3,.flac"></label><button type="button">Clear</button>`;
+    row.querySelector("input").addEventListener("change", (e) => { slotFill(k, e.target.files); e.target.value = ""; });
+    row.querySelector("button").addEventListener("click", () => { slots[k] = null; slotDraw(k); slotSend(k); slotSave(k); });
+    row.addEventListener("dragover", (e) => { e.preventDefault(); row.classList.add("over"); });
+    row.addEventListener("dragleave", () => row.classList.remove("over"));
+    row.addEventListener("drop", (e) => { e.preventDefault(); row.classList.remove("over"); slotFill(k, e.dataTransfer.files); });
+    box.appendChild(row);
+  }
+  slotsLoad().then(() => [0, 1, 2].forEach((k) => slotDraw(k)));
+})();
+
 // ---------------------------------------------------------------- switching on
 const status = document.getElementById("status"), cpu = document.getElementById("cpu");
 async function switchOn() {
@@ -388,6 +505,7 @@ async function switchOn() {
     });
     node.port.postMessage({ type: "load", wasm, store: loadStore(), master }, [wasm]);
     await ready;
+    [0, 1, 2].forEach((k) => { if (slots[k]) slotSend(k); });   // the loops kept in this browser
     await ac.resume();
     document.getElementById("start").hidden = true;
     status.textContent = ac.sampleRate === 44100 ? "On." : `On (the browser runs audio at ${ac.sampleRate} Hz).`;

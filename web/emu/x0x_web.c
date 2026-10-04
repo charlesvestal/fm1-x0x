@@ -73,3 +73,48 @@ __attribute__((used, visibility("default"))) void web_store_set_len(uint32_t obj
 __attribute__((used, visibility("default"))) uint32_t web_store_writes(void) { return store_writes; }
 __attribute__((used, visibility("default"))) uint32_t web_nobj(void) { return OBJ_NOBJ; }
 __attribute__((used, visibility("default"))) uint32_t web_store_max(void) { return PLAT_STORE_MAX; }
+
+/* user break slots (the BREAK part's own loops, as tools/upload_breaks.py puts them on the FM-1):
+ * the page decodes a file to mono 22050 Hz 16-bit into web_slot_pcm and hands it over one loop
+ * (zone) at a time; it is IMA-encoded here exactly as the simulator's "slot" command does. A slot
+ * holds what 80 KiB of flash holds on the device, all its loops together. */
+#define WEB_SLOT_MAX (2u * (0x14000u - 512u))
+static int16_t web_pcm[WEB_SLOT_MAX];
+static char web_name[9];
+__attribute__((used, visibility("default"))) int16_t *web_slot_pcm(void) { return web_pcm; }
+__attribute__((used, visibility("default"))) uint32_t web_slot_max(void) { return WEB_SLOT_MAX; }
+__attribute__((used, visibility("default"))) char *web_slot_namebuf(void) { return web_name; }
+__attribute__((used, visibility("default"))) void web_slot_clear(int k)
+{
+    int z;
+    if (k < 0 || k >= PLAT_NSLOTS)
+        return;
+    for (z = 0; z < PLAT_SLOT_ZONES; z++) {
+        free(slot_data[k][z]);
+        slot_data[k][z] = 0;
+        slot_n[k][z] = 0;
+    }
+    slot_nz[k] = 0;
+    slot_is_img[k] = 0;
+    web_name[8] = 0;
+    memcpy(slot_name[k], web_name, 9);                /* the name the page put in web_slot_namebuf */
+}
+/* loop z of slot k from the first n samples of web_slot_pcm: 0 = kept */
+__attribute__((used, visibility("default"))) int web_slot_zone(int k, int z, uint32_t n, uint32_t rate)
+{
+    if (k < 0 || k >= PLAT_NSLOTS || z < 0 || z >= PLAT_SLOT_ZONES || !n)
+        return -1;
+    if (n > WEB_SLOT_MAX)
+        n = WEB_SLOT_MAX;
+    free(slot_data[k][z]);
+    if (!(slot_data[k][z] = calloc(1, (n + 1) / 2 + 1)))
+        return -1;
+    ima_encode(web_pcm, n, slot_data[k][z]);
+    slot_n[k][z] = n;
+    slot_rate[k][z] = rate;
+    if (z + 1 > slot_nz[k])
+        slot_nz[k] = z + 1;
+    return 0;
+}
+/* the slots changed: the break part reloads its loops (and the LOOPS page's names) */
+__attribute__((used, visibility("default"))) void web_slots_changed(void) { engine_brk_loops(); }
