@@ -53,8 +53,8 @@ python3 tools/fm1_install.py x0x-0.3-beta.fwsc
 
 Note that the web installer on hugelton.github.io installs Felucca, not X0X.
 
-To go back to the original firmware, use M-VAVE's own updater. If an install is interrupted
-and the FM-1 won't start, Felucca's FM-1-transporter can still reach it. Installing
+To go back to the original firmware, use M-VAVE's own updater. If the FM-1 no longer starts,
+see [Recovering an FM-1 that won't start](#recovering-an-fm-1-that-won-t-start). Installing
 third-party firmware is at your own risk.
 
 ---
@@ -507,6 +507,36 @@ before it ends to cancel.
 
 **Calibration:** if a button or knob does the wrong thing, hold OCT- and OCT+ while you switch
 the FM-1 on. The screen then asks you to press each button and turn each knob in turn.
+
+### Recovering an FM-1 that won't start
+
+If the FM-1 crashes every time it starts (X0X 0.2-beta did: the X0X screen, a red X0X CRASH
+screen, then a blank screen), the web installer and M-VAVE's updater can't see it. After two
+crashes in a row it goes into the chip's own update mode, which they don't use. A script can put
+M-VAVE's stock firmware back from there, on a Mac, with the USB cable you already have:
+
+Open Terminal, paste this line and press Return:
+
+```
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/charlesvestal/fm1-x0x/main/tools/fm1_rescue.sh)"
+```
+
+1. If a window asks to install the command line developer tools, click Install. When it has
+   finished, paste the line again.
+2. If it asks for a password, type your Mac password (nothing shows as you type) and press Return.
+3. When it says it's waiting, plug the FM-1 in and switch it on. It crashes and goes blank, and
+   the script catches it. It checks the chip, saves a backup of the FM-1's memory in the
+   `fm1-rescue` folder in your home folder, and asks before it writes anything.
+4. Type **yes** and press Return. Don't unplug anything until it says it's restarting the FM-1.
+   The FM-1 then starts into its original firmware, and you can install X0X again from there.
+
+The script downloads M-VAVE's FM-1 V15 firmware and JieLi's flash loader, and checks both against
+known fingerprints. It writes only the firmware area of the memory, never the bootloader or the
+FM-1's own settings, and checks everything it writes. Running it again is always safe. If it fails,
+copy everything in the Terminal window and
+[open an issue](https://github.com/charlesvestal/fm1-x0x/issues). If the FM-1 never shows up at
+all, Felucca's [FM-1-transporter](https://github.com/kurogedelic/FM-1-transporter) (a small
+RP2040 board wired to the USB lines) can still reach it.
 
 ---
 

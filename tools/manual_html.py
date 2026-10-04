@@ -86,6 +86,7 @@ def inline(t):
     t = html.escape(t, quote=False)
     t = re.sub(r"`([^`]+)`", r"<code>\1</code>", t)
     t = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", t)
+    t = re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", lambda m: f'<a href="{m.group(2)}">{m.group(1)}</a>', t)
     for name, col in PART_COLOURS.items():          # a part named at the start of a table cell gets its swatch
         t = re.sub(rf"^<strong>{name}</strong>", f'<span class="swatch" style="background:{col}"></span><strong>{name}</strong>', t)
     return t
@@ -151,7 +152,7 @@ def convert(md):
             else:
                 out.append(f'<h2 id="{slug(t)}">{inline(t)}</h2>')
         elif ln.startswith("### "):
-            out.append(f"<h3>{inline(ln[4:])}</h3>")
+            out.append(f'<h3 id="{slug(ln[4:])}">{inline(ln[4:])}</h3>')
         elif ln.strip() == "---":
             if contents:
                 out.append("</nav>")
