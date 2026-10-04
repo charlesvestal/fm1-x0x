@@ -64,6 +64,7 @@ static void audio_silence(void)                     /* IRQs off (flash erase): t
 }
 
 /* ------------------------------------------------------------ timer --- */
+static uint8_t usb_due;
 void fm1_timer5_irq(void)
 {
     static uint32_t sub;
@@ -72,8 +73,15 @@ void fm1_timer5_irq(void)
     if (x0x_dbg.in_audio)
         x0x_dbg.nested++;
     fm1_input_tick();
+    /* 2 kHz: all USB SIE traffic lives here. This ISR now nests into the audio render (so the key
+     * matrix keeps its rhythm, below); USB shares the MIDI queues with the audio ISR, so a poll that
+     * falls inside the render waits for the first tick outside it, as it did before the nesting. */
     if (sub % 5u == 0u)
-        usb_poll();                                 /* 2 kHz: all USB SIE traffic lives here */
+        usb_due = 1;
+    if (usb_due && !x0x_dbg.in_audio) {
+        usb_due = 0;
+        usb_poll();
+    }
     if (++sub == 10u)
         sub = 0;
     {
@@ -247,7 +255,11 @@ static void fm1_main(void)
     engine_brk_loops();
     audio_init();
     usb_start();
-    fm1_timer5_start(isr_timer5, 1);                /* below ALNK0 (3): no nesting into audio */
+    /* above ALNK0 (3): the key / encoder / LED matrix is scanned one column per tick and must keep
+     * its rhythm. Below the audio (as Felucca has it), a render that takes most of its 5.8 ms half
+     * buffer stopped the scan for milliseconds: fast encoder turns lost their steps, and the column
+     * lit when the render began stayed lit through it, so the LEDs flickered with the audio load. */
+    fm1_timer5_start(isr_timer5, 4);
     fm1_guard_lock_top();
     fm1_irq_enable_all();
     fm1_delay_ms(30);
