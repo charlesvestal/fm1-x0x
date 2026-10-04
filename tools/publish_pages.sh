@@ -8,6 +8,7 @@ cd "$(dirname "$0")/.."
 V="${1:?usage: tools/publish_pages.sh VERSION}"
 PKG="build/x0x-$V.fwsc"
 [ -f "$PKG" ] || { echo "no $PKG: run ./build.sh --release $V first"; exit 1; }
+sh web/emu/build.sh
 python3 tools/make_pages.py "$PKG" "$V" build/pages
 REMOTE="$(git remote get-url origin)"
 SHA="$(git rev-parse --short HEAD)"

@@ -3,6 +3,7 @@
 """Make the X0X site for GitHub Pages (https://charlesvestal.github.io/fm1-x0x/):
 
   index.html                  what X0X is, and the three ways in: install, manual, source
+  emu/                        X0X in the browser (web/emu: build/emu, from web/emu/build.sh)
   install/index.html          the web installer (web/x0x_installer.html, with fm1pkg.js, fm1ota.js
                               and the package's metadata inlined; Chrome or Edge, Web MIDI)
   manual/index.html, img/     the manual (tools/manual_html.py, from docs/MANUAL.md)
@@ -68,6 +69,7 @@ recorded knob moves.</p>
 It runs in a simulator using the same code, and it installs and uninstalls the way Felucca does,
 but the first people to install it are the first test. Installing is at your own risk.</div>
 <nav class="ways" aria-label="Get X0X">
+  <a href="emu/"><strong>Try it in the browser</strong><span>The same code the FM-1 runs, with sound. Mouse, touch or keyboard; no FM-1 needed.</span></a>
   <a href="install/"><strong>Install</strong><span>From Chrome or Edge, with the FM-1 connected by USB. Nothing to install on the computer.</span></a>
   <a href="manual/"><strong>Manual</strong><span>Getting started in ten steps, then everything else.</span></a>
   <a href="firmware/__PKG__"><strong>Download __PKG__</strong><span>For the command-line installer: <code>python3 tools/fm1_install.py __PKG__</code></span></a>
@@ -111,6 +113,10 @@ def main(pkg, version, out):
     # the landing page
     (out / "index.html").write_text(LANDING.replace("__VERSION__", html.escape(version)).replace("__PKG__", name)
                                     .replace("__REPO__", REPO), encoding="utf-8")
+    emu = SRC / "build" / "emu"
+    if not (emu / "x0x.wasm").exists():
+        raise SystemExit("no build/emu/x0x.wasm: run web/emu/build.sh (needs Emscripten)")
+    shutil.copytree(emu, out / "emu")
     (out / ".nojekyll").write_text("")
     print(f"site: {out}: index.html, install/ ({product}), manual/, firmware/{name} ({len(raw)} B)")
 

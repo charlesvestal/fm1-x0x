@@ -60,6 +60,11 @@ fi
 run upload-images sh -c "python3 tests/host/make_test_loops.py build/test_loops && \
     python3 tools/upload_breaks.py --dry-run build/test_upload build/test_loops/loop*.wav"
 run host-build sh host/build_host.sh
+if command -v emcc >/dev/null 2>&1 && command -v node >/dev/null 2>&1; then   # the browser build, when it can be built
+    printf 'wav emu_ref.wav\nwait 500\npress PLAY\nwait 40\nrelease PLAY\nwait 3000\nwavstop\n' > build/host/emu_ref.x0x
+    run emu sh -c "sh web/emu/build.sh >/dev/null 2>&1 && build/host/x0x_host build/host/emu_ref.x0x build/host >/dev/null && \
+        node tests/host/emu_test.mjs build/emu/x0x.wasm build/host/emu_ref.wav"
+fi
 for s in tests/scenarios/*.x0x; do
     n=$(basename "$s" .x0x)
     mkdir -p "build/scenarios/$n"

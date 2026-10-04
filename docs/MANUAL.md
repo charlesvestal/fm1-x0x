@@ -35,6 +35,9 @@ FM-1. Nobody has run it on an FM-1 yet.
 
 ## 1. Install
 
+You can try X0X before installing it: **https://charlesvestal.github.io/fm1-x0x/emu/** runs the
+same code in the browser, with sound, played with the mouse, a touch screen or the keyboard.
+
 The easiest way to install X0X is the web installer at
 **https://charlesvestal.github.io/fm1-x0x/install/**. It works in Chrome or Edge on a computer,
 and you don't need to install anything else. Connect the FM-1 to the computer with a USB data

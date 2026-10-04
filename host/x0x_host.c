@@ -389,6 +389,9 @@ static void run_ms(uint32_t ms)
             for (k = 0; k < ENG_PROF_N; k++)
                 pr0[k] = eng_prof[k];
             engine_render(blk, 256);
+#ifdef X0X_WEB
+            web_audio(blk, 256);                         /* the browser build: to the AudioWorklet */
+#endif
             di = instr_now() - i0;
             dt = now_ns() - t0;
             if (seq.playing) {                           /* the cost that matters: while it plays */
@@ -683,6 +686,7 @@ static int expect(const char *what, const char *val)
     return 0;
 }
 
+#ifndef X0X_WEB
 int main(int argc, char **argv)
 {
     FILE *sc;
@@ -864,3 +868,4 @@ int main(int argc, char **argv)
                (double)ins_total / (double)ins_frames, (double)ins_block_max / 256.0);
     return fails ? 1 : 0;
 }
+#endif /* X0X_WEB */
