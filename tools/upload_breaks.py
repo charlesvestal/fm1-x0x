@@ -49,15 +49,13 @@ def pack(loops, nslots):
             if cur:
                 slots.append(cur)
             cur, used = [], 0
-            if len(slots) >= nslots:
-                skipped.append(label)
-                continue
+        if len(slots) >= nslots:                # every slot is full: the rest do not fit
+            skipped.append(label)
+            continue
         cur.append((label, s))
         used += need
-    if cur and len(slots) < nslots:
+    if cur:
         slots.append(cur)
-    elif cur:
-        skipped += [lb for lb, _ in cur]
     return slots, skipped
 
 
@@ -110,7 +108,13 @@ def main():
         t0 = time.time()
         for off in range(0, len(data), 256):
             adr = sio.SLOT_DATA_OFF + off
-            r = link.req(12, [slot, adr & 0x7F, (adr >> 7) & 0x7F, (adr >> 14) & 0x7F] + up.pack7(data[off:off + 256]))
+            for attempt in range(3):                # a SysEx frame is now and then lost on the USB link;
+                try:                                # writing the same bytes again is harmless
+                    r = link.req(12, [slot, adr & 0x7F, (adr >> 7) & 0x7F, (adr >> 14) & 0x7F] + up.pack7(data[off:off + 256]))
+                    break
+                except TimeoutError:
+                    if attempt == 2:
+                        raise
             if r[4]:
                 sys.exit(f"USR{slot + 1}: write at {adr:#x} failed ({r[4]})")
             print(f"\r  USR{slot + 1}: {min(off + 256, len(data))} / {len(data)}", end="", flush=True)
