@@ -4,9 +4,10 @@ The manual: [docs/MANUAL.md](docs/MANUAL.md) (and [docs/manual.html](docs/manual
 `tools/manual_html.py`).
 
 Standalone groovebox firmware for the M-VAVE FM-1: a **TR-909**, a **TR-808**, **two TB-303s**
-with **TB-3PO** acid generators, and a **breakbeat generator**, with 16 patterns, shared
-reverb / tape delay sends on every part, and a master compressor with kick-keyed pump, a sweepable
-filter and a limiter.
+with **TB-3PO** acid generators, and a **breakbeat generator**, with 16 patterns (each part can
+play its own), a **song mode**, **recorded knob moves**, shared reverb / tape delay sends on every
+part, and a master compressor with kick-keyed pump, a sweepable filter and a limiter. The factory
+sound is set up for big beat.
 
 X0X is a fork of [Felucca](https://github.com/hugelton/Felucca) by Leo Kuroshita (Hügelton
 Instruments). It keeps Felucca's platform — the hardware layer, USB MIDI, the update loader,
