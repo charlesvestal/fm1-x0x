@@ -1,5 +1,8 @@
 # X0X for the M-VAVE FM-1
 
+**Try it in your browser, no FM-1 needed:** <https://charlesvestal.github.io/fm1-x0x/emu/>
+(the whole firmware running in the page). Site: <https://charlesvestal.github.io/fm1-x0x/>
+
 **Install:** <https://charlesvestal.github.io/fm1-x0x/install/> (Chrome or Edge, the FM-1 on USB).
 **Manual:** <https://charlesvestal.github.io/fm1-x0x/manual/> (source: [docs/MANUAL.md](docs/MANUAL.md)).
 **Firmware file:** [releases](https://github.com/charlesvestal/fm1-x0x/releases).
