@@ -43,6 +43,9 @@ typedef struct {
     uint8_t wpos[NBASS];
     int8_t held_step;
     uint8_t step_edited;
+    uint32_t step_t0;                  /* when the held 303 step went down: a tap toggles, a hold does not */
+    uint8_t step_preview;              /* the held step is sounding (only while stopped) */
+    uint8_t gen_stale[NBASS];          /* TB-3PO's knobs changed since the line was written */
     uint32_t btn, keys, btn_used;
     int8_t chain_first;
     uint32_t enc_t[NE];
@@ -338,8 +341,8 @@ static void pref_set(pref_t r, int v)
         case G_BASE: g->base_oct = (uint8_t)v; break;
         default: g->mutate_bars = (uint8_t)v; break;
         }
-        if (r.c != G_MUT)
-            tb3po_generate(&p->bass[r.a]);           /* the line follows its settings, from the same seed */
+        if (r.c != G_MUT)                            /* the line stays: the settings are the next NEW / MUTATE's */
+            ui.gen_stale[r.a] = 1;
         break;
     }
     case R_BRKSET: p->brk.set[r.c] = (uint8_t)v; break;
@@ -1425,6 +1428,9 @@ static void bass_kbd(int key, int down)
     }
 }
 
+/* an edit sounds as the drum keys do (KEY SOUND): while stopped or recording, or always */
+static int key_sounds(void) { return proj.set.keysound || !seq.playing || ui.rec; }
+#define STEP_TAP_MS 300u
 static void bass_step_key(int white, int down)
 {
     int b = bidx(), s = ui.spage * 16 + white;
@@ -1434,14 +1440,18 @@ static void bass_step_key(int white, int down)
     if (down) {
         ui.held_step = (int8_t)s;
         ui.step_edited = 0;
-        if (bstep_gate(&bp->step[s]) != G_REST)
+        ui.step_t0 = plat_ms();
+        ui.step_preview = key_sounds() && bstep_gate(&bp->step[s]) != G_REST;   /* as the drum keys */
+        if (ui.step_preview)
             engine_bass_on(b, bp->step[s].note + bp->transpose - 24, (bp->step[s].flags & BS_ACCENT) != 0, 0);
     } else if (ui.held_step == s) {
-        if (!ui.step_edited) {
+        if (!ui.step_edited && plat_ms() - ui.step_t0 < STEP_TAP_MS) {   /* a tap; a hold only shows the step */
             bp->step[s].flags = bstep_gate(&bp->step[s]) == G_REST ? G_NOTE : G_REST;
             mark_dirty();
         }
-        engine_bass_off(b);
+        if (ui.step_preview)
+            engine_bass_off(b);
+        ui.step_preview = 0;
         ui.held_step = -1;
     }
 }
@@ -1710,11 +1720,13 @@ static void button_tap(int b)
                 char t[20];
                 bp->gen.seed = tb3po_new_seed(plat_ms() ^ (ui.frame << 7));
                 tb3po_generate(bp);
+                ui.gen_stale[bidx()] = 0;
                 put_hex(put_s(t, "NEW LINE "), bp->gen.seed & 0xFFFFu, 4);
                 say(t, 0);
             } else {
                 uint32_t r = bp->gen.seed ^ plat_ms();
                 tb3po_mutate(bp, &r);
+                ui.gen_stale[bidx()] = 0;
                 say("MUTATED", 0);
             }
             mark_dirty();
@@ -1828,7 +1840,10 @@ static void input(void)
                 st->note = (uint8_t)(n < 12 ? 12 : n > 108 ? 108 : n);
                 if (bstep_gate(st) == G_REST)
                     st->flags = (uint8_t)((st->flags & ~BS_GATE_MASK) | G_NOTE);
-                engine_bass_on(bidx(), st->note + bp->transpose - 24, 0, 1);
+                if (key_sounds()) {                     /* as the drum keys: playing, the line is heard */
+                    engine_bass_on(bidx(), st->note + bp->transpose - 24, 0, 1);
+                    ui.step_preview = 1;
+                }
             } else if (i == 1) {
                 st->flags = (uint8_t)((st->flags & ~BS_GATE_MASK) | (bstep_gate(st) + (e > 0 ? 1 : 2)) % 3);
             } else if (i == 2) {
@@ -2385,8 +2400,9 @@ static void draw_303(int band, int gen)
             put_hex(put_s(t2, "SEED "), bp->gen.seed & 0xFFFFu, 4);
             segs(4, 26, &FONT_S, C_GRAY, 18, t, t2, 0, 0);
         }
-        if (gen)
-            segs(4, 50, &FONT_XS, C_AMB, 16, "OCT+  NEW LINE", "OCT-  MUTATE", 0, 0);
+        if (gen)                                     /* settings changed: they apply on the next press */
+            segs(4, 50, &FONT_XS, ui.gen_stale[b] ? C_WHITE : C_AMB, 16, ui.gen_stale[b] ? "OCT+  NEW LINE *" : "OCT+  NEW LINE",
+                 "OCT-  MUTATE", 0, 0);
         else if (ui.held_step < 0)
             segs(4, 50, &FONT_XS, C_DIM, 16, ui.kbd[b] ? "KEYS PLAY" : "TAP: STEP", ui.kbd[b] ? "REC: STEP WRITE" : "HOLD + KNOBS: EDIT", 0, 0);
     }

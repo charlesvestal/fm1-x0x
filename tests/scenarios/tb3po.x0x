@@ -1,0 +1,34 @@
+# TB-3PO: the settings are the next line's. Turning them leaves the line as it is (and marks the
+# screen); OCT+ writes a new line, OCT- mutates it.
+wait 300
+turn ALGO 2
+expect part 2
+tap ARP
+tap OCT+
+wait 100
+snapline 0
+# GENERATE: density, accent, slide, octaves
+turn K1 20
+turn K2 -20
+turn K3 15
+turn K4 1
+wait 100
+expect linechg0 0
+wait 1200
+shot t01_stale.png
+# SCALE: root, scale, octave
+tap ARP
+turn K1 3
+turn K2 2
+turn K3 1
+wait 100
+expect linechg0 0
+# now they apply
+tap OCT+
+wait 100
+expect linechg0 1
+shot t02_new.png
+snapline 0
+tap OCT-
+wait 100
+expect linechg0 1

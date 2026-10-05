@@ -1,0 +1,26 @@
+# 303 steps: a tap toggles the step; holding a step shows it (and its knobs edit it), and letting
+# go without an edit leaves it as it was.
+wait 300
+turn ALGO 2
+expect part 2
+expect gate0.0 0
+tapkey w0
+expect gate0.0 1
+tapkey w0
+expect gate0.0 0
+# held, nothing changed: no toggle either way
+key w0 down
+wait 600
+key w0 up
+expect gate0.0 0
+tapkey w0
+expect gate0.0 1
+key w0 down
+wait 600
+key w0 up
+expect gate0.0 1
+# held and edited (knob 1 = note): the edit stays, no toggle
+key w2 down
+turn K1 2
+key w2 up
+expect gate0.2 1
