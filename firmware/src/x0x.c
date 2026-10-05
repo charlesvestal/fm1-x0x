@@ -40,6 +40,12 @@ static inline int32_t clamp(int32_t v, int32_t lo, int32_t hi) { return v < lo ?
 #define FELUCCA_ID "FM-1_900"     /* package identity (tools/build.py) */
 #endif
 #include "usb.c"
+#ifndef X0X_TRS
+#define X0X_TRS 1                 /* MIDI IN on the TRS jack */
+#endif
+#if X0X_TRS
+#include "midi_uart.c"
+#endif
 
 static uint8_t flash_ok;          /* JEDEC id matched at boot */
 static void audio_silence(void);

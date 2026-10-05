@@ -113,6 +113,9 @@ void fm1_timer5_irq(void)
     if (usb_due && !x0x_dbg.in_audio) {
         usb_due = 0;
         usb_poll();
+#if X0X_TRS
+        uart_midi_poll();                           /* the TRS jack: same context, same queue */
+#endif
     }
     if (++sub == 10u)
         sub = 0;
@@ -287,6 +290,9 @@ static void fm1_main(void)
     engine_brk_loops();
     audio_init();
     usb_start();
+#if X0X_TRS
+    uart_midi_init();                               /* before TIMER5: it read-modify-writes port H too */
+#endif
     /* above ALNK0 (3): the key / encoder / LED matrix is scanned one column per tick and must keep
      * its rhythm. Below the audio (as Felucca has it), a render that takes most of its 5.8 ms half
      * buffer stopped the scan for milliseconds: fast encoder turns lost their steps, and the column

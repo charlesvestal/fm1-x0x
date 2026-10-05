@@ -530,7 +530,7 @@ them on, switch it off and on again.
 
 When connected over USB, the FM-1 shows up as a MIDI device called "X0X FM-1".
 
-X0X responds to this MIDI input:
+X0X takes MIDI from USB and from the FM-1's TRS MIDI IN jack, both the same way:
 
 | Input | What it plays |
 |---|---|
