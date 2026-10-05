@@ -77,6 +77,19 @@ FM1_INLINE uint32_t fm1_usb_sie_done(void) { return FM1_USB_CON1 & 0x8000u; }
 FM1_INLINE uint32_t fm1_usb_sie_data(void) { return FM1_USB_CON1 & 0xFFu; }
 
 FM1_INLINE void fm1_usb_ep0_buf(void *p) { FM1_USB_EP0_ADR = (uint32_t)(uintptr_t)p; }
+/* EP4 IN (the USB audio stream, isochronous; Felucca 1.0): its DMA address and count have their
+ * own registers (SDK usb_set_dma_taddr / usb_write_ep_cnt, id 0, ep 4) */
+#define FM1_USB_EP4_CNT (*(volatile uint32_t *)0x11834u)
+#define FM1_USB_EP4_TADR (*(volatile uint32_t *)0x11838u)
+FM1_INLINE void fm1_usb_ep4_txbuf(void *p) { FM1_USB_EP4_TADR = (uint32_t)(uintptr_t)p; }
+FM1_INLINE void fm1_usb_ep4_send(void *p, uint32_t n)
+{
+    __asm__ volatile("csync" ::: "memory");
+    FM1_USB_EP4_TADR = (uint32_t)(uintptr_t)p;
+    FM1_USB_EP4_CNT = n;
+    __asm__ volatile("csync" ::: "memory");
+}
+
 FM1_INLINE void fm1_usb_ep_txbuf(uint32_t ep, void *p) { FM1_USB_EP_TADR(ep) = (uint32_t)(uintptr_t)p; }
 FM1_INLINE void fm1_usb_ep_rxbuf(uint32_t ep, void *p) { FM1_USB_EP_RADR(ep) = (uint32_t)(uintptr_t)p; }
 FM1_INLINE void fm1_usb_ep0_send(void *p, uint32_t n)

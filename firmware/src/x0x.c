@@ -32,6 +32,10 @@ static inline int32_t clamp(int32_t v, int32_t lo, int32_t hi) { return v < lo ?
 #define X0X_CDC 0                 /* USB serial console off: one plain MIDI interface */
 #endif
 #define FELUCCA_CDC X0X_CDC
+#ifndef X0X_UAC
+#define X0X_UAC 1                 /* USB audio input: the master output, recordable over the cable */
+#endif
+#define FELUCCA_UAC X0X_UAC
 #ifndef FELUCCA_ID
 #define FELUCCA_ID "FM-1_900"     /* package identity (tools/build.py) */
 #endif

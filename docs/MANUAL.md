@@ -27,7 +27,7 @@ for headroom (see Performance).
 13. Effects
 14. Mix and master
 15. Settings and saving
-16. MIDI
+16. MIDI and USB audio
 17. Troubleshooting
 18. Parameters
 19. Credits
@@ -47,13 +47,13 @@ cable, open the page and press Install. Don't unplug the cable while it's writin
 finishes, the FM-1 restarts into X0X.
 
 You can also install from the command line. Download the firmware file (for example
-`x0x-0.8-beta.fwsc`) from the
+`x0x-0.9-beta.fwsc`) from the
 [releases page](https://github.com/charlesvestal/fm1-x0x/releases), get the X0X source code from
 GitHub, install Python 3 with the `mido` and `python-rtmidi` packages
 (`pip3 install mido python-rtmidi`), and run:
 
 ```
-python3 tools/fm1_install.py x0x-0.8-beta.fwsc
+python3 tools/fm1_install.py x0x-0.9-beta.fwsc
 ```
 
 Note that the web installer on hugelton.github.io installs Felucca, not X0X.
@@ -258,9 +258,11 @@ TB-3PO has three pages:
   OCTAVE, and MUTATE, which mutates the line by itself every 1–16 bars (or never).
 - LINE: the same as the 303's LINE page.
 
-Changing any setting on GENERATE or SCALE, other than MUTATE, writes the line again.
-**This replaces any steps you edited by hand.** The same settings always produce the same
-line, and it is the same line that Schwung's TB-3PO module would write.
+The settings on GENERATE and SCALE don't change the line you hear: they are what the next
+**OCT+** (a new line) or **OCT-** (a mutation) will use, so the line stays as it is, hand edits
+and all, until you press one. While the settings differ from the line's, the screen shows
+NEW LINE with a star. The same settings and seed always produce the same line, and it is the
+same line that Schwung's TB-3PO module would write.
 
 ---
 
@@ -476,7 +478,7 @@ Press GLO for these settings:
 | CLOCK OUT | Sends MIDI clock and start/stop messages. |
 | NOTES OUT | Sends the patterns out as MIDI notes. |
 | KEY LIGHTS | Shows the steps on the key lights. |
-| KEY SOUND | STOPPED (the default): the black drum keys play their sound only when the pattern is stopped, or with REC on; while it plays they only select. ALWAYS: they always play. |
+| KEY SOUND | STOPPED (the default): the black drum keys, and a 303 step you hold or edit, sound only when the pattern is stopped, or with REC on; while it plays they only select, and you hear the line. ALWAYS: they always sound. The 303 keyboard always plays. |
 | THEME | The screen colour: green, amber, cyan, red or mono. |
 | BRIGHTNESS | The screen's brightness, 1 (dim) to 8 (full). |
 | ACCENT | How loud an unaccented drum hit is compared with an accented one. |
@@ -524,7 +526,7 @@ them on, switch it off and on again.
 
 ---
 
-## 16. MIDI
+## 16. MIDI and USB audio
 
 When connected over USB, the FM-1 shows up as a MIDI device called "X0X FM-1".
 
@@ -537,10 +539,20 @@ X0X responds to this MIDI input:
 | Channel 2 | 303A. Overlapping notes slide, and a velocity of 100 or more plays an accent. |
 | Channel 3 | 303B, in the same way. |
 | Channel 4 | Notes 36–43 play break slices 1–8. |
-| Clock | X0X follows an incoming MIDI clock automatically, and returns to its own tempo half a second after the clock stops. |
+| Clock | X0X follows an incoming MIDI clock automatically, and returns to its own tempo half a second after the clock stops. Start, Stop and Continue start and stop the patterns. |
 
 X0X can also send MIDI: clock and start/stop when CLOCK OUT is on, and the patterns as notes
 on the channels above when NOTES OUT is on.
+
+### USB audio
+
+Over the same USB cable, the FM-1 also shows up on a computer as an audio input called
+"X0X FM-1": two channels at 44.1 kHz, with no driver to install. It carries what the headphones
+hear, after VOLUME. X0X mixes in mono, so both channels are the same.
+
+Record it in any audio app, or monitor it live through one. The FM-1 keeps its USB audio in step
+with the computer's clock, so live monitoring doesn't drift or drop out. The first moment after an
+app opens the input can click while the FM-1 settles.
 
 ---
 

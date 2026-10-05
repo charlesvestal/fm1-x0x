@@ -7,8 +7,15 @@ extern uint32_t _data_start[], _data_end[], _data_load[], _bss_start[], _bss_end
 extern uint32_t _pool_start[], _pool_end[], _rt_start[], _rt_end[], _rt_load[];
 
 /* --------------------------------------------------------------- audio --- */
-#define HALF_FRAMES 256u                    /* I2S half buffer: 5.8 ms at 44.1 kHz */
+/* X0X: 512-frame halves (11.6 ms; Felucca 256). The render runs inside the DMA's deadline, and a
+ * busy pattern averaging ~80 % ran over it about one half in 300 (a heavy step): a dropped half.
+ * Twice the half averages a heavy step over twice the time, for one more half of latency. */
+#define HALF_FRAMES 512u                    /* I2S half buffer: 11.6 ms at 44.1 kHz */
 #define HALF_WORDS (HALF_FRAMES * 2u)
+#define REND_FRAMES 256u                    /* engine_render's most per call */
+#if FELUCCA_UAC
+_Static_assert(REND_FRAMES == UA_HALF, "usb.c sizes the USB audio ring band for this block");
+#endif
 static int32_t abuf[2u * HALF_WORDS] __attribute__((aligned(4)));
 
 #define DBG_MAGIC 0x44424731u                       /* "DBG1": read with `fm1t memr` */
@@ -19,33 +26,48 @@ struct x0x_dbg {
 } x0x_dbg __attribute__((section(".noinit")));
 static uint8_t safe_mode;                           /* two failed boots: no audio, USB on (safe_main) */
 
+static void render_block(int32_t *o)                /* ALNK0: one half, measured */
+{
+    uint32_t t0 = fm1_ticks(), us, budget = HALF_FRAMES * 1000000u / FS;
+    x0x_dbg.in_audio = 1;
+#if FELUCCA_UAC
+    uac_render_start();
+#endif
+    {
+        uint32_t k;
+        for (k = 0; k < HALF_FRAMES; k += REND_FRAMES) {
+            engine_render(o + 2u * k, REND_FRAMES);
+#if FELUCCA_UAC
+            uac_tap(o + 2u * k, REND_FRAMES);       /* the USB audio input: the same master output */
+#endif
+        }
+    }
+    us = (fm1_ticks() - t0) / FM1_TICKS_PER_US;
+    x0x_dbg.cpu_q8 = (x0x_dbg.cpu_q8 * 15u + (us * 256u) / budget) / 16u;
+    audio_cpu_pct = (x0x_dbg.cpu_q8 * 100u) >> 8;
+    if (us * 100u / budget > audio_peak_pct)
+        audio_peak_pct = us * 100u / budget;        /* the PERF screen's peak (read and reset) */
+    engine_load(us * 100u / budget, HALF_FRAMES);
+    x0x_dbg.halves++;
+    x0x_dbg.last_us = us;
+    if (us > x0x_dbg.max_us)
+        x0x_dbg.max_us = us;
+    x0x_dbg.in_audio = 0;
+}
+
 void fm1_alnk0_irq(void)                            /* via isr_alnk0 (hal/fm1_isr.S) */
 {
     uint8_t p = fm1_audio_pending();
-    uint32_t t0 = fm1_ticks();
     fm1_audio_ack_aux(p);
-    x0x_dbg.in_audio = 1;
     if (p & FM1_AUDIO_HALF) {
-        uint32_t half = fm1_audio_free_half(), us, budget = HALF_FRAMES * 1000000u / FS;
-        int32_t *o = &abuf[half * HALF_WORDS];
-        engine_render(o, HALF_FRAMES);
+        uint32_t half = fm1_audio_free_half();
+        render_block(&abuf[half * HALF_WORDS]);
         fm1_audio_ack_half();
-        us = (fm1_ticks() - t0) / FM1_TICKS_PER_US;
-        x0x_dbg.cpu_q8 = (x0x_dbg.cpu_q8 * 15u + (us * 256u) / budget) / 16u;
-        audio_cpu_pct = (x0x_dbg.cpu_q8 * 100u) >> 8;
-        if (us * 100u / budget > audio_peak_pct)
-            audio_peak_pct = us * 100u / budget;            /* the PERF screen's peak (read and reset) */
         if (fm1_audio_free_half() != half) {
             x0x_dbg.late++;                         /* the DMA moved on while we rendered */
             audio_xruns++;
         }
-        engine_load(us * 100u / budget, HALF_FRAMES);
-        x0x_dbg.halves++;
-        x0x_dbg.last_us = us;
-        if (us > x0x_dbg.max_us)
-            x0x_dbg.max_us = us;
     }
-    x0x_dbg.in_audio = 0;
 }
 extern void isr_alnk0(void);
 
@@ -78,8 +100,16 @@ void fm1_timer5_irq(void)
     /* 2 kHz: all USB SIE traffic lives here. This ISR now nests into the audio render (so the key
      * matrix keeps its rhythm, below); USB shares the MIDI queues with the audio ISR, so a poll that
      * falls inside the render waits for the first tick outside it, as it did before the nesting. */
-    if (sub % 5u == 0u)
+    if (sub % 5u == 0u) {
         usb_due = 1;
+#if FELUCCA_UAC
+        /* the USB audio stream cannot wait for the render (one packet per 1 ms frame, a render takes
+         * up to ~11.6 ms): it runs nested too. It touches only EP4 (INDEX is set on every access) and
+         * the consumer side of its ring, and usb_poll never runs nested, so the two never interleave */
+        if (x0x_dbg.in_audio)
+            uac_service();
+#endif
+    }
     if (usb_due && !x0x_dbg.in_audio) {
         usb_due = 0;
         usb_poll();
