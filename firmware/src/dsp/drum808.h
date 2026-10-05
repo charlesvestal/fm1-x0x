@@ -159,6 +159,8 @@ typedef struct {
 /* one output lane: 8W8's per-lane gain, choke fade and Crush state */
 typedef struct {
     float hit, cg, cstep, crush[2];
+    float pk;                         /* X0X: the hit's peak so far; the tail ends 60 dB under it */
+    int32_t qn;                       /* samples in a row under that */
     uint8_t snd;
 } d8_lane_t;
 

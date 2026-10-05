@@ -1467,6 +1467,8 @@ void drum808_trigger(drum808_t *d, int track, float vel)
     default: lane = track; break;                 /* BD, SD */
     }
     d->lane[lane].hit = vgain;
+    d->lane[lane].pk = 0.0f;
+    d->lane[lane].qn = 0;
     d->lane[lane].cg = 1.0f;
     d->lane[lane].cstep = 0.0f;
     d->lane[lane].snd = (uint8_t)s;
@@ -1546,6 +1548,56 @@ static int voice_active(const drum808_t *d, int l)
     default: return d->cy.active;
     }
 }
+
+/* X0X: a voice's tail ends once it has stayed 60 dB under the hit's own peak for 20 ms. 8W8 runs
+ * each voice until its output is under -90 dBFS-ish (3.2e-5, or the metal voices' envelopes), so a
+ * voice spends 12..87 % of its life (cymbal .. rim shot; cowbell 51 %) under -60 dB of its peak,
+ * at full cost: the 808 was the biggest share of the renders that ran over. D8_TAIL_DB=0 keeps
+ * 8W8's endings (the reference test). */
+#ifndef D8_TAIL_DB
+#define D8_TAIL_DB 1
+#endif
+#define D8_TAIL_K 1.0e-3f              /* -60 dB */
+#define D8_TAIL_N 882                  /* 20 ms: the gaps between a clap's bursts are shorter */
+#define D8_TAIL_FLOOR 1.0e-2f          /* the hit has sounded (voices peak at 0.2 .. 7) */
+#if D8_TAIL_DB
+static void voice_stop(drum808_t *d, int l)
+{
+    switch (l) {
+    case L_BD: d->bd.active = 0; break;
+    case L_SD: d->sd.active = 0; break;
+    case L_T0: case L_T1: case L_T2: d->tom[l - L_T0].active = 0; break;
+    case L_RS: d->rs.active = 0; break;
+    case L_CL: d->cl.active = 0; break;
+    case L_MA: d->ma.active = 0; break;
+    case L_CP: d->cp.active = 0; break;
+    case L_CB: d->cb.active = 0; break;
+    case L_CH: d->ch.active = 0; break;
+    case L_OH: d->oh.active = 0; break;
+    default: d->cy.active = 0; break;
+    }
+}
+static void lane_tail(drum808_t *d, int l, const float *buf, int m)
+{
+    d8_lane_t *ln = &d->lane[l];
+    float pk = ln->pk;
+    int32_t qn = ln->qn;
+    int i;
+    for (i = 0; i < m; i++) {
+        float a = buf[i] < 0.0f ? -buf[i] : buf[i];
+        if (a > pk)
+            pk = a;
+        if (a > pk * D8_TAIL_K)
+            qn = 0;
+        else
+            qn++;
+    }
+    ln->pk = pk;
+    ln->qn = qn;
+    if (qn > D8_TAIL_N && pk > D8_TAIL_FLOOR)       /* (a metal voice opens late: it has to have sounded) */
+        voice_stop(d, l);
+}
+#endif
 
 static int lane_on(const drum808_t *d, int l) { return d->lane[l].cg > 0.0f && voice_active(d, l); }
 
@@ -1655,6 +1707,9 @@ void drum808_render(drum808_t *d, float *dry, float *rev, float *dly, int n)
             }
             got = voice_run(d, l, buf, mm, bus, pair);
             lane_mix(d, ln, buf, got, dry + off, rev + off, dly + off);
+#if D8_TAIL_DB
+            lane_tail(d, l, buf, got);
+#endif
         }
     }
 }

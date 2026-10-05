@@ -25,6 +25,9 @@
  *   expect WHAT VALUE            check state (playing, pattern, cue, view-part, ...): exit 1 on mismatch;
  *                                VALUE "<N" / ">N" is a bound
  *   reboot                       save nothing; re-run boot from the simulated flash (persistence test)
+ *   snapline B                   remember 303 B's line on the pattern shown (expect linechgB: 1 = it changed since)
+ *   projimg FILE                 a project as the FM-1 holds it in RAM (fm1_debug peek of proj): saved
+ *                                to the simulated flash and booted, as if it had been made here
  */
 #define X0X_HOST 1
 #include <stdio.h>
@@ -584,6 +587,7 @@ static int load_slot(int k, int z, const char *path)
     return 0;
 }
 
+static bpart_t line_snap[NBASS];                  /* "snapline" */
 static int expect(const char *what, const char *val)
 {
     int got;
@@ -599,7 +603,10 @@ static int expect(const char *what, const char *val)
         got = perf.test;
     else if (!strncmp(what, "perfres", 7))         /* perfresK: scenario K's share of the CPU x 10 */
         got = perf.res_load[atoi(what + 7) % 3];
-    else if (!strcmp(what, "guard"))               /* the overload guard: 1 engaged */
+    else if (!strncmp(what, "linechg", 7)) {       /* linechgB: 303 B's steps differ from snapline B */
+        int b = atoi(what + 7) % NBASS;
+        got = memcmp(cur_pat()->bass[b].step, line_snap[b].step, sizeof line_snap[b].step) != 0;
+    } else if (!strcmp(what, "guard"))               /* the overload guard: 1 engaged */
         got = engine_guard_active();
     else if (!strcmp(what, "guardcount"))
         got = (int)eng_guard_count;
@@ -850,6 +857,9 @@ int main(int argc, char **argv)
         } else if (!strcmp(cmd, "wav")) {
             snprintf(out, sizeof out, "%s/%s", dir, a);
             wav_open(out);
+        } else if (!strcmp(cmd, "snapline")) {
+            int b = atoi(a) % NBASS;
+            line_snap[b] = cur_pat()->bass[b];
         } else if (!strcmp(cmd, "load"))              /* load N: every block costs N% (the guard's input) */
             load_force = atoi(a);
         else if (!strcmp(cmd, "peakreset"))
@@ -874,7 +884,18 @@ int main(int argc, char **argv)
             printf("\n");
         } else if (!strcmp(cmd, "expect"))
             fails += expect(a, b);
-        else if (!strcmp(cmd, "reboot")) {
+        else if (!strcmp(cmd, "projimg")) {
+            FILE *f;
+            snprintf(out, sizeof out, "%s", a);
+            if (!(f = fopen(out, "rb")) || fread(&proj, 1, sizeof proj, f) != sizeof proj) {
+                fprintf(stderr, "projimg: %s is not a %zu-byte project image\n", a, sizeof proj);
+                return 1;
+            }
+            fclose(f);
+            project_save();
+            memset(&proj, 0, sizeof proj);
+            boot();
+        } else if (!strcmp(cmd, "reboot")) {
             memset(&proj, 0, sizeof proj);
             boot();
         } else if (!strcmp(cmd, "echo"))
