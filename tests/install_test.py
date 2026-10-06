@@ -178,6 +178,8 @@ def wire():
        and ~sum(u[6:17]) & 0xFF == u[17], "response: header, address, data, checksum")
     raw = package("FM-1_906")
     ok(I.product_of(raw) == "FM-1_906" and len(I.logical_image(raw)) == len(raw) - 20, "product_of / logical_image (synthetic)")
+    raw = package("FM-1_9001000")                  # X0X from 0.10: major, minor, patch, two digits each
+    ok(I.product_of(raw) == "FM-1_9001000", "product_of: a 12-character identity")
 
 
 def installs():
@@ -189,6 +191,12 @@ def installs():
     rc, out, err = cli([p, "--yes"], dev)
     ok(rc == 0 and dev.bad == 0 and dev.upgrades == 2 and dev.served == 11 and "done: the FM-1 runs FM-1_900" in out
        and "100%" in out, f"install: running -> loader -> Felucca ({dev.served} reads)")
+
+    raw10 = package("FM-1_9001000")
+    dev = FakeFM1(I.logical_image(raw10), identity="FM-1_909", after_write="FM-1_9001000")
+    rc, out, err = cli([pkgfile("x10.fwsc", raw10), "--yes"], dev)
+    ok(rc == 0 and dev.bad == 0 and "done: the FM-1 runs FM-1_9001000" in out,
+       "install: 0.9 (FM-1_909) -> 0.10 (FM-1_9001000), the longer identity verified after")
 
     dev = FakeFM1(image, identity="ota-FM-1_900", name="Felucca Update")
     rc, out, err = cli([p, "--yes"], dev)

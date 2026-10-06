@@ -47,13 +47,13 @@ cable, open the page and press Install. Don't unplug the cable while it's writin
 finishes, the FM-1 restarts into X0X.
 
 You can also install from the command line. Download the firmware file (for example
-`x0x-0.9-beta.fwsc`) from the
+`x0x-0.10-beta.fwsc`) from the
 [releases page](https://github.com/charlesvestal/fm1-x0x/releases), get the X0X source code from
 GitHub, install Python 3 with the `mido` and `python-rtmidi` packages
 (`pip3 install mido python-rtmidi`), and run:
 
 ```
-python3 tools/fm1_install.py x0x-0.9-beta.fwsc
+python3 tools/fm1_install.py x0x-0.10-beta.fwsc
 ```
 
 Note that the web installer on hugelton.github.io installs Felucca, not X0X.
@@ -206,7 +206,9 @@ steps 1–16 and OCT+ for steps 17–32.
 The closed hat cuts off the open hat. On the 808 you can change this with CHOKE on the KIT
 page.
 
-Press EDIT to step through the selected track's sound settings, followed by these pages:
+Press EDIT to step through the selected track's sound settings, the last of which is its PAN
+(on the 808, a track's alternate sound shares its pan: conga with tom, clave with rim shot,
+maracas with clap), followed by these pages:
 
 - SENDS: how much of the part goes to the reverb and the delay, its level and its PAN.
 - PART: LENGTH (1–32 steps), RATE (1/16, 1/16 triplet, 1/32 or 1/8 triplet), SWING and
@@ -483,7 +485,6 @@ Press GLO for these settings:
 | KEY LIGHTS | Shows the steps on the key lights. |
 | KEY SOUND | STOPPED (the default): the black drum keys, and a 303 step you hold or edit, sound only when the pattern is stopped, or with REC on; while it plays they only select, and you hear the line. ALWAYS: they always sound. The 303 keyboard always plays. |
 | THEME | The screen colour: green, amber, cyan, red or mono. |
-| BRIGHTNESS | The screen's brightness, 1 (dim) to 8 (full). |
 | ACCENT | How loud an unaccented drum hit is compared with an accented one. |
 | MODE | PATTERN, or SONG to play the song. |
 | SAVE PROJECT | Saves everything. |

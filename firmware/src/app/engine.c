@@ -188,11 +188,8 @@ static void apply_param(int t, int v, int i, int val)    /* ISR */
             mix_rev[v] = (float)val / 127.0f;
         else if (i == MX_DLY)
             mix_dly[v] = (float)val / 127.0f;
-        else if (i == MX_PAN) {
-            float q = val >= 64 ? (float)(val - 64) / 63.0f : (float)(val - 64) / 64.0f;   /* -1 .. 1 */
-            mix_pl[v] = q > 0.0f ? fm_cosf(q * 1.5707963f) : 1.0f;
-            mix_pr[v] = q < 0.0f ? fm_cosf(q * 1.5707963f) : 1.0f;
-        }
+        else if (i == MX_PAN)
+            x0x_pan_gains(val, &mix_pl[v], &mix_pr[v]);
         break;
     case T_MST: master_set(&mst, i, val); break;
     default: break;
@@ -247,6 +244,18 @@ void engine_sound_defaults(sound_t *s)
     s->v[T_MST][0][MST_ATTACK] = 85;                 /* 10 ms: faster grabbed each kick hard enough to click */
     s->v[T_MST][0][MST_RELEASE] = 58;                /* 100 ms: it breathes with the beat */
     s->v[T_MST][0][MST_PUMP] = 21;                   /* 4 dB of 909-keyed pump */
+}
+
+void engine_sound_centre_drum_pans(sound_t *s)
+{
+    int t, v;
+    for (t = T_909; t <= T_808; t++)
+        for (v = 0; v < NDRUM && v < NVOICES_MAX; v++) {
+            int i = engine_nparams(t, v) - 1;           /* PAN is every voice's last pot */
+            const x0x_param_t *p = engine_param(t, v, i);
+            if (p && p->def == 64 && p->max == 127)
+                s->v[t][v][i] = 64;
+        }
 }
 
 void engine_apply_sound(const sound_t *s)
@@ -447,7 +456,7 @@ static void add_panned(float *dl, float *dr, const float *src, int p, float g, u
 
 static void render_sub(float *out_l, float *out_r, uint32_t n)
 {
-    static float dry_l[256], dry_r[256], rev[256], dly[256], t0[256], t1[256], t2[256];
+    static float dry_l[256], dry_r[256], rev[256], dly[256], t0[256], t1[256], t2[256], tr[256];
     uint32_t i;
     int b;
     for (i = 0; i < n; i++)
@@ -465,15 +474,23 @@ static void render_sub(float *out_l, float *out_r, uint32_t n)
             continue;
         }
         for (i = 0; i < n; i++)
-            t0[i] = t1[i] = t2[i] = 0.0f;
-        if (b == 0)
-            drum909_render(&d909, t0, t1, t2, (int)n);
+            t0[i] = t1[i] = t2[i] = tr[i] = 0.0f;
+        if (b == 0)                                       /* each voice placed by its own PAN */
+            drum909_render_st(&d909, t0, tr, t1, t2, (int)n);
         else
-            drum808_render(&d808, t0, t1, t2, (int)n);
-        add_panned(dry_l, dry_r, t0, b, g, n);
+            drum808_render_st(&d808, t0, tr, t1, t2, (int)n);
+        {                                                 /* then the part's PAN over the kit */
+            float gl = g * mix_pl[b], gr = g * mix_pr[b];
+            for (i = 0; i < n; i++) {
+                dry_l[i] += t0[i] * gl;
+                dry_r[i] += tr[i] * gr;
+            }
+        }
         add_scaled(rev, t1, g, n);
         add_scaled(dly, t2, g, n);
-        add_scaled(rev, t0, g * mix_rev[b], n);        /* the kit send: the whole machine */
+        for (i = 0; i < n; i++)                           /* the kit send: the whole machine, both sides */
+            t0[i] = (t0[i] + tr[i]) * 0.5f;               /* (centred: t0 exactly) */
+        add_scaled(rev, t0, g * mix_rev[b], n);
         add_scaled(dly, t0, g * mix_dly[b], n);
         meter(b, t0, g, n);
         PROF_ADD(b, pt);

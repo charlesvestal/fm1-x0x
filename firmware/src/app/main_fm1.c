@@ -96,7 +96,6 @@ void fm1_timer5_irq(void)
     if (x0x_dbg.in_audio)
         x0x_dbg.nested++;
     fm1_input_tick();
-    fm1_lcd_bl_tick();
     /* 2 kHz: all USB SIE traffic lives here. This ISR now nests into the audio render (so the key
      * matrix keeps its rhythm, below); USB shares the MIDI queues with the audio ISR, so a poll that
      * falls inside the render waits for the first tick outside it, as it did before the nesting. */

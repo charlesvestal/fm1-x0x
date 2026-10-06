@@ -66,11 +66,6 @@ int plat_midi_in(uint32_t *pkt)
 void plat_midi_out(uint32_t pkt) { midi_out_event(pkt); }
 
 int plat_store_load(uint32_t obj, void *dst, uint32_t max) { return flash_ok ? st_load(obj, dst, max) : -1; }
-void plat_brightness(int level)
-{
-    static const uint8_t DUTY[9] = {16, 1, 2, 3, 5, 7, 10, 13, 16};   /* of 16; roughly even steps to the eye */
-    fm1_lcd_bl_duty = DUTY[level < 0 || level > 8 ? 0 : level];
-}
 int plat_store_save(uint32_t obj, const void *src, uint32_t len) { return flash_ok ? st_save(obj, src, len) : -9; }
 
 int plat_slot_zones(int k) { return (k >= 0 && k < SMP_USER_SLOTS) ? usr_nz[k] : 0; }

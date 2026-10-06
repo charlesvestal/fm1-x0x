@@ -219,6 +219,8 @@ static void voice_cases(void)
         for (int i = 0; i < drum909_nparams(v); ++i) {
             const x0x_param_t *p = drum909_param(v, i);
             const int sends = !strcmp(p->name, "Rev") || !strcmp(p->name, "Dly");
+            if (!strcmp(p->name, "Pan"))
+                continue;                       /* X0X's (stereo): 9W9 has none; stereo_test covers it */
             if (p->max == 127) {
                 static const int pots[3] = { 0, 64, 127 };
                 for (int k = 0; k < 3; ++k) {
@@ -336,6 +338,8 @@ static void check_tables(void)
         for (int v = 0; v <= DR_KIT; ++v)
             for (int i = 0; i < drum909_nparams(v); ++i) {
                 float pv;
+                if (!strcmp(drum909_param(v, i)->name, "Pan"))
+                    continue;                   /* X0X's: no 9W9 key */
                 ref_get(ref, dkeys[v][i], &pv);
                 nk++;
                 if ((int)pv != drum909_get(&D, v, i)) {

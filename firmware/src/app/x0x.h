@@ -17,6 +17,7 @@
 #endif
 #define PROJ_MAGIC 0x50305830u           /* "0X0P" */
 #define PROJ_FORMAT 1u
+#define PROJ_STEREO 2u
 
 typedef struct {
     uint32_t magic, format;
@@ -24,8 +25,9 @@ typedef struct {
     uint16_t bpm_x10;
     uint8_t accent_q7, keysound;         /* black drum keys sound: 0 = only when stopped or recording, 1 = always */
     uint8_t autosave_off;                /* 0: save by itself while stopped and idle (ui.c autosave) */
-    uint8_t brightness;                  /* screen 1..8; 0 (older saves) = 8, full */
-    uint8_t stereo;                      /* 1: the sound has its pans (0: saved before X0X was stereo) */
+    uint8_t rsv_bright;                  /* was the screen's brightness (removed: always full); unused */
+    uint8_t stereo;                      /* the pans the sound has: 0 none (saved mono), 1 the parts', 2 the
+                                          * drum voices' too (PROJ_STEREO); a load centres what is missing */
     uint8_t rsv[5];                      /* room to grow: an older, shorter object loads (zeros here) */
 } settings_t;
 

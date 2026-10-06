@@ -32,18 +32,6 @@
 
 static uint32_t fm1_lcd_timeouts;
 
-/* backlight brightness by PWM on PA2, from the 10 kHz TIMER5 ISR (the only code that writes port A
- * once it runs: the key matrix lives there too): on for fm1_lcd_bl_duty of every 16 ticks, 625 Hz */
-static volatile uint8_t fm1_lcd_bl_duty = 16;
-FM1_INLINE void fm1_lcd_bl_tick(void)
-{
-    static uint8_t ph;
-    ph = (uint8_t)((ph + 1u) & 15u);
-    if (ph < fm1_lcd_bl_duty)
-        FM1_LCD_PA_OUT &= ~FM1_LCD_BL;                  /* active low: on */
-    else
-        FM1_LCD_PA_OUT |= FM1_LCD_BL;
-}
 
 FM1_INLINE void fm1_lcd_hw_init(void)
 {

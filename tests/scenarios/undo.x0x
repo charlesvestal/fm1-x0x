@@ -52,9 +52,9 @@ tap PLAY
 release HOME
 expect hit0.0.8 0
 expect hit0.0.12 1
-# FACTORY RESET (GLO, the twelfth row, asks) can be undone too
+# FACTORY RESET (GLO, the eleventh row, asks) can be undone too
 tap GLO
-turn SELECT 11
+turn SELECT 10
 tap SEL
 tap SEL
 wait 600

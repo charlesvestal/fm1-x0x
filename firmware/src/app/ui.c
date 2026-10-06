@@ -160,7 +160,7 @@ static void say(const char *a, const char *b)
 
 /* =============================================================== param refs === */
 enum { R_NONE, R_ENG, R_SWING, R_DLEN, R_DRATE, R_BLEN, R_BRATE, R_BDIR, R_BTRANS, R_GEN, R_BRKSET,
-       R_BRKSLOT, R_TEMPO, R_ACCENT, R_CLKOUT, R_NOTEOUT, R_PALETTE, R_KEYLED, R_KEYSOUND, R_AUTOSAVE, R_BRIGHT, R_ACT, R_SBAR, R_SPAT, R_SMODE,
+       R_BRKSLOT, R_TEMPO, R_ACCENT, R_CLKOUT, R_NOTEOUT, R_PALETTE, R_KEYLED, R_KEYSOUND, R_AUTOSAVE, R_ACT, R_SBAR, R_SPAT, R_SMODE,
        R_SLEN, R_STALLS };
 typedef struct { uint8_t kind, a, b, c; } pref_t;
 #define PR(k, a, b, c) ((pref_t){(k), (a), (b), (c)})
@@ -178,15 +178,14 @@ static const x0x_param_t GEN_P[NGEN] = {
     {"MUTATE", 16, 0, 0},
 };
 enum { SQ_SWING, SQ_DLEN, SQ_DRATE, SQ_BLEN, SQ_BRATE, SQ_BDIR, SQ_BTRANS, SQ_TEMPO, SQ_ACCENT, SQ_CLK, SQ_NOTES,
-       SQ_THEME, SQ_KEYLED, SQ_KEYSOUND, SQ_AUTOSAVE, SQ_BRIGHT, NSQ };
+       SQ_THEME, SQ_KEYLED, SQ_KEYSOUND, SQ_AUTOSAVE, NSQ };
 static const char *const KEYSOUND_N[] = {"STOPPED", "ALWAYS"};
-static const char *const BRIGHT_N[] = {"1", "2", "3", "4", "5", "6", "7", "8"};
 static const x0x_param_t SEQ_P[NSQ] = {
     {"SWING", 100, 0, 0}, {"LENGTH", 31, 15, 0}, {"RATE", 3, 0, RATE_N}, {"LENGTH", 31, 15, 0},
     {"RATE", 3, 0, RATE_N}, {"DIR", 3, 0, DIR_N}, {"TRANSP", 48, 24, 0}, {"TEMPO", 255, 105, 0},
     {"ACCENT", 127, 88, 0}, {"CLOCK OUT", 1, 1, ONOFF_N}, {"NOTES OUT", 1, 0, ONOFF_N}, {"THEME", 4, 1, THEME_N},
     {"KEY LIGHTS", 1, 1, ONOFF_N}, {"KEY SOUND", 1, 0, KEYSOUND_N},
-    {"AUTOSAVE", 1, 1, ONOFF_N}, {"BRIGHTNESS", 7, 7, BRIGHT_N},
+    {"AUTOSAVE", 1, 1, ONOFF_N},
 };
 static const x0x_param_t ACT_P[] = {
     {"", 0, 0, 0}, {"SAVE PROJECT", 0, 0, 0}, {"CLEAR THIS PART", 0, 0, 0}, {"CLEAR PATTERN", 0, 0, 0},
@@ -245,7 +244,6 @@ static const x0x_param_t *pref_desc(pref_t r)
     case R_KEYLED: return &SEQ_P[SQ_KEYLED];
     case R_KEYSOUND: return &SEQ_P[SQ_KEYSOUND];
     case R_AUTOSAVE: return &SEQ_P[SQ_AUTOSAVE];
-    case R_BRIGHT: return &SEQ_P[SQ_BRIGHT];
     case R_ACT: return &ACT_P[r.a];
     case R_SBAR: {
         static x0x_param_t d = {"BAR", 0, 0, 0};
@@ -295,7 +293,6 @@ static int pref_get(pref_t r)
     case R_KEYLED: return proj.set.keyled;
     case R_KEYSOUND: return proj.set.keysound;
     case R_AUTOSAVE: return !proj.set.autosave_off;
-    case R_BRIGHT: return (proj.set.brightness ? proj.set.brightness : 8) - 1;
     case R_SBAR: return ui.song_sel;
     case R_SPAT: {
         const song_t *sg = song();
@@ -362,7 +359,6 @@ static void pref_set(pref_t r, int v)
     case R_KEYLED: proj.set.keyled = (uint8_t)v; break;
     case R_KEYSOUND: proj.set.keysound = (uint8_t)v; break;
     case R_AUTOSAVE: proj.set.autosave_off = (uint8_t)!v; ui.last_autosave = (uint8_t)!v; break;
-    case R_BRIGHT: proj.set.brightness = (uint8_t)(v + 1); plat_brightness(v + 1); break;
     case R_SBAR: ui.song_sel = (uint8_t)v; break;
     case R_SPAT:
         song_fill(ui.song_sel);
@@ -402,6 +398,19 @@ static const char *pref_name(pref_t r)
     return d ? d->name : "";
 }
 
+/* a pan: a part's (MIX) or a drum voice's ("Pan", its last pot): drawn L / C / R, its arc from the middle */
+static int is_pan(pref_t r)
+{
+    const x0x_param_t *d;
+    if (r.kind != R_ENG)
+        return 0;
+    if (r.a == T_MIX)
+        return r.c == MX_PAN;
+    d = pref_desc(r);
+    return (r.a == T_909 || r.a == T_808) && d && d->name[0] == 'P' && d->name[1] == 'a' && d->name[2] == 'n' &&
+           !d->name[3];
+}
+
 /* the value, as a number and a unit ("-6" "dB"); a switch gives its name and no unit */
 static void pref_value_of(pref_t r, int v, char *num, char *unit)
 {
@@ -411,6 +420,13 @@ static void pref_value_of(pref_t r, int v, char *num, char *unit)
         return;
     if (d->names) {
         put_s(num, d->names[v]);
+        return;
+    }
+    if (is_pan(r)) {                                     /* L64 .. C .. R63 */
+        if (v == 64)
+            put_s(num, "C");
+        else
+            put_i(put_s(num, v < 64 ? "L" : "R"), v < 64 ? 64 - v : v - 64);
         return;
     }
     switch (r.kind) {
@@ -426,13 +442,6 @@ static void pref_value_of(pref_t r, int v, char *num, char *unit)
             return;
         }
         if (r.a == T_MIX) {
-            if (r.c == MX_PAN) {                         /* L64 .. C .. R63 */
-                if (v == 64)
-                    put_s(num, "C");
-                else
-                    put_i(put_s(num, v < 64 ? "L" : "R"), v < 64 ? 64 - v : v - 64);
-                return;
-            }
             if (r.c == 0) {                              /* level: 100 = 0 dB, square law */
                 if (!v)
                     put_s(num, "OFF");
@@ -681,7 +690,6 @@ static void open_global(void)
     list_add(PR(R_KEYLED, 0, 0, 0));
     list_add(PR(R_KEYSOUND, 0, 0, 0));
     list_add(PR(R_PALETTE, 0, 0, 0));
-    list_add(PR(R_BRIGHT, 0, 0, 0));
     list_add(PR(R_ACCENT, 0, 0, 0));
     list_add(PR(R_SMODE, 0, 0, 0));
     list_add(PR(R_ACT, ACT_SAVE, 0, 0));
@@ -3005,7 +3013,7 @@ static void draw_knobs(void)
                     box(cx - w0 / 2 + k * (pw + gap), 26, pw, 10, k == val ? col : C_LINE);
         } else {
             arc(cx, 34, 15, d->max ? (float)val / (float)d->max : 0.0f, C_LINE, col,
-                r.kind == R_BTRANS || (r.kind == R_ENG && r.a == T_MIX && r.c == MX_PAN));   /* from the middle */
+                r.kind == R_BTRANS || is_pan(r));                                              /* from the middle */
         }
         pref_value_of(r, val, num, unit);
         cell_value(cx, vc(&FONT_B, 55, 14), num, unit, touched ? C_WHITE : C_HI);
@@ -3117,7 +3125,6 @@ void ui_init(void)
     ui.overlay = O_NONE;
     ui.outline_ok = 0;
     palette_set(proj.set.palette);
-    plat_brightness(proj.set.brightness ? proj.set.brightness : 8);
     for (i = 0; i < 4; i++)
         blit_hash[i] = 0;
     build_pages();

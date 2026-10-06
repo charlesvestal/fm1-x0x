@@ -20,7 +20,7 @@
 
 enum { DR_BD, DR_SD, DR_LT, DR_MT, DR_HT, DR_RS, DR_CP, DR_CH, DR_OH, DR_CR, DR_RD, DR_NUM, DR_KIT = DR_NUM };
 
-#define DR_MAX_PARAMS 8          /* most params any voice (or the kit) has */
+#define DR_MAX_PARAMS 9          /* most params any voice (or the kit) has (X0X: + PAN) */
 #define DR_NZ_HIST 256           /* noise history kept across blocks (filter warm-up) */
 #define DR_NZ_BUF (DR_NZ_HIST + 2 * 256)
 
@@ -95,6 +95,7 @@ struct drum909 {
     d9_clap_t clap;
     d9_smp_t smp[4];              /* CH OH CR RD */
     float send_rev[DR_NUM], send_dly[DR_NUM];
+    float pan_l[DR_NUM], pan_r[DR_NUM];   /* X0X: each voice's pan (x0x_pan_gains) */
     float accent, vel_depth;      /* kit */
     uint32_t noise;
     float nz_buf[DR_NZ_BUF];      /* noise, linear; the block plus >= DR_NZ_HIST before it */
@@ -106,6 +107,9 @@ typedef struct drum909 drum909_t;
 void drum909_init(drum909_t *d);
 void drum909_trigger(drum909_t *d, int voice, float vel);
 void drum909_render(drum909_t *d, float *dry, float *rev, float *dly, int n);
+/* X0X stereo: each voice placed by its PAN into dry_l / dry_r (sends mono); all centred, both are
+ * drum909_render's dry exactly */
+void drum909_render_st(drum909_t *d, float *dry_l, float *dry_r, float *rev, float *dly, int n);
 int drum909_nparams(int voice);
 const x0x_param_t *drum909_param(int voice, int i);
 void drum909_set(drum909_t *d, int voice, int i, int value);

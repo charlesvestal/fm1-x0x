@@ -47,7 +47,7 @@ expect guard 1
 load 95
 tap PLAY
 tap GLO
-turn SELECT 12
+turn SELECT 11
 tap SEL
 expect view 7
 tap SEL

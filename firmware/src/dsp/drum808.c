@@ -1247,7 +1247,7 @@ static void set_pot(drum808_t *d, int s, int slot, int v)
 }
 
 /* a track's parameter list: which sound slot each knob edits */
-enum { K_POT, K_FIXED, K_SWITCH, K_KIT };
+enum { K_POT, K_FIXED, K_SWITCH, K_KIT, K_PAN };
 typedef struct { uint8_t kind, slot, snd; } d8_pmap_t;
 
 static const char *const k_dist_names[7] = {"DIODE", "CLIP", "SAT", "BFZ", "PDIST", "FOLD", "CRUSH"};
@@ -1263,41 +1263,41 @@ static const char *const k_choke_names[3] = {"OFF", "CH>OH", "BOTH"};
 #define P_DLY {"Dly", 127, 0, 0}
 
 static const x0x_param_t k_p_bd[] = {PP("Level", 64), PP("Tone", 42), PP("Decay", 87), PP("Tune", 64),
-                                     PP("Attack", 24), P_DRIVE, P_DIST};
+                                     PP("Attack", 24), P_DRIVE, P_DIST, PP("Pan", 64)};
 static const d8_pmap_t k_m_bd[] = {{K_POT, D8P_LEVEL, 0}, {K_POT, D8P_X1, 0}, {K_POT, D8P_DECAY, 0},
                                    {K_POT, D8P_TUNE, 0}, {K_POT, D8P_X2, 0}, {K_POT, D8P_DRIVE, 0},
-                                   {K_POT, D8P_DIST, 0}};
+                                   {K_POT, D8P_DIST, 0}, {K_PAN, 0, 0}};
 static const x0x_param_t k_p_sd[] = {PP("Level", 64), PP("Tone", 64), PP("Snappy", 89), PP("Tune", 64),
-                                     PP("Decay", 108), P_DRIVE, P_DIST, P_REV, P_DLY};
+                                     PP("Decay", 108), P_DRIVE, P_DIST, P_REV, P_DLY, PP("Pan", 64)};
 static const d8_pmap_t k_m_sd[] = {{K_POT, D8P_LEVEL, 0}, {K_POT, D8P_X2, 0}, {K_POT, D8P_X1, 0},
                                    {K_POT, D8P_TUNE, 0}, {K_POT, D8P_DECAY, 0}, {K_POT, D8P_DRIVE, 0},
-                                   {K_POT, D8P_DIST, 0}, {K_POT, D8P_REV, 0}, {K_POT, D8P_DLY, 0}};
+                                   {K_POT, D8P_DIST, 0}, {K_POT, D8P_REV, 0}, {K_POT, D8P_DLY, 0}, {K_PAN, 0, 0}};
 static const x0x_param_t k_p_lt[] = {PP("Level", 64), PP("Tune", 64), PP("Decay", 68), {"Sound", 1, 0, k_tom_names},
-                                     P_DRIVE, P_DIST, P_REV, P_DLY};
+                                     P_DRIVE, P_DIST, P_REV, P_DLY, PP("Pan", 64)};
 static const x0x_param_t k_p_mt[] = {PP("Level", 64), PP("Tune", 64), PP("Decay", 56), {"Sound", 1, 0, k_tom_names},
-                                     P_DRIVE, P_DIST, P_REV, P_DLY};
+                                     P_DRIVE, P_DIST, P_REV, P_DLY, PP("Pan", 64)};
 static const x0x_param_t k_p_ht[] = {PP("Level", 64), PP("Tune", 64), PP("Decay", 53), {"Sound", 1, 0, k_tom_names},
-                                     P_DRIVE, P_DIST, P_REV, P_DLY};
+                                     P_DRIVE, P_DIST, P_REV, P_DLY, PP("Pan", 64)};
 static const x0x_param_t k_p_rs[] = {PP("Level", 64), PP("Tune", 64), PP("Decay", 40), {"Sound", 1, 0, k_rim_names},
-                                     P_DRIVE, P_DIST, P_REV, P_DLY};
+                                     P_DRIVE, P_DIST, P_REV, P_DLY, PP("Pan", 64)};
 static const d8_pmap_t k_m_sw[] = {{K_POT, D8P_LEVEL, 0}, {K_POT, D8P_TUNE, 0}, {K_POT, D8P_DECAY, 0},
                                    {K_SWITCH, 0, 0}, {K_POT, D8P_DRIVE, 0}, {K_POT, D8P_DIST, 0},
-                                   {K_POT, D8P_REV, 0}, {K_POT, D8P_DLY, 0}};
+                                   {K_POT, D8P_REV, 0}, {K_POT, D8P_DLY, 0}, {K_PAN, 0, 0}};
 static const x0x_param_t k_p_cp[] = {PP("Level", 64), PP("Tune", 64), PP("Decay", 64), PP("Attack", 32),
-                                     {"Sound", 1, 0, k_clap_names}, P_DRIVE, P_DIST, P_REV, P_DLY};
+                                     {"Sound", 1, 0, k_clap_names}, P_DRIVE, P_DIST, P_REV, P_DLY, PP("Pan", 64)};
 static const d8_pmap_t k_m_cp[] = {{K_POT, D8P_LEVEL, 0}, {K_POT, D8P_TUNE, 0}, {K_POT, D8P_DECAY, 0},
                                    {K_FIXED, D8P_X1, D8S_MA}, {K_SWITCH, 0, 0}, {K_POT, D8P_DRIVE, 0},
-                                   {K_POT, D8P_DIST, 0}, {K_POT, D8P_REV, 0}, {K_POT, D8P_DLY, 0}};
-static const x0x_param_t k_p_cb[] = {PP("Level", 64), PP("Tune", 64), PP("Decay", 62), P_DRIVE, P_DIST, P_REV, P_DLY};
-static const x0x_param_t k_p_ch[] = {PP("Level", 64), PP("Tune", 64), PP("Decay", 47), P_DRIVE, P_DIST, P_REV, P_DLY};
+                                   {K_POT, D8P_DIST, 0}, {K_POT, D8P_REV, 0}, {K_POT, D8P_DLY, 0}, {K_PAN, 0, 0}};
+static const x0x_param_t k_p_cb[] = {PP("Level", 64), PP("Tune", 64), PP("Decay", 62), P_DRIVE, P_DIST, P_REV, P_DLY, PP("Pan", 64)};
+static const x0x_param_t k_p_ch[] = {PP("Level", 64), PP("Tune", 64), PP("Decay", 47), P_DRIVE, P_DIST, P_REV, P_DLY, PP("Pan", 64)};
 static const d8_pmap_t k_m_tune_decay[] = {{K_POT, D8P_LEVEL, 0}, {K_POT, D8P_TUNE, 0}, {K_POT, D8P_DECAY, 0},
                                            {K_POT, D8P_DRIVE, 0}, {K_POT, D8P_DIST, 0}, {K_POT, D8P_REV, 0},
-                                           {K_POT, D8P_DLY, 0}};
-static const x0x_param_t k_p_cy[] = {PP("Level", 64), PP("Decay", 70), PP("Tune", 64), P_DRIVE, P_DIST, P_REV, P_DLY};
-static const x0x_param_t k_p_oh[] = {PP("Level", 64), PP("Decay", 74), PP("Tune", 64), P_DRIVE, P_DIST, P_REV, P_DLY};
+                                           {K_POT, D8P_DLY, 0}, {K_PAN, 0, 0}};
+static const x0x_param_t k_p_cy[] = {PP("Level", 64), PP("Decay", 70), PP("Tune", 64), P_DRIVE, P_DIST, P_REV, P_DLY, PP("Pan", 64)};
+static const x0x_param_t k_p_oh[] = {PP("Level", 64), PP("Decay", 74), PP("Tune", 64), P_DRIVE, P_DIST, P_REV, P_DLY, PP("Pan", 64)};
 static const d8_pmap_t k_m_decay_tune[] = {{K_POT, D8P_LEVEL, 0}, {K_POT, D8P_DECAY, 0}, {K_POT, D8P_TUNE, 0},
                                            {K_POT, D8P_DRIVE, 0}, {K_POT, D8P_DIST, 0}, {K_POT, D8P_REV, 0},
-                                           {K_POT, D8P_DLY, 0}};
+                                           {K_POT, D8P_DLY, 0}, {K_PAN, 0, 0}};
 static const x0x_param_t k_p_kit[] = {PP("Level", 100), PP("Accent", 127), {"Choke", 2, 1, k_choke_names}};
 static const d8_pmap_t k_m_kit[] = {{K_KIT, 0, 0}, {K_KIT, 1, 0}, {K_KIT, 2, 0}};
 
@@ -1347,6 +1347,10 @@ void drum808_set(drum808_t *d, int track, int i, int value)
     case K_POT: set_pot(d, track_sound(d, track), m->slot, value); break;
     case K_FIXED: set_pot(d, m->snd, m->slot, value); break;
     case K_SWITCH: d->sw[track] = (uint8_t)value; break;
+    case K_PAN:
+        d->tpan[track] = (uint8_t)value;
+        x0x_pan_gains(value, &d->pan_l[track], &d->pan_r[track]);
+        break;
     default: d->kpot[m->slot] = (uint8_t)value; kit_apply(d); break;
     }
 }
@@ -1361,6 +1365,7 @@ int drum808_get(const drum808_t *d, int track, int i)
     case K_POT: return d->pot[track_sound(d, track)][m->slot];
     case K_FIXED: return d->pot[m->snd][m->slot];
     case K_SWITCH: return d->sw[track];
+    case K_PAN: return d->tpan[track];
     default: return d->kpot[m->slot];
     }
 }
@@ -1383,6 +1388,10 @@ void drum808_init(drum808_t *d)
     for (s = 0; s < D8S_NUM; s++)
         for (k = 0; k < D8P_NUM; k++)
             set_pot(d, s, k, k_spec[s][k].def);
+    for (s = 0; s < D8_NUM; s++) {
+        d->tpan[s] = 64;                          /* centre */
+        d->pan_l[s] = d->pan_r[s] = 1.0f;
+    }
     d->kpot[0] = 100;
     d->kpot[1] = 127;
     d->kpot[2] = 1;
@@ -1636,8 +1645,16 @@ static int voice_run(drum808_t *d, int l, float *buf, int m, const float *bus, c
 }
 
 /* trim, drive, level x velocity x choke, into the three buses (sends post-fader) */
+/* the track each lane belongs to (its pan): the clave is the RS track's, the maracas the CP's */
+static const uint8_t k_lane_track[L_NUM] = {D8_BD, D8_SD, D8_LT, D8_MT, D8_HT, D8_RS, D8_RS, D8_CP, D8_CP,
+                                            D8_CB, D8_CH, D8_OH, D8_CY};
+static float *d8_dry_r;         /* the render in progress: its right side (0: mono) */
+
 static void lane_mix(drum808_t *d, d8_lane_t *l, const float *buf, int m, float *dry, float *rev, float *dly)
 {
+    const int tr = k_lane_track[l - d->lane];
+    float *dry_r = d8_dry_r;
+    const float pl = d->pan_l[tr], pr = d->pan_r[tr];
     int s = l->snd, i, type = d->pot[s][D8P_DIST];
     const d8_shp_t *p = &d->shp[s];
     float trim = k_trim[s], g = d->potv[s][D8P_LEVEL] * l->hit * d->vol;
@@ -1645,8 +1662,15 @@ static void lane_mix(drum808_t *d, d8_lane_t *l, const float *buf, int m, float 
     int bypass = p->drive < 1.0e-3f;
     if (l->cstep == 0.0f && bypass) {             /* the common case */
         float k = trim * g * l->cg;
-        for (i = 0; i < m; i++)
-            dry[i] += buf[i] * k;
+        if (dry_r) {
+            float kl = k * pl, kr = k * pr;
+            for (i = 0; i < m; i++) {
+                dry[i] += buf[i] * kl;
+                dry_r[i] += buf[i] * kr;
+            }
+        } else
+            for (i = 0; i < m; i++)
+                dry[i] += buf[i] * k;
         if (ra > 0.0f)
             for (i = 0; i < m; i++) rev[i] += buf[i] * k * ra;
         if (da > 0.0f)
@@ -1668,13 +1692,17 @@ static void lane_mix(drum808_t *d, d8_lane_t *l, const float *buf, int m, float 
         if (!bypass)
             x = shape(x, p, type, l->crush);
         sv = x * g * l->cg;
-        dry[i] += sv;
+        if (dry_r) {
+            dry[i] += sv * pl;
+            dry_r[i] += sv * pr;
+        } else
+            dry[i] += sv;
         rev[i] += sv * ra;
         dly[i] += sv * da;
     }
 }
 
-void drum808_render(drum808_t *d, float *dry, float *rev, float *dly, int n)
+static void d8_render(drum808_t *d, float *dry, float *rev, float *dly, int n)
 {
     float buf[CHUNK], bus[CHUNK], pair[CHUNK];
     int off, l, i;
@@ -1706,10 +1734,28 @@ void drum808_render(drum808_t *d, float *dry, float *rev, float *dly, int n)
                 }
             }
             got = voice_run(d, l, buf, mm, bus, pair);
-            lane_mix(d, ln, buf, got, dry + off, rev + off, dly + off);
+            {
+                float *dr = d8_dry_r;                     /* the chunk's slice of the right side */
+                d8_dry_r = dr ? dr + off : 0;
+                lane_mix(d, ln, buf, got, dry + off, rev + off, dly + off);
+                d8_dry_r = dr;
+            }
 #if D8_TAIL_DB
             lane_tail(d, l, buf, got);
 #endif
         }
     }
+}
+
+void drum808_render(drum808_t *d, float *dry, float *rev, float *dly, int n)
+{
+    d8_dry_r = 0;
+    d8_render(d, dry, rev, dly, n);
+}
+
+void drum808_render_st(drum808_t *d, float *dry_l, float *dry_r, float *rev, float *dly, int n)
+{
+    d8_dry_r = dry_r;
+    d8_render(d, dry_l, rev, dly, n);
+    d8_dry_r = 0;
 }

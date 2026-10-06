@@ -61,6 +61,7 @@ const char *engine_voice_name(int target, int voice);
 void engine_set(int target, int voice, int i, int value);   /* queued; the sound_t mirror is the caller's */
 void engine_apply_sound(const sound_t *s);                  /* queue every value (load, init) */
 void engine_sound_defaults(sound_t *s);                     /* each engine's power-on values */
+void engine_sound_centre_drum_pans(sound_t *s);             /* every drum voice's PAN (its last pot) to centre */
 void engine_drum(int kit, int voice, float vel);            /* play now (keys) */
 void engine_bass_on(int part, int note, int accent, int slide);
 void engine_bass_off(int part);

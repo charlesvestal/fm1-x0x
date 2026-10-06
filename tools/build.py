@@ -52,7 +52,7 @@ SDK_SHA256 = {
     "cfg/eq_cfg_hw.bin": "41167491bffed4651750719c973d2758adeb9021a5670d02d6a53c85ed80ea7d",
 }
 
-PRODUCT = "FM-1_900"                # package identity; release builds are FM-1_9XY
+PRODUCT = "FM-1_900"                # package identity; release builds are FM-1_9XXYYZZ (see main)
 VERSION = None                      # FELUCCA_VERSION for release builds (default: firmware/src/ui.c)
 
 
@@ -328,15 +328,19 @@ def mmio_check():
 def main():
     global PRODUCT, VERSION
     ap = argparse.ArgumentParser()
-    ap.add_argument("--release", metavar="X.Y", help="release build: identity FM-1_9XY, version string X.Y")
+    ap.add_argument("--release", metavar="X.Y[.Z]", help="release build: identity FM-1_9XXYYZZ, version string X.Y[.Z]")
     ap.add_argument("--sdk", type=Path, help="JieLi AC79 SDK checkout (default: $AC79_SDK)")
     a = ap.parse_args()
     name = "x0x.fwsc"
-    if a.release:                   # one digit each: the identity has room for two
-        m = re.fullmatch(r"(\d)\.(\d)(-[A-Za-z0-9]+)?", a.release)
+    if a.release:
+        # identity FM-1_9 + major, minor, patch as two digits each (0.10 -> FM-1_9001000). FM-1 is the
+        # model the update tools match on; the number is ours (X0X 0.3..0.9 were FM-1_9XY, one digit
+        # each, which ran out at 0.9 and was also Felucca's own numbering). 12 of the 20 characters a
+        # package's identity holds; digits only after the underscore, as the tools parse it.
+        m = re.fullmatch(r"(\d{1,2})\.(\d{1,2})(?:\.(\d{1,2}))?(-[A-Za-z0-9]+)?", a.release)
         if not m:
-            raise SystemExit(f"--release {a.release}: use X.Y or X.Y-suffix, one digit each")
-        PRODUCT = "FM-1_9" + m[1] + m[2]
+            raise SystemExit(f"--release {a.release}: use X.Y[.Z][-suffix], up to two digits each")
+        PRODUCT = "FM-1_9%02d%02d%02d" % (int(m[1]), int(m[2]), int(m[3] or 0))
         VERSION = a.release.upper() if "BETA" in a.release.upper() else a.release.upper() + " BETA"
         name = f"x0x-{a.release}.fwsc"
     fm1pkg_make.SDK = a.sdk
