@@ -8,7 +8,7 @@ MIDI device and an audio input, with no driver needed.
 
 The factory sound is set up for big beat, so it should make noise the moment you press PLAY.
 
-[![X0X running on the FM-1 (watch on YouTube)](https://img.youtube.com/vi/jFaJaiuF0JE/maxresdefault.jpg)](https://www.youtube.com/watch?v=jFaJaiuF0JE)
+[![X0X running on the FM-1 (watch on YouTube)](https://img.youtube.com/vi/qU3SP3JC_ok/hqdefault.jpg)](https://www.youtube.com/watch?v=qU3SP3JC_ok)
 
 - **Try it in your browser** (no FM-1 needed): <https://charlesvestal.github.io/fm1-x0x/emu/>
 - **Install it** (Chrome or Edge, with the FM-1 plugged in): <https://charlesvestal.github.io/fm1-x0x/install/>
