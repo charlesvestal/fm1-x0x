@@ -57,6 +57,9 @@ h1 { font: 700 2.6rem/1.1 "Barlow Semi Condensed", "Barlow", sans-serif; margin:
 .ways span { color: var(--muted); font-size: .95rem; }
 p.small { color: var(--muted); font-size: .9rem; }
 .video { position: relative; aspect-ratio: 16 / 9; max-width: 100%; margin: 1.5rem 0; border-radius: 6px; overflow: hidden; background: #000; }
+.listen { margin: 0 0 1.5rem; }
+.listen p { margin: 0 0 .5rem; color: var(--muted); font-size: .95rem; }
+.listen audio { width: 100%; display: block; }
 .video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
 a { color: var(--accent); }
 </style>
@@ -69,6 +72,9 @@ line generator, and a breakbeat player, all running at once, with patterns, a so
 recorded knob moves.</p>
 <div class="video"><iframe src="https://www.youtube-nocookie.com/embed/jFaJaiuF0JE" title="X0X running on the FM-1"
   allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div>
+<figure class="listen"><p>Hear it: <strong>Higher State</strong>, made on the FM-1 with X0X.</p>
+  <audio controls preload="metadata" src="audio/higher-state.m4a">
+    <a href="audio/higher-state.m4a">Download Higher State (m4a)</a></audio></figure>
 <div class="status"><strong>Version __VERSION__, a beta.</strong> X0X runs on the FM-1; with every part
 playing a dense pattern at once it can still overload. It installs and uninstalls the way Felucca
 does, and the installer can put M-VAVE's own firmware back. Installing is at your own risk.</div>
@@ -114,6 +120,7 @@ def main(pkg, version, out):
     subprocess.run([sys.executable, str(SRC / "tools" / "manual_html.py"), str(SRC / "docs" / "MANUAL.md"),
                     str(out / "manual" / "index.html")], check=True, capture_output=True)
     shutil.copytree(SRC / "docs" / "img", out / "manual" / "img")
+    shutil.copytree(SRC / "web" / "audio", out / "audio")
     # the landing page
     (out / "index.html").write_text(LANDING.replace("__VERSION__", html.escape(version)).replace("__PKG__", name)
                                     .replace("__REPO__", REPO), encoding="utf-8")
