@@ -4,6 +4,7 @@
  * the fitted constants, the defaults and the per-trigger pinning are 9W9's, line
  * for line; only the arithmetic substrate changed (see drum909_dsp.h). Comments
  * that explain WHY a constant is what it is live in 9W9 and are not repeated. */
+#define X0X_DRUM_TABLES_DEFINE              /* the shared lookup tables live here (x0x_drum_tables.h) */
 #include "drum909.h"
 #include "x0x_drum_samples.h"
 

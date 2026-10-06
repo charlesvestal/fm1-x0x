@@ -1,0 +1,12 @@
+# Stereo: the MIX view's PANS page, and a part's pan on its SENDS page.
+wait 300
+tap LFO
+turn SELECT 1
+wait 100
+shot s01_pans.png
+turn K1 -40
+turn K3 30
+wait 1200
+shot s02_panned.png
+expect sound5.0.3 24
+expect sound5.2.3 94

@@ -389,11 +389,13 @@ static void pref_set(pref_t r, int v)
 /* a knob's label: mixer refs name their part */
 static const char *pref_name(pref_t r)
 {
-    static const char *const MIXN[NPARTS][3] = {{"909", "909 RV", "909 DL"}, {"808", "808 RV", "808 DL"},
-                                                {"303 A", "A REV", "A DLY"}, {"303 B", "B REV", "B DLY"},
-                                                {"BREAK", "BRK RV", "BRK DL"}};
+    static const char *const MIXN[NPARTS][MX_NPARAMS] = {{"909", "909 RV", "909 DL", "909 PAN"},
+                                                         {"808", "808 RV", "808 DL", "808 PAN"},
+                                                         {"303 A", "A REV", "A DLY", "A PAN"},
+                                                         {"303 B", "B REV", "B DLY", "B PAN"},
+                                                         {"BREAK", "BRK RV", "BRK DL", "BRK PAN"}};
     const x0x_param_t *d = pref_desc(r);
-    if (r.kind == R_ENG && r.a == T_MIX && r.b < NPARTS && r.c < 3)
+    if (r.kind == R_ENG && r.a == T_MIX && r.b < NPARTS && r.c < MX_NPARAMS)
         return MIXN[r.b][r.c];
     if (r.kind == R_BRKSLOT)
         return r.a ? "LOOP B" : "LOOP A";
@@ -424,6 +426,13 @@ static void pref_value_of(pref_t r, int v, char *num, char *unit)
             return;
         }
         if (r.a == T_MIX) {
+            if (r.c == MX_PAN) {                         /* L64 .. C .. R63 */
+                if (v == 64)
+                    put_s(num, "C");
+                else
+                    put_i(put_s(num, v < 64 ? "L" : "R"), v < 64 ? 64 - v : v - 64);
+                return;
+            }
             if (r.c == 0) {                              /* level: 100 = 0 dB, square law */
                 if (!v)
                     put_s(num, "OFF");
@@ -546,7 +555,7 @@ static void build_pages(void)
         if (is_drum()) {
             int t = p == PART_909 ? T_909 : T_808, k = p;
             add_eng_pages(t, ui.sel[k], 0, 99, engine_voice_name(t, ui.sel[k]));
-            add_page("SENDS", PR(R_ENG, T_MIX, p, 1), PR(R_ENG, T_MIX, p, 2), PR(R_ENG, T_MIX, p, 0), NONE);
+            add_page("SENDS", PR(R_ENG, T_MIX, p, 1), PR(R_ENG, T_MIX, p, 2), PR(R_ENG, T_MIX, p, 0), PR(R_ENG, T_MIX, p, MX_PAN));
             add_page("PART", PR(R_DLEN, k, 0, 0), PR(R_DRATE, k, 0, 0), PR(R_SWING, 0, 0, 0), PR(R_ACCENT, 0, 0, 0));
             add_eng_pages(t, NDRUM, 0, 99, "KIT");
         } else if (is_303()) {
@@ -554,7 +563,7 @@ static void build_pages(void)
             add_eng_pages(T_303, b, 0, 4, "FILTER");
             add_eng_pages(T_303, b, 4, 8, "VOICE");
             add_eng_pages(T_303, b, 8, 12, "DRIVE");
-            add_page("SENDS", PR(R_ENG, T_MIX, p, 1), PR(R_ENG, T_MIX, p, 2), PR(R_ENG, T_MIX, p, 0), NONE);
+            add_page("SENDS", PR(R_ENG, T_MIX, p, 1), PR(R_ENG, T_MIX, p, 2), PR(R_ENG, T_MIX, p, 0), PR(R_ENG, T_MIX, p, MX_PAN));
             add_page("LINE", PR(R_BLEN, b, 0, 0), PR(R_BRATE, b, 0, 0), PR(R_BDIR, b, 0, 0), PR(R_BTRANS, b, 0, 0));
         } else {
             add_page("GROOVE", PR(R_BRKSET, 0, 0, BRK_COMPLEX), PR(R_BRKSET, 0, 0, BRK_ANCHOR),
@@ -566,7 +575,7 @@ static void build_pages(void)
             add_page("LOOPS", PR(R_BRKSLOT, 0, 0, 0), PR(R_BRKSLOT, 1, 0, 0), PR(R_ENG, T_BRK, 0, 0),
                      PR(R_ENG, T_BRK, 0, 1));
             add_page("SENDS", PR(R_ENG, T_MIX, PART_BRK, 1), PR(R_ENG, T_MIX, PART_BRK, 2),
-                     PR(R_ENG, T_MIX, PART_BRK, 0), NONE);
+                     PR(R_ENG, T_MIX, PART_BRK, 0), PR(R_ENG, T_MIX, PART_BRK, MX_PAN));
         }
         break;
     case V_GEN: {
@@ -589,13 +598,15 @@ static void build_pages(void)
         add_page("DELAY", PR(R_ENG, T_FX, 0, FX_DL_TIME), PR(R_ENG, T_FX, 0, FX_DL_FDBK),
                  PR(R_ENG, T_FX, 0, FX_DL_TONE), PR(R_ENG, T_FX, 0, FX_DL_LEVEL));
         add_page("TAPE", PR(R_ENG, T_FX, 0, FX_DL_TYPE), PR(R_ENG, T_FX, 0, FX_DL_WEAR),
-                 PR(R_ENG, T_FX, 0, FX_DL_HPF), NONE);
+                 PR(R_ENG, T_FX, 0, FX_DL_HPF), PR(R_ENG, T_FX, 0, FX_DL_PING));
         add_page("KIT DRIVE", PR(R_ENG, T_FX, 0, FX_VOLUME), PR(R_ENG, T_FX, 0, FX_DIST),
                  PR(R_ENG, T_FX, 0, FX_DRIVE), PR(R_ENG, T_FX, 0, FX_COMP));
         break;
     case V_MIX:
         add_page("LEVELS", PR(R_ENG, T_MIX, PART_909, 0), PR(R_ENG, T_MIX, PART_808, 0), PR(R_ENG, T_MIX, PART_303A, 0),
                  PR(R_ENG, T_MIX, PART_303B, 0));
+        add_page("PANS", PR(R_ENG, T_MIX, PART_909, MX_PAN), PR(R_ENG, T_MIX, PART_808, MX_PAN),
+                 PR(R_ENG, T_MIX, PART_303A, MX_PAN), PR(R_ENG, T_MIX, PART_303B, MX_PAN));
         add_page("COMP", PR(R_ENG, T_MST, 0, MST_THRESH), PR(R_ENG, T_MST, 0, MST_RATIO),
                  PR(R_ENG, T_MST, 0, MST_ATTACK), PR(R_ENG, T_MST, 0, MST_RELEASE));
         add_page("COMP", PR(R_ENG, T_MST, 0, MST_MAKEUP), PR(R_ENG, T_MST, 0, MST_MIX), PR(R_ENG, T_MST, 0, MST_PUMP),
@@ -2993,7 +3004,8 @@ static void draw_knobs(void)
                 for (k = 0; k < n; k++)
                     box(cx - w0 / 2 + k * (pw + gap), 26, pw, 10, k == val ? col : C_LINE);
         } else {
-            arc(cx, 34, 15, d->max ? (float)val / (float)d->max : 0.0f, C_LINE, col, r.kind == R_BTRANS);
+            arc(cx, 34, 15, d->max ? (float)val / (float)d->max : 0.0f, C_LINE, col,
+                r.kind == R_BTRANS || (r.kind == R_ENG && r.a == T_MIX && r.c == MX_PAN));   /* from the middle */
         }
         pref_value_of(r, val, num, unit);
         cell_value(cx, vc(&FONT_B, 55, 14), num, unit, touched ? C_WHITE : C_HI);

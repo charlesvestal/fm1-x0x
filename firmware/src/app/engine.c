@@ -88,10 +88,13 @@ static void guard_apply(void)
 }
 
 /* mixer: per part Level, Rev send, Dly send (a drum machine's add to its voices' own sends) */
-enum { MX_LEVEL, MX_REV, MX_DLY, MX_NPARAMS };
-static const x0x_param_t MIX_P[MX_NPARAMS] = {{"LEVEL", 127, 100, 0}, {"REV", 127, 0, 0}, {"DLY", 127, 0, 0}};
+static const x0x_param_t MIX_P[MX_NPARAMS] = {{"LEVEL", 127, 100, 0}, {"REV", 127, 0, 0}, {"DLY", 127, 0, 0},
+                                               {"PAN", 127, 64, 0}};
 static const char *const PART_NAMES[NPARTS] = {"909", "808", "303 A", "303 B", "BREAK"};
 static float mix_level[NPARTS], mix_rev[NPARTS], mix_dly[NPARTS];
+/* pan: a balance law. Centre is full level on both sides (a centred mix is the mono one exactly);
+ * turning toward a side fades the other out along a quarter cosine, the near side stays at 1 */
+static float mix_pl[NPARTS] = {1, 1, 1, 1, 1}, mix_pr[NPARTS] = {1, 1, 1, 1, 1};
 
 /* ------------------------------------------------------- command queue --- */
 /* uint32 commands, single producer (main loop) / single consumer (audio ISR):
@@ -185,6 +188,11 @@ static void apply_param(int t, int v, int i, int val)    /* ISR */
             mix_rev[v] = (float)val / 127.0f;
         else if (i == MX_DLY)
             mix_dly[v] = (float)val / 127.0f;
+        else if (i == MX_PAN) {
+            float q = val >= 64 ? (float)(val - 64) / 63.0f : (float)(val - 64) / 64.0f;   /* -1 .. 1 */
+            mix_pl[v] = q > 0.0f ? fm_cosf(q * 1.5707963f) : 1.0f;
+            mix_pr[v] = q < 0.0f ? fm_cosf(q * 1.5707963f) : 1.0f;
+        }
         break;
     case T_MST: master_set(&mst, i, val); break;
     default: break;
@@ -416,13 +424,34 @@ static void meter(int p, const float *x, float g, uint32_t n)
     part_peak[p] = pk;
 }
 
-static void render_sub(float *out, uint32_t n)
+/* dry into L and R by the part's pan; the sends stay mono (the reverb and delay make the width) */
+static void add_panned(float *dl, float *dr, const float *src, int p, float g, uint32_t n)
 {
-    static float dry[256], rev[256], dly[256], t0[256], t1[256], t2[256];
+    uint32_t i;
+    float gl = g * mix_pl[p], gr = g * mix_pr[p];
+    if (gl == gr) {                                       /* centred: one product for both sides */
+        if (gl == 0.0f)
+            return;
+        for (i = 0; i < n; i++) {
+            float x = src[i] * gl;
+            dl[i] += x;
+            dr[i] += x;
+        }
+        return;
+    }
+    for (i = 0; i < n; i++) {
+        dl[i] += src[i] * gl;
+        dr[i] += src[i] * gr;
+    }
+}
+
+static void render_sub(float *out_l, float *out_r, uint32_t n)
+{
+    static float dry_l[256], dry_r[256], rev[256], dly[256], t0[256], t1[256], t2[256];
     uint32_t i;
     int b;
     for (i = 0; i < n; i++)
-        dry[i] = rev[i] = dly[i] = 0.0f;
+        dry_l[i] = dry_r[i] = rev[i] = dly[i] = 0.0f;
     /* drum machines: their own per-voice sends; the part level scales all three buses. A silent
      * part is not cleared, mixed or metered (it would add zeros): the 909 is still called, for its
      * shared noise; the 808 does nothing while silent, so it is skipped. Exact either way. */
@@ -441,7 +470,7 @@ static void render_sub(float *out, uint32_t n)
             drum909_render(&d909, t0, t1, t2, (int)n);
         else
             drum808_render(&d808, t0, t1, t2, (int)n);
-        add_scaled(dry, t0, g, n);
+        add_panned(dry_l, dry_r, t0, b, g, n);
         add_scaled(rev, t1, g, n);
         add_scaled(dly, t2, g, n);
         add_scaled(rev, t0, g * mix_rev[b], n);        /* the kit send: the whole machine */
@@ -458,7 +487,7 @@ static void render_sub(float *out, uint32_t n)
             PROF_ADD(2 + b, pt);
             continue;
         }
-        add_scaled(dry, t0, mix_level[p], n);
+        add_panned(dry_l, dry_r, t0, p, mix_level[p], n);
         add_scaled(rev, t0, mix_level[p] * mix_rev[p], n);
         add_scaled(dly, t0, mix_level[p] * mix_dly[p], n);
         meter(p, t0, mix_level[p], n);
@@ -470,7 +499,7 @@ static void render_sub(float *out, uint32_t n)
         int silent = breaks_silent(&brk);              /* the render writes zeros: nothing to mix */
         breaks_render(&brk, t0, (int)n);
         if (!silent) {
-            add_scaled(dry, t0, g, n);
+            add_panned(dry_l, dry_r, t0, PART_BRK, g, n);
             add_scaled(rev, t0, g * mix_rev[PART_BRK], n);
             add_scaled(dly, t0, g * mix_dly[PART_BRK], n);
             meter(PART_BRK, t0, g, n);
@@ -479,14 +508,14 @@ static void render_sub(float *out, uint32_t n)
     }
     {
         PROF_T(pt);
-        fxbus_process(&fx, dry, rev, dly, out, (int)n);
+        fxbus_process_st(&fx, dry_l, dry_r, rev, dly, out_l, out_r, (int)n);
         PROF_ADD(5, pt);
     }
 }
 
 void engine_render(int32_t *out_lr, uint32_t n)
 {
-    static float mono[256];
+    static float out_l[256], out_r[256];
     uint32_t done = 0, i;
     float vol = (float)plat_master() / 4096.0f;
     int p;
@@ -510,7 +539,7 @@ void engine_render(int32_t *out_lr, uint32_t n)
     }
     while (done < n) {
         uint32_t k = seq_until_event(&seq, n - done);
-        render_sub(mono + done, k);
+        render_sub(out_l + done, out_r + done, k);
         {
             PROF_T(pt);
             seq_advance(&seq, k, &SINK);
@@ -523,15 +552,14 @@ void engine_render(int32_t *out_lr, uint32_t n)
     mot_playing = seq.playing;
     {
         PROF_T(pt);
-        master_process(&mst, mono, (int)n, vol);
+        master_process_st(&mst, out_l, out_r, (int)n, vol);
         PROF_ADD(6, pt);
     }
     for (i = 0; i < n; i++) {
-        int32_t s = (int32_t)(mono[i] * 4194303.0f);     /* 2^22: Felucca's -6 dBFS ceiling of the 24-bit codec */
-        out_lr[2u * i] = s;
-        out_lr[2u * i + 1u] = s;
+        out_lr[2u * i] = (int32_t)(out_l[i] * 4194303.0f);   /* 2^22: Felucca's -6 dBFS ceiling of the 24-bit codec */
+        out_lr[2u * i + 1u] = (int32_t)(out_r[i] * 4194303.0f);
         if (i & 1u)
-            eng_scope[eng_scope_w++ & (SCOPE_N - 1u)] = (int16_t)(mono[i] * 32767.0f);
+            eng_scope[eng_scope_w++ & (SCOPE_N - 1u)] = (int16_t)((out_l[i] + out_r[i]) * 16383.5f);
     }
     for (p = 0; p < NPARTS; p++) {                      /* meters: peak hold, ~300 ms decay at the UI */
         uint32_t q = (uint32_t)(fm_minf(part_peak[p], 1.0f) * 32767.0f);

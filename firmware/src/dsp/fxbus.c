@@ -5,6 +5,7 @@
 
 static const int32_t fx_cl[4] = { 1116, 1188, 1277, 1356 };
 static const int32_t fx_al[2] = { 556, 441 };
+static const int32_t fx_alr[2] = { 579, 457 };
 #define FX_RV_QUIET (1356 + 8192)          /* combs silent this long: the allpass tail is < -140 dB */
 
 /* 1/32 1/16T 1/16 1/8T 1/16. 1/8 1/4T 1/8. 1/4 1/2T 1/4. 1/2 1/2. (in beats) */
@@ -26,6 +27,7 @@ static const char *const fx_div_names[13] = {
     "1/32", "1/16T", "1/16", "1/8T", "1/16.", "1/8", "1/4T", "1/8.", "1/4", "1/2T", "1/4.", "1/2", "1/2."
 };
 static const char *const fx_type_names[2] = { "DIGI", "TAPE" };
+static const char *const fx_onoff_names[2] = { "OFF", "ON" };
 
 /* pot defaults: the positions 9W9 seeds from its defaults (the engine itself
  * starts on the exact defaults) */
@@ -45,6 +47,7 @@ static const fx_pspec_t fx_p[FX_NPARAMS] = {
     [FX_DL_HPF]   = { { "DlHPF", 127, 62, 0 }, CV_EXP, X0X_EXP_FX_HPF, 0.0f, 0.0f },
     [FX_DL_TYPE]  = { { "DlType", 1, 0, fx_type_names }, CV_SW, 0, 0.0f, 0.0f },
     [FX_DL_WEAR]  = { { "Wear", 127, 64, 0 }, CV_LIN, 0, 0.0f, 1.0f },
+    [FX_DL_PING]  = { { "Ping", 1, 0, fx_onoff_names }, CV_SW, 0, 0.0f, 0.0f },
 };
 
 int fxbus_nparams(void) { return FX_NPARAMS; }
@@ -99,6 +102,7 @@ static void fx_apply(fxbus_t *f, int i, float v)
     case FX_DL_HPF: d9_biquad_set(&f->dl_hp, D9_HP, v, 0.7071f); break;
     case FX_DL_TYPE: f->dl_type = (int32_t)v; break;
     case FX_DL_WEAR: f->wear = v; break;
+    case FX_DL_PING: f->dl_ping = (int32_t)v; break;
     default: break;
     }
     if (i == FX_DIST || i == FX_DRIVE)
@@ -172,7 +176,7 @@ void fxbus_init(fxbus_t *f, int16_t *dly_buf, int dly_len)
 /* ===================================================================== */
 /* Reverb (er99_verb_tick), adds its return into out                      */
 /* ===================================================================== */
-static void fx_reverb(fxbus_t *f, const float *in, float *out, int n)
+static void fx_reverb(fxbus_t *f, const float *in, float *out, float *out_r, int n)
 {
     if (f->rv_quiet >= FX_RV_QUIET) {
         int any = 0;
@@ -190,16 +194,18 @@ static void fx_reverb(fxbus_t *f, const float *in, float *out, int n)
     cb[2] = cb[1] + fx_cl[1];
     cb[3] = cb[2] + fx_cl[2];
     float *ab0 = f->ap, *ab1 = f->ap + fx_al[0];
+    float *ar0 = f->apr, *ar1 = f->apr + fx_alr[0];
     int32_t quiet = f->rv_quiet;
     for (int i = 0; i < n; ++i) {
         const float x = d9_biquad_tick(&f->rv_hp, in[i]);
-        float acc = 0.0f;
+        float acc = 0.0f, acc_r = 0.0f;
         int32_t wr = 0;
         for (int c = 0; c < 4; ++c) {
             int16_t *b = cb[c];
             const int32_t p = f->cpos[c];
             const float y = (float)b[p] * (1.0f / 2048.0f);
             acc += y;
+            acc_r += (c & 1) ? -y : y;
             f->cdmp[c] = y + (f->cdmp[c] - y) * damp;
             /* the loop runs at 12 bits, truncated toward zero (no DC) */
             int32_t k = (int32_t)((x + f->cdmp[c] * fb) * 2048.0f);
@@ -225,6 +231,20 @@ static void fx_reverb(fxbus_t *f, const float *in, float *out, int n)
             f->apos[1] = p + 1 >= fx_al[1] ? 0 : p + 1;
         }
         out[i] += y * lvl;
+        if (out_r) {                        /* the right: the combs, alternate signs, its own allpasses */
+            float yr = acc_r * 0.25f;
+            int32_t p = f->aposr[0];
+            float bo = ar0[p];
+            ar0[p] = yr + bo * 0.5f;
+            yr = bo - yr * 0.5f;
+            f->aposr[0] = p + 1 >= fx_alr[0] ? 0 : p + 1;
+            p = f->aposr[1];
+            bo = ar1[p];
+            ar1[p] = yr + bo * 0.5f;
+            yr = bo - yr * 0.5f;
+            f->aposr[1] = p + 1 >= fx_alr[1] ? 0 : p + 1;
+            out_r[i] += yr * lvl;
+        }
         quiet = (wr == 0 && in[i] == 0.0f) ? quiet + 1 : 0;
     }
     f->rv_quiet = quiet;
@@ -239,7 +259,23 @@ static inline float fx_psin(uint32_t ph)                 /* parabolic sine of a 
     return 4.0f * x * (1.0f - fm_fabsf(x));
 }
 
-static void fx_delay(fxbus_t *f, const float *in, float *out, int n)
+/* the line at d samples behind w, interpolated (X0X: the ping-pong tap) */
+static inline float dl_tap(const int16_t *buf, int32_t len, float flen, int32_t w, float d)
+{
+    float rp = (float)w - d;
+    while (rp < 0.0f) rp += flen;
+    int32_t i0 = (int32_t)rp;
+    const float fr = rp - (float)i0;
+    if (i0 >= len) i0 -= len;
+    const int32_t i1 = i0 + 1 >= len ? 0 : i0 + 1;
+    const float b0 = (float)buf[i0] * (1.0f / 2048.0f), b1 = (float)buf[i1] * (1.0f / 2048.0f);
+    return b0 + (b1 - b0) * fr;
+}
+
+/* out_r 0: 9W9's mono delay. Else both sides get the echo, or with PING the left reads at the time and
+ * the right at twice it, the loop fed from the right: echoes alternate L R L R, one time apart. The
+ * line holds both, so PING needs twice the time to fit (a 2 s line: 1 s); past that it plays centred. */
+static void fx_delay(fxbus_t *f, const float *in, float *out, float *out_r, int n)
 {
     const float target = f->dl_time_ms * 0.001f * D9_SR;
     const int32_t len = f->dlen;
@@ -272,6 +308,7 @@ static void fx_delay(fxbus_t *f, const float *in, float *out, int n)
     }
     int16_t *buf = f->dbuf;
     const float flen = (float)len;
+    const int ping = out_r && f->dl_ping && 2.0f * fm_maxf(f->dcur, target) + 4.0f < flen;
     const float lvl = f->dl_level;
     int32_t quiet = f->dl_quiet;
     int32_t w = f->w;
@@ -291,7 +328,8 @@ static void fx_delay(fxbus_t *f, const float *in, float *out, int n)
             const int32_t i1 = i0 + 1 >= len ? 0 : i0 + 1;
             const float b0 = (float)buf[i0] * (1.0f / 2048.0f), b1 = (float)buf[i1] * (1.0f / 2048.0f);
             const float y = b0 + (b1 - b0) * fr;
-            lp += (y * fdbk - lp) * tc;
+            const float y2 = ping ? dl_tap(buf, len, flen, w, 2.0f * dcur) : y;
+            lp += (y2 * fdbk - lp) * tc;
             if (fm_fabsf(lp) < 1e-20f) lp = 0.0f;
             int32_t k = (int32_t)((x + lp) * 2048.0f);       /* 12-bit, toward zero */
             if (k > 32767) k = 32767;
@@ -299,6 +337,8 @@ static void fx_delay(fxbus_t *f, const float *in, float *out, int n)
             buf[w] = (int16_t)k;
             if (++w >= len) w = 0;
             out[i] += y * lvl;
+            if (out_r)
+                out_r[i] += y2 * lvl;
             quiet = (k == 0 && in[i] == 0.0f) ? quiet + 1 : 0;
         }
     } else {
@@ -318,7 +358,8 @@ static void fx_delay(fxbus_t *f, const float *in, float *out, int n)
             dcur += (target - dcur) * 0.0008f;
             wp += wow_i;
             fp += flut_i;
-            float rp = (float)w - (dcur + wow_a * fx_psin(wp) + flut_a * fx_psin(fp));
+            const float dmod = dcur + wow_a * fx_psin(wp) + flut_a * fx_psin(fp);
+            float rp = (float)w - dmod;
             while (rp < 0.0f) rp += flen;
             int32_t i0 = (int32_t)rp;
             const float fr = rp - (float)i0;
@@ -326,7 +367,8 @@ static void fx_delay(fxbus_t *f, const float *in, float *out, int n)
             const int32_t i1 = i0 + 1 >= len ? 0 : i0 + 1;
             const float b0 = (float)buf[i0] * (1.0f / 2048.0f), b1 = (float)buf[i1] * (1.0f / 2048.0f);
             const float y = b0 + (b1 - b0) * fr;
-            lp += (y * fdbk - lp) * tc;
+            const float y2 = ping ? dl_tap(buf, len, flen, w, 2.0f * dmod) : y;
+            lp += (y2 * fdbk - lp) * tc;
             if (fm_fabsf(lp) < 1e-20f) lp = 0.0f;
             float s = d9_tanh(lp * g) * inv_g;                   /* tape saturation holds the loop */
             hp += (s - hp) * 0.0042725f;                          /* 30 Hz: no DC latch-up past unity */
@@ -337,6 +379,8 @@ static void fx_delay(fxbus_t *f, const float *in, float *out, int n)
             buf[w] = (int16_t)k;
             if (++w >= len) w = 0;
             out[i] += y * lvl;
+            if (out_r)
+                out_r[i] += y2 * lvl;
             quiet = (k == 0 && in[i] == 0.0f) ? quiet + 1 : 0;
         }
         f->wow_ph = wp;
@@ -358,8 +402,8 @@ void fxbus_process(fxbus_t *f, const float *dry, const float *rev, const float *
         n = 256;
     for (int i = 0; i < n; ++i)
         out[i] = dry[i];
-    fx_reverb(f, rev, out, n);
-    fx_delay(f, dly, out, n);
+    fx_reverb(f, rev, out, 0, n);
+    fx_delay(f, dly, out, 0, n);
 
     if (f->dist_mode >= 1) {
         const float k = f->drive;
@@ -392,4 +436,56 @@ void fxbus_process(fxbus_t *f, const float *dry, const float *rev, const float *
     const float vol = f->volume;
     for (int i = 0; i < n; ++i)
         out[i] *= vol;
+}
+
+/* X0X stereo: 9W9's chain on L and R. The distortion runs on each side; the glue compressor reads
+ * the louder side and moves both together, so the image holds */
+void fxbus_process_st(fxbus_t *f, const float *dry_l, const float *dry_r, const float *rev, const float *dly,
+                      float *out_l, float *out_r, int n)
+{
+    if (n > 256)
+        n = 256;
+    for (int i = 0; i < n; ++i) {
+        out_l[i] = dry_l[i];
+        out_r[i] = dry_r[i];
+    }
+    fx_reverb(f, rev, out_l, out_r, n);
+    fx_delay(f, dly, out_l, out_r, n);
+    if (f->dist_mode >= 1) {
+        const float k = f->drive;
+        for (int i = 0; i < n; ++i) {
+            out_l[i] = d9_shape(&f->shape, out_l[i] * k, f->crush_st) * 0.7f;
+            out_r[i] = d9_shape(&f->shape, out_r[i] * k, f->crush_str) * 0.7f;
+        }
+    }
+    if (f->comp > 0.001f) {
+        const float thr = f->c_thr, slope = f->c_slope, makeup = f->c_makeup;
+        const float drel = f->c_drel, atk = f->c_atk, rel = f->c_rel;
+        float det = f->comp_det, env = f->comp_env_db;
+        for (int i = 0; i < n; ++i) {
+            const float ml = fm_fabsf(out_l[i]), mr = fm_fabsf(out_r[i]);
+            const float mag = ml > mr ? ml : mr;
+            det = mag > det ? mag : det * drel;
+            const float in_db = det > 1e-9f ? 6.0205999f * fm_log2f(det) : -120.0f;
+            const float over = in_db - thr;
+            float gr = 0.0f;
+            if (over >= 3.0f)
+                gr = -over * slope;
+            else if (over > -3.0f) {
+                const float t = over + 3.0f;
+                gr = -(t * t) * (1.0f / 12.0f) * slope;
+            }
+            env = gr + (env - gr) * (gr < env ? atk : rel);
+            const float g = fm_db2lin(env + makeup);
+            out_l[i] *= g;
+            out_r[i] *= g;
+        }
+        f->comp_det = det;
+        f->comp_env_db = env;
+    }
+    const float vol = f->volume;
+    for (int i = 0; i < n; ++i) {
+        out_l[i] *= vol;
+        out_r[i] *= vol;
+    }
 }

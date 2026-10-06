@@ -208,7 +208,7 @@ page.
 
 Press EDIT to step through the selected track's sound settings, followed by these pages:
 
-- SENDS: how much of the part goes to the reverb and the delay, and its level.
+- SENDS: how much of the part goes to the reverb and the delay, its level and its PAN.
 - PART: LENGTH (1–32 steps), RATE (1/16, 1/16 triplet, 1/32 or 1/8 triplet), SWING and
   ACCENT.
 - KIT: settings for the whole kit.
@@ -235,7 +235,7 @@ Press EDIT to step through these pages:
 - FILTER: CUTOFF, RESO, ENVMOD and DECAY.
 - VOICE: ACCENT, WAVE (saw or square), TUNE and VOLUME.
 - DRIVE: DRIVE, DRIVE TYPE (off, soft or RAT), SLIDE time and ACCENT DECAY.
-- SENDS: reverb, delay and level.
+- SENDS: reverb, delay, level and pan.
 - LINE: LENGTH (1–32 steps), RATE, DIRECTION (forward, reverse, ping-pong or random) and
   TRANSPOSE.
 
@@ -424,13 +424,14 @@ Press SEL on the SONG screen for LENGTH, INSERT BAR, DELETE BAR and CLEAR SONG.
 
 There is one reverb and one delay, and every part can send to both. Press FX: the first pages
 set how much each part sends to the reverb and the delay. Each drum track also has its own
-sends, on that track's own page.
+sends, on that track's own page. The reverb is stereo: whatever you send it comes back wide.
 
 - REVERB: DECAY, TONE, HPF and LEVEL.
 - DELAY: TIME, in note values from 1/32 to a dotted half note, plus FEEDBACK, TONE and LEVEL.
 - TAPE: TYPE switches the delay between DIGI, a clean 12-bit digital delay, and TAPE, which
   wobbles, saturates, and can feed back on itself at high feedback. WEAR sets how worn the
-  tape sounds. HPF cuts low end from the delay.
+  tape sounds. HPF cuts low end from the delay. PING makes the echoes bounce between left
+  and right.
 - KIT DRIVE: the 909's drive and glue compressor, applied to the whole mix.
 
 ---
@@ -440,7 +441,9 @@ sends, on that track's own page.
 ![MIX, with the compressor pumping](img/screen-mix.png)
 
 Press LFO to open MIX. It shows a level and a meter for each part, and the compressor's gain
-reduction in red.
+reduction in red. The PANS page places each part in the stereo field (C is the middle, L and R
+the sides); the break's pan is on its own SENDS page. A part stays at full level on the side
+it is turned toward and fades out of the other.
 
 The factory mix is set up for big beat: the break is up front with the 909 kick under it, the
 303s run through RAT distortion into a tape delay, and the clap has reverb. The master
@@ -548,7 +551,7 @@ on the channels above when NOTES OUT is on.
 
 Over the same USB cable, the FM-1 also shows up on a computer as an audio input called
 "X0X FM-1": two channels at 44.1 kHz, with no driver to install. It carries what the headphones
-hear, after VOLUME. X0X mixes in mono, so both channels are the same.
+hear, after VOLUME, in stereo.
 
 Record it in any audio app, or monitor it live through one. The FM-1 keeps its USB audio in step
 with the computer's clock, so live monitoring doesn't drift or drop out. The first moment after an
@@ -660,12 +663,14 @@ PDIST, FOLD or CRUSH.
 |---|---|
 | REVERB | Decay, Tone, HPF, Level |
 | DELAY | Time (1/32, 1/16T, 1/16, 1/8T, 1/16., 1/8, 1/4T, 1/8., 1/4, 1/2T, 1/4., 1/2, 1/2.), Feedback, Tone, Level |
-| TAPE | Type (DIGI or TAPE), Wear, HPF |
+| TAPE | Type (DIGI or TAPE), Wear, HPF, Ping (off or on) |
 | KIT DRIVE | Volume, Dist, Drive, Comp |
 
 The delay follows the tempo, including an external MIDI clock. A delay time longer than two
 seconds (1/2. below 90 BPM, 1/2 below 60) plays at half that length, which is still on the beat.
-TAPE's Wear sets how much the echoes wow and flutter around the beat.
+TAPE's Wear sets how much the echoes wow and flutter around the beat. With PING on, the first
+echo comes from the left and the next from the right, one delay time apart; a delay time longer
+than one second plays centred instead.
 
 ---
 

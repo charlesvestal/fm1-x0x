@@ -33,10 +33,11 @@ typedef struct {
     float g, g_t, k;
     float a1;                         /* 1 / (1 + g (g + k)): recomputed only while g moves */
     float ic1, ic2;
+    float ic1r, ic2r;                 /* X0X stereo: the right side's filter state */
     /* limiter: looks MST_LA samples ahead, so it can lower the gain before a peak arrives */
 #define MST_LA 64
     float env, gain, inv_env;         /* inv_env = 1 / env, kept up as env moves (no divide a sample) */
-    float la[MST_LA];
+    float la[MST_LA], la_r[MST_LA];
     int la_pos, hold;
 } master_t;
 
@@ -49,5 +50,8 @@ int master_get(const master_t *m, int i);
 void master_key(master_t *m, int kit, float vel);
 /* in place, mono: compressor, filter, volume (0..1+), limiter */
 void master_process(master_t *m, float *x, int n, float volume);
+/* X0X stereo: the compressor reads both sides' power, the limiter the louder side, and each moves
+ * both together; the filter runs on each. With l == r it is master_process exactly. */
+void master_process_st(master_t *m, float *l, float *r, int n, float volume);
 /* the value of a pot in its unit, for the screen ("-12 dB", "4:1", "30 ms") */
 void master_format(const master_t *m, int i, char *buf);

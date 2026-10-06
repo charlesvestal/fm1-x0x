@@ -231,6 +231,119 @@ void master_process(master_t *m, float *x, int n, float volume)
     m->gr_view = grmax > m->gr_view ? grmax : m->gr_view * 0.93f;   /* the meter: peak, falling */
 }
 
+/* the limiter's last stage: a soft knee over 0.89 (master_process spells it out) */
+static inline float soft_ceiling(float s)
+{
+    if (s > 0.89f || s < -0.89f)
+        s = s > 0.0f ? 0.89f + 0.11f * fm_tanhf((s - 0.89f) * 9.0f) : -0.89f - 0.11f * fm_tanhf((-s - 0.89f) * 9.0f);
+    return s;
+}
+
+void master_process_st(master_t *m, float *xl, float *xr, int n, float volume)
+{
+    int i, mode = m->pot[MST_MODE];
+    float k = m->k, grmax = 0.0f;
+    for (i = 0; i < n; i++) {
+        float s = xl[i], sr = xr[i];
+        if (m->comp_on) {
+            float lv, want, total, wet;
+            /* the level: mean square over ~8 ms, x2 so a sine reads its peak. Read sample by sample
+             * (|x|), the reduction chased every cycle of a bass note and grabbed each kick within a
+             * millisecond: audio-rate gain movement, heard as clicks */
+            /* both sides' power, each term as master_process forms it, so l == r gives its value */
+            m->ms = fm_flush(m->a_det * m->ms + 0.5f * ((1.0f - m->a_det) * s * s + (1.0f - m->a_det) * sr * sr));
+            if (m->cr == 0) {                                /* the static curve, every MST_CR samples */
+                lv = 2.0f * m->ms;
+                m->want = (lv > 1e-12f && m->slope > 0.0f) ? gr_of(m, 3.0103f * fm_log2f(lv)) : 0.0f;
+            }
+            want = m->want;
+            m->gr = want > m->gr ? m->a_att * m->gr + (1.0f - m->a_att) * want
+                                 : m->a_rel * m->gr + (1.0f - m->a_rel) * want;
+            if (m->pump_tgt > m->pump) {                     /* PUMP: rise to the kick's depth ... */
+                m->pump = m->a_pump * m->pump + (1.0f - m->a_pump) * m->pump_tgt;
+                if (m->pump_tgt - m->pump < 0.05f)
+                    m->pump_tgt = 0.0f;                      /* ... then let go: the release swells back */
+            } else {
+                m->pump = fm_flush(m->a_rel * m->pump);
+            }
+            total = m->gr + m->pump;
+            if (total > grmax)
+                grmax = total;
+            if (m->cr == 0) {                                /* the gain, linear, ramped over MST_CR samples */
+                m->g_step = (m->makeup * fm_db2lin(-total) - m->g_lin) * (1.0f / MST_CR);
+                m->cr = MST_CR;
+            }
+            m->cr--;
+            m->g_lin += m->g_step;
+            wet = s * m->g_lin;
+            s = s + (wet - s) * m->mix;
+            wet = sr * m->g_lin;
+            sr = sr + (wet - sr) * m->mix;
+        }
+        if (mode) {
+            float g = m->g, a1;
+            if (g != m->g_t) {                               /* the cutoff moving: its coefficient too */
+                g = m->g += (m->g_t - m->g) * 0.0625f;
+                if (fm_fabsf(m->g_t - g) < 1e-6f * m->g_t)
+                    g = m->g = m->g_t;
+                m->a1 = 1.0f / (1.0f + g * (g + k));
+            }
+            a1 = m->a1;
+            float v3 = s - m->ic2;
+            float v1 = a1 * m->ic1 + g * a1 * v3;
+            float v2 = m->ic2 + g * v1;
+            m->ic1 = fm_flush(2.0f * v1 - m->ic1);
+            m->ic2 = fm_flush(2.0f * v2 - m->ic2);
+            s = mode == 1 ? v2 : mode == 2 ? v1 : s - k * v1 - v2;
+            v3 = sr - m->ic2r;
+            v1 = a1 * m->ic1r + g * a1 * v3;
+            v2 = m->ic2r + g * v1;
+            m->ic1r = fm_flush(2.0f * v1 - m->ic1r);
+            m->ic2r = fm_flush(2.0f * v2 - m->ic2r);
+            sr = mode == 1 ? v2 : mode == 2 ? v1 : sr - k * v1 - v2;
+        }
+        s *= volume;
+        sr *= volume;
+        if (m->pot[MST_LIMIT]) {
+            /* look ahead MST_LA samples: a peak is seen when it enters, the gain eases down over the
+             * MST_LA samples it takes to come out, and is held for them. (It used to halve the
+             * distance every sample: a step in the waveform, a click on every limited kick.) */
+            float a = fm_maxf(fm_fabsf(s), fm_fabsf(sr)), d, dr;
+            if (a >= m->env) {
+                m->env = a;
+                m->hold = MST_LA;
+                /* a divide only for a new peak over the ceiling. The compiler computes the divide
+                 * before the test, so it must be safe on its own: a clamp INSIDE the branch is folded
+                 * away (a > 0.8 there) and 0.2-beta crashed here on 1 / 0 (firmware/hal/fm1_irq.h). */
+                float r = 1.0f / fm_maxf(a, 0.8f);
+                m->inv_env = a > 0.8f ? r : 0.0f;
+            } else if (m->hold) {
+                m->hold--;
+            } else {
+                m->env *= 0.99985f;
+                m->inv_env *= 1.0001500225f;                 /* 1 / 0.99985 */
+            }
+            {
+                float want = m->env > 0.8f ? 0.8f * m->inv_env : 1.0f;
+                m->gain += (want - m->gain) * (want < m->gain ? (5.0f / MST_LA) : 0.002f);
+            }
+            d = m->la[m->la_pos];
+            dr = m->la_r[m->la_pos];
+            m->la[m->la_pos] = s;
+            m->la_r[m->la_pos] = sr;
+            m->la_pos = (m->la_pos + 1) % MST_LA;
+            s = soft_ceiling(d * m->gain);
+            sr = soft_ceiling(dr * m->gain);
+        } else {
+            s = fm_clampf(s, -1.0f, 1.0f);
+            sr = fm_clampf(sr, -1.0f, 1.0f);
+        }
+        xl[i] = s;
+        xr[i] = sr;
+    }
+    m->gr_view = grmax > m->gr_view ? grmax : m->gr_view * 0.93f;   /* the meter: peak, falling */
+}
+
 static void put_num(char *b, float v, int decimals, const char *unit)
 {
     int neg = v < 0.0f, n = 0, i;

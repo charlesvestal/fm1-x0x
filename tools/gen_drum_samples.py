@@ -84,7 +84,15 @@ def read_wav(path):
     return out, bits
 
 
-def arr(ctype, name, vals, fmt=str, per=12):
+def arr(ctype, name, vals, fmt=str, per=12, shared=False):
+    # shared: a table several units include, defined once (in the unit that defines
+    # X0X_DRUM_TABLES_DEFINE, drum909.c) and declared extern in the rest. Static gave each unit its own
+    # copy: two of x0x_tanh_tab and x0x_pot_exp, 13.8 KB of the app's flash.
+    if shared:
+        return "\n".join([f"#ifdef X0X_DRUM_TABLES_DEFINE",
+                          f"const {ctype} {name}[{len(vals)}] = {{"] +
+                         ["    " + ", ".join(fmt(v) for v in vals[i:i + per]) + "," for i in range(0, len(vals), per)] +
+                         ["};", "#else", f"extern const {ctype} {name}[{len(vals)}];", "#endif"])
     lines = [f"static const {ctype} {name}[{len(vals)}] = {{"]
     for i in range(0, len(vals), per):
         lines.append("    " + ", ".join(fmt(v) for v in vals[i:i + per]) + ",")
@@ -124,12 +132,13 @@ def main():
          f"/* tanh(u) at u = i * {TANH_MAX} / {TANH_N}, i = 0..{TANH_N + 1} (one guard point) */",
          f"#define X0X_TANH_N {TANH_N}",
          f"#define X0X_TANH_SCALE {cfloat(TANH_N / TANH_MAX)}",
-         arr("float", "x0x_tanh_tab", tab, cfloat, per=6), "",
+         arr("float", "x0x_tanh_tab", tab, cfloat, per=6, shared=True), "",
          "/* 9W9 EXP pots (er99_pots.h): value = min * (max/min)^(pot/127), pot 0..127 */"]
     for i, (n, lo, hi) in enumerate(EXP_RANGES):
         t.append(f"#define X0X_EXP_{n} {i}   /* {lo:g} .. {hi:g} */")
     t.append(f"#define X0X_EXP_COUNT {len(EXP_RANGES)}")
-    t.append(f"static const float x0x_pot_exp[{len(EXP_RANGES)}][128] = {{")
+    t.append("#ifdef X0X_DRUM_TABLES_DEFINE")                   # shared: see arr()
+    t.append(f"const float x0x_pot_exp[{len(EXP_RANGES)}][128] = {{")
     for n, lo, hi in EXP_RANGES:
         vals = [pot_exp(lo, hi, p) for p in range(128)]
         t.append("    { /* " + n + " */")
@@ -137,6 +146,9 @@ def main():
             t.append("        " + ", ".join(cfloat(v) for v in vals[i:i + 6]) + ",")
         t.append("    },")
     t.append("};")
+    t.append("#else")
+    t.append(f"extern const float x0x_pot_exp[{len(EXP_RANGES)}][128];")
+    t.append("#endif")
     t.append("")
     out_t.write_text("\n".join(t))
     print(f"gen_drum_samples: {total} frames ({total * 2} bytes) -> {out_s.name}; "

@@ -207,7 +207,9 @@ def build_app():
         objs.append(o)
     tc_all(*units)
     elf = OUT / "x0x.elf"
-    tc("pi32v2/bin/ld", "-T", FW / "app.ld", *objs, "-o", elf)
+    # unreferenced functions (each in its own section: -ffunction-sections) are dropped: the DSP keeps
+    # mono reference paths for the host tests that the firmware no longer calls
+    tc("pi32v2/bin/ld", "--gc-sections", "-e", "_start", "-T", FW / "app.ld", *objs, "-o", elf)
     for sect in ("text.bin", "data.bin", "ramtext.bin"):
         (OUT / sect).unlink(missing_ok=True)
     *_, syms, dis, rt = tc_all(("common/bin/objcopy", "-O", "binary", "-j", ".text", elf, OUT / "text.bin"),

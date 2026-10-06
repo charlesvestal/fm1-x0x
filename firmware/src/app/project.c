@@ -24,6 +24,7 @@ void project_defaults(void)
     proj.set.notes_out = 0;
     proj.set.bpm_x10 = 1250;
     proj.set.accent_q7 = 88;
+    proj.set.stereo = 1;
     engine_sound_defaults(&proj.sound);
     arrange_defaults();
     /* the 303 lines start empty, like the drums: OCT+ on TB-3PO (or keyboard mode) writes one */
@@ -125,6 +126,11 @@ int project_load(void)
         bad = 1;
     if (load_obj(OBJ_SOUND, &proj.sound, sizeof proj.sound))
         bad = 1;
+    if (!proj.set.stereo) {                           /* saved mono: no pans there (zeros = hard left) */
+        for (i = 0; i < NPARTS; i++)
+            proj.sound.v[T_MIX][i][MX_PAN] = 64;
+        proj.set.stereo = 1;
+    }
     if (load_obj(OBJ_PAT0, &proj.pat[0], sizeof(pattern_t) * PAT_PER_OBJ) ||
         load_obj(OBJ_PAT1, &proj.pat[PAT_PER_OBJ], sizeof(pattern_t) * PAT_PER_OBJ)) {
         for (i = 0; i < NPAT; i++) {                  /* half a set is no set: the defaults */

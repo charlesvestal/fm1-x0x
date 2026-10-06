@@ -21,6 +21,8 @@
 
 enum { T_909, T_808, T_303, T_BRK, T_FX, T_MIX, T_MST, NTARGETS };
 enum { PART_909, PART_808, PART_303A, PART_303B, PART_BRK, NPARTS };
+/* T_MIX, per part: level, reverb send, delay send, pan (64 = centre) */
+enum { MX_LEVEL, MX_REV, MX_DLY, MX_PAN, MX_NPARAMS };
 #define NVOICES_MAX 12                 /* a drum machine: 11 tracks + the kit */
 #define NPARAMS_MAX 16                 /* params per (target, voice) */
 

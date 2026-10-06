@@ -421,11 +421,14 @@ static void run_ms(uint32_t ms)
             engine_load(load_force >= 0 ? (uint32_t)load_force : cpu_pct, 256);
 #endif
             for (k = 0; k < 256; k++) {
-                float l = (float)blk[2 * k] / 8388608.0f;
+                float l = (float)blk[2 * k] / 8388608.0f, r = (float)blk[2 * k + 1] / 8388608.0f;
                 int16_t s[2];
                 if (fabsf(l) > peak_out)
                     peak_out = fabsf(l);
-                s[0] = s[1] = (int16_t)(l * 32767.0f);
+                if (fabsf(r) > peak_out)
+                    peak_out = fabsf(r);
+                s[0] = (int16_t)(l * 32767.0f);
+                s[1] = (int16_t)(r * 32767.0f);
                 if (wav) {
                     fwrite(s, 2, 2, wav);
                     wav_frames++;

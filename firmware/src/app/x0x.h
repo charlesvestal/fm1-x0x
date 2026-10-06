@@ -25,7 +25,8 @@ typedef struct {
     uint8_t accent_q7, keysound;         /* black drum keys sound: 0 = only when stopped or recording, 1 = always */
     uint8_t autosave_off;                /* 0: save by itself while stopped and idle (ui.c autosave) */
     uint8_t brightness;                  /* screen 1..8; 0 (older saves) = 8, full */
-    uint8_t rsv[6];                      /* room to grow: an older, shorter object loads (zeros here) */
+    uint8_t stereo;                      /* 1: the sound has its pans (0: saved before X0X was stereo) */
+    uint8_t rsv[5];                      /* room to grow: an older, shorter object loads (zeros here) */
 } settings_t;
 
 /* the song and the motion lanes: one blob, split across OBJ_SONG and OBJ_MOTION */
