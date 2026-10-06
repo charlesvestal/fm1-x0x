@@ -261,7 +261,7 @@ void drum909_init(drum909_t *d)
     for (unsigned i = 0; i < sizeof(*d); ++i)
         p[i] = 0;
     for (int v = 0; v < DR_NUM; ++v)
-        d->pan_l[v] = d->pan_r[v] = 1.0f;         /* centre */
+        d->pan_l[v] = d->pan_r[v] = d->pan_lc[v] = d->pan_rc[v] = 1.0f;   /* centre */
     d->noise = 0xC0FFEEu;
     d->nz_pos = DR_NZ_HIST;
 
@@ -507,13 +507,14 @@ typedef struct {
     float *dry, *rev, *dly;   /* rev / dly are 0 when the voice's send is 0 */
     float srev, sdly;
     float *dry_r, pl, pr;     /* X0X stereo: dry_r 0 = mono (dry gets y as 9W9's) */
+    float dpl, dpr;           /* the pans' glide per sample this block (0 settled) */
 } d9_bus_t;
 
 static inline void d9_emit(const d9_bus_t *b, int i, float y)
 {
     if (b->dry_r) {
-        b->dry[i] += y * b->pl;
-        b->dry_r[i] += y * b->pr;
+        b->dry[i] += y * (b->pl + b->dpl * (float)i);
+        b->dry_r[i] += y * (b->pr + b->dpr * (float)i);
     } else
         b->dry[i] += y;
     if (b->rev) b->rev[i] += y * b->srev;
@@ -747,12 +748,15 @@ static void d9_render_smp(d9_smp_t *s, const d9_bus_t *bus, int n)
 }
 
 static float *d9_dry_r;         /* the render in progress: its right side (0: mono) */
-static inline void d9_bus(d9_bus_t *b, const drum909_t *d, int voice, float *dry, float *rev, float *dly)
+static float d9_pl0[DR_NUM], d9_pr0[DR_NUM];   /* each voice's pan where this block starts */
+static inline void d9_bus(d9_bus_t *b, drum909_t *d, int voice, float *dry, float *rev, float *dly)
 {
     b->dry = dry;
     b->dry_r = d9_dry_r;
-    b->pl = d->pan_l[voice];
-    b->pr = d->pan_r[voice];
+    b->pl = d9_pl0[voice];                         /* the pan glides from here over this block */
+    b->pr = d9_pr0[voice];
+    b->dpl = d->pan_dl[voice];
+    b->dpr = d->pan_dr[voice];
     b->srev = d->send_rev[voice];
     b->sdly = d->send_dly[voice];
     b->rev = b->srev != 0.0f ? rev : 0;
@@ -818,8 +822,22 @@ void drum909_render(drum909_t *d, float *dry, float *rev, float *dly, int n)
 void drum909_render_st(drum909_t *d, float *dry_l, float *dry_r, float *rev, float *dly, int n)
 {
     d9_dry_r = dry_r;
+    for (int v = 0; v < DR_NUM; ++v) {             /* every voice's pan glides, sounding or not */
+        d9_pl0[v] = d->pan_lc[v];
+        d9_pr0[v] = d->pan_rc[v];
+        d->pan_dl[v] = x0x_glide_block(&d->pan_lc[v], d->pan_l[v], n > 256 ? 256 : n);
+        d->pan_dr[v] = x0x_glide_block(&d->pan_rc[v], d->pan_r[v], n > 256 ? 256 : n);
+    }
     d9_render(d, dry_l, rev, dly, n);
     d9_dry_r = 0;
+}
+
+void drum909_pan_settle(drum909_t *d)
+{
+    for (int v = 0; v < DR_NUM; ++v) {
+        d->pan_lc[v] = d->pan_l[v];
+        d->pan_rc[v] = d->pan_r[v];
+    }
 }
 
 int drum909_active(const drum909_t *d)

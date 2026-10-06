@@ -174,6 +174,7 @@ struct drum808 {
     uint8_t kpot[3];                  /* kit: level, accent, choke */
     uint8_t tpan[D8_NUM];             /* X0X: each track's pan pot (a track, not a sound: tom / conga share it) */
     float pan_l[D8_NUM], pan_r[D8_NUM];
+    float pan_lc[D8_NUM], pan_rc[D8_NUM], pan_dl[D8_NUM], pan_dr[D8_NUM];   /* gliding: now, per sample */
     float potv[D8S_NUM][D8P_NUM];     /* engineering values of pot[] */
     d8_shp_t shp[D8S_NUM];
     float vol, vel_depth;
@@ -200,6 +201,7 @@ void drum808_render(drum808_t *d, float *dry, float *rev, float *dly, int n);
 /* X0X stereo: each track placed by its PAN into dry_l / dry_r (sends mono); all centred, both are
  * drum808_render's dry exactly */
 void drum808_render_st(drum808_t *d, float *dry_l, float *dry_r, float *rev, float *dly, int n);
+void drum808_pan_settle(drum808_t *d);   /* every pan to its target at once (the kit is silent: no zipper) */
      /* ADDS this block (mono, n <= 256) into the dry bus and the reverb / delay send buses */
 int drum808_nparams(int track);                           /* D8_KIT = kit-wide */
 const x0x_param_t *drum808_param(int track, int i);

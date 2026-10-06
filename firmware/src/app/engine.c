@@ -411,15 +411,6 @@ static void drain(void)
         midi_in(pkt);
 }
 
-static void add_scaled(float *dst, const float *src, float g, uint32_t n)
-{
-    uint32_t i;
-    if (g == 0.0f)
-        return;
-    for (i = 0; i < n; i++)
-        dst[i] += src[i] * g;
-}
-
 static float part_peak[NPARTS];
 static void meter(int p, const float *x, float g, uint32_t n)
 {
@@ -434,24 +425,49 @@ static void meter(int p, const float *x, float g, uint32_t n)
 }
 
 /* dry into L and R by the part's pan; the sends stay mono (the reverb and delay make the width) */
-static void add_panned(float *dl, float *dr, const float *src, int p, float g, uint32_t n)
+/* a mix gain that glides to its target (one pole, ~10 ms) instead of stepping each block, which
+ * zippered on quick turns of LEVEL, PAN or a send. cur < 0: never used, takes the target at once
+ * (no fade-in at boot); settled, cur IS the target, so the product is the unsmoothed one exactly */
+typedef struct { float cur, tgt; } glide_t;
+#define GLIDE_A 0.0022651f                                /* 1 - exp(-1 / (10 ms * 44.1 kHz)) */
+static void glide_set(glide_t *g, float t)
+{
+    g->tgt = t;
+    if (g->cur < 0.0f)
+        g->cur = t;
+}
+static void add_glide(float *dst, const float *src, glide_t *g, uint32_t n)
 {
     uint32_t i;
-    float gl = g * mix_pl[p], gr = g * mix_pr[p];
-    if (gl == gr) {                                       /* centred: one product for both sides */
-        if (gl == 0.0f)
-            return;
-        for (i = 0; i < n; i++) {
-            float x = src[i] * gl;
-            dl[i] += x;
-            dr[i] += x;
-        }
+    float c = g->cur, t = g->tgt;
+    if (c == t) {
+        if (c != 0.0f)
+            for (i = 0; i < n; i++)
+                dst[i] += src[i] * c;
         return;
     }
     for (i = 0; i < n; i++) {
-        dl[i] += src[i] * gl;
-        dr[i] += src[i] * gr;
+        c += (t - c) * GLIDE_A;
+        dst[i] += src[i] * c;
     }
+    if (fm_fabsf(t - c) < 1e-5f)
+        c = t;
+    g->cur = c;
+}
+/* each part's gains: dry left and right, its reverb and delay sends, and (drums) the voices' own sends */
+enum { GL_L, GL_R, GL_REV, GL_DLY, GL_VREV, GL_VDLY, GL_N };
+static glide_t mix_glide[NPARTS][GL_N] = {
+    {{-1, 0}, {-1, 0}, {-1, 0}, {-1, 0}, {-1, 0}, {-1, 0}}, {{-1, 0}, {-1, 0}, {-1, 0}, {-1, 0}, {-1, 0}, {-1, 0}},
+    {{-1, 0}, {-1, 0}, {-1, 0}, {-1, 0}, {-1, 0}, {-1, 0}}, {{-1, 0}, {-1, 0}, {-1, 0}, {-1, 0}, {-1, 0}, {-1, 0}},
+    {{-1, 0}, {-1, 0}, {-1, 0}, {-1, 0}, {-1, 0}, {-1, 0}}};
+static void mix_targets(int p, float g)                     /* g: the part level */
+{
+    glide_set(&mix_glide[p][GL_L], g * mix_pl[p]);
+    glide_set(&mix_glide[p][GL_R], g * mix_pr[p]);
+    glide_set(&mix_glide[p][GL_REV], g * mix_rev[p]);
+    glide_set(&mix_glide[p][GL_DLY], g * mix_dly[p]);
+    glide_set(&mix_glide[p][GL_VREV], g);
+    glide_set(&mix_glide[p][GL_VDLY], g);
 }
 
 static void render_sub(float *out_l, float *out_r, uint32_t n)
@@ -468,8 +484,11 @@ static void render_sub(float *out_l, float *out_r, uint32_t n)
         PROF_T(pt);
         float g = mix_level[b];
         if (!(b == 0 ? drum909_active(&d909) : drum808_active(&d808))) {
-            if (b == 0)
+            if (b == 0) {
                 drum909_render(&d909, t0, t1, t2, (int)n);   /* writes nothing; advances the noise */
+                drum909_pan_settle(&d909);                    /* silent: pans move at once, no glide */
+            } else
+                drum808_pan_settle(&d808);
             PROF_ADD(b, pt);
             continue;
         }
@@ -479,19 +498,15 @@ static void render_sub(float *out_l, float *out_r, uint32_t n)
             drum909_render_st(&d909, t0, tr, t1, t2, (int)n);
         else
             drum808_render_st(&d808, t0, tr, t1, t2, (int)n);
-        {                                                 /* then the part's PAN over the kit */
-            float gl = g * mix_pl[b], gr = g * mix_pr[b];
-            for (i = 0; i < n; i++) {
-                dry_l[i] += t0[i] * gl;
-                dry_r[i] += tr[i] * gr;
-            }
-        }
-        add_scaled(rev, t1, g, n);
-        add_scaled(dly, t2, g, n);
+        mix_targets(b, g);
+        add_glide(dry_l, t0, &mix_glide[b][GL_L], n);     /* then the part's PAN over the kit */
+        add_glide(dry_r, tr, &mix_glide[b][GL_R], n);
+        add_glide(rev, t1, &mix_glide[b][GL_VREV], n);
+        add_glide(dly, t2, &mix_glide[b][GL_VDLY], n);
         for (i = 0; i < n; i++)                           /* the kit send: the whole machine, both sides */
             t0[i] = (t0[i] + tr[i]) * 0.5f;               /* (centred: t0 exactly) */
-        add_scaled(rev, t0, g * mix_rev[b], n);
-        add_scaled(dly, t0, g * mix_dly[b], n);
+        add_glide(rev, t0, &mix_glide[b][GL_REV], n);
+        add_glide(dly, t0, &mix_glide[b][GL_DLY], n);
         meter(b, t0, g, n);
         PROF_ADD(b, pt);
     }
@@ -504,9 +519,11 @@ static void render_sub(float *out_l, float *out_r, uint32_t n)
             PROF_ADD(2 + b, pt);
             continue;
         }
-        add_panned(dry_l, dry_r, t0, p, mix_level[p], n);
-        add_scaled(rev, t0, mix_level[p] * mix_rev[p], n);
-        add_scaled(dly, t0, mix_level[p] * mix_dly[p], n);
+        mix_targets(p, mix_level[p]);
+        add_glide(dry_l, t0, &mix_glide[p][GL_L], n);
+        add_glide(dry_r, t0, &mix_glide[p][GL_R], n);
+        add_glide(rev, t0, &mix_glide[p][GL_REV], n);
+        add_glide(dly, t0, &mix_glide[p][GL_DLY], n);
         meter(p, t0, mix_level[p], n);
         PROF_ADD(2 + b, pt);
     }
@@ -516,9 +533,11 @@ static void render_sub(float *out_l, float *out_r, uint32_t n)
         int silent = breaks_silent(&brk);              /* the render writes zeros: nothing to mix */
         breaks_render(&brk, t0, (int)n);
         if (!silent) {
-            add_panned(dry_l, dry_r, t0, PART_BRK, g, n);
-            add_scaled(rev, t0, g * mix_rev[PART_BRK], n);
-            add_scaled(dly, t0, g * mix_dly[PART_BRK], n);
+            mix_targets(PART_BRK, g);
+            add_glide(dry_l, t0, &mix_glide[PART_BRK][GL_L], n);
+            add_glide(dry_r, t0, &mix_glide[PART_BRK][GL_R], n);
+            add_glide(rev, t0, &mix_glide[PART_BRK][GL_REV], n);
+            add_glide(dly, t0, &mix_glide[PART_BRK][GL_DLY], n);
             meter(PART_BRK, t0, g, n);
         }
         PROF_ADD(4, pt);

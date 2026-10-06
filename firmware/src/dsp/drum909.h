@@ -96,6 +96,8 @@ struct drum909 {
     d9_smp_t smp[4];              /* CH OH CR RD */
     float send_rev[DR_NUM], send_dly[DR_NUM];
     float pan_l[DR_NUM], pan_r[DR_NUM];   /* X0X: each voice's pan (x0x_pan_gains) */
+    float pan_lc[DR_NUM], pan_rc[DR_NUM]; /* where each voice's pan gains are now, gliding to pan_l/r */
+    float pan_dl[DR_NUM], pan_dr[DR_NUM]; /* this block's glide per sample */
     float accent, vel_depth;      /* kit */
     uint32_t noise;
     float nz_buf[DR_NZ_BUF];      /* noise, linear; the block plus >= DR_NZ_HIST before it */
@@ -110,6 +112,7 @@ void drum909_render(drum909_t *d, float *dry, float *rev, float *dly, int n);
 /* X0X stereo: each voice placed by its PAN into dry_l / dry_r (sends mono); all centred, both are
  * drum909_render's dry exactly */
 void drum909_render_st(drum909_t *d, float *dry_l, float *dry_r, float *rev, float *dly, int n);
+void drum909_pan_settle(drum909_t *d);   /* every pan to its target at once (the kit is silent: no zipper) */
 int drum909_nparams(int voice);
 const x0x_param_t *drum909_param(int voice, int i);
 void drum909_set(drum909_t *d, int voice, int i, int value);

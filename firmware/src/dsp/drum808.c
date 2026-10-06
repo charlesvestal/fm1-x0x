@@ -1390,7 +1390,7 @@ void drum808_init(drum808_t *d)
             set_pot(d, s, k, k_spec[s][k].def);
     for (s = 0; s < D8_NUM; s++) {
         d->tpan[s] = 64;                          /* centre */
-        d->pan_l[s] = d->pan_r[s] = 1.0f;
+        d->pan_l[s] = d->pan_r[s] = d->pan_lc[s] = d->pan_rc[s] = 1.0f;
     }
     d->kpot[0] = 100;
     d->kpot[1] = 127;
@@ -1654,7 +1654,7 @@ static void lane_mix(drum808_t *d, d8_lane_t *l, const float *buf, int m, float 
 {
     const int tr = k_lane_track[l - d->lane];
     float *dry_r = d8_dry_r;
-    const float pl = d->pan_l[tr], pr = d->pan_r[tr];
+    const float pl = d->pan_lc[tr], pr = d->pan_rc[tr], dpl = d->pan_dl[tr], dpr = d->pan_dr[tr];
     int s = l->snd, i, type = d->pot[s][D8P_DIST];
     const d8_shp_t *p = &d->shp[s];
     float trim = k_trim[s], g = d->potv[s][D8P_LEVEL] * l->hit * d->vol;
@@ -1663,10 +1663,9 @@ static void lane_mix(drum808_t *d, d8_lane_t *l, const float *buf, int m, float 
     if (l->cstep == 0.0f && bypass) {             /* the common case */
         float k = trim * g * l->cg;
         if (dry_r) {
-            float kl = k * pl, kr = k * pr;
             for (i = 0; i < m; i++) {
-                dry[i] += buf[i] * kl;
-                dry_r[i] += buf[i] * kr;
+                dry[i] += buf[i] * (k * (pl + dpl * (float)i));
+                dry_r[i] += buf[i] * (k * (pr + dpr * (float)i));
             }
         } else
             for (i = 0; i < m; i++)
@@ -1693,8 +1692,8 @@ static void lane_mix(drum808_t *d, d8_lane_t *l, const float *buf, int m, float 
             x = shape(x, p, type, l->crush);
         sv = x * g * l->cg;
         if (dry_r) {
-            dry[i] += sv * pl;
-            dry_r[i] += sv * pr;
+            dry[i] += sv * (pl + dpl * (float)i);
+            dry_r[i] += sv * (pr + dpr * (float)i);
         } else
             dry[i] += sv;
         rev[i] += sv * ra;
@@ -1709,6 +1708,11 @@ static void d8_render(drum808_t *d, float *dry, float *rev, float *dly, int n)
     for (off = 0; off < n; off += CHUNK) {
         int m = n - off < CHUNK ? n - off : CHUNK;
         int cb_on = lane_on(d, L_CB);
+        if (d8_dry_r)                                 /* the tracks' pans glide over this chunk */
+            for (l = 0; l < D8_NUM; l++) {
+                d->pan_dl[l] = x0x_glide_block(&d->pan_lc[l], d->pan_l[l], m);
+                d->pan_dr[l] = x0x_glide_block(&d->pan_rc[l], d->pan_r[l], m);
+            }
         /* the shared bank runs only while a metal voice sounds */
         if (cb_on || lane_on(d, L_CH) || lane_on(d, L_OH) || lane_on(d, L_CY)) {
             d8_bank_t *b = &d->bank;
@@ -1751,6 +1755,15 @@ void drum808_render(drum808_t *d, float *dry, float *rev, float *dly, int n)
 {
     d8_dry_r = 0;
     d8_render(d, dry, rev, dly, n);
+}
+
+void drum808_pan_settle(drum808_t *d)
+{
+    int t;
+    for (t = 0; t < D8_NUM; t++) {
+        d->pan_lc[t] = d->pan_l[t];
+        d->pan_rc[t] = d->pan_r[t];
+    }
 }
 
 void drum808_render_st(drum808_t *d, float *dry_l, float *dry_r, float *rev, float *dly, int n)

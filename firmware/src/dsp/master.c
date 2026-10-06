@@ -98,6 +98,7 @@ void master_init(master_t *m)
     for (i = 0; i < MST_NPARAMS; i++)
         m->pot[i] = MST_P[i].def;
     m->gain = 1.0f;
+    m->vol_cur = -1.0f;                               /* unset: the first block takes the volume as it is */
     comp_coefs(m);
     m->g = m->g_t = 0.0f;
     filt_coefs(m);
@@ -242,7 +243,7 @@ static inline float soft_ceiling(float s)
 void master_process_st(master_t *m, float *xl, float *xr, int n, float volume)
 {
     int i, mode = m->pot[MST_MODE];
-    float k = m->k, grmax = 0.0f;
+    float k = m->k, grmax = 0.0f, vc = m->vol_cur < 0.0f ? volume : m->vol_cur;
     for (i = 0; i < n; i++) {
         float s = xl[i], sr = xr[i];
         if (m->comp_on) {
@@ -302,8 +303,13 @@ void master_process_st(master_t *m, float *xl, float *xr, int n, float volume)
             m->ic2r = fm_flush(2.0f * v2 - m->ic2r);
             sr = mode == 1 ? v2 : mode == 2 ? v1 : sr - k * v1 - v2;
         }
-        s *= volume;
-        sr *= volume;
+        if (vc != volume) {                          /* the MASTER knob glides (~10 ms): no zipper */
+            vc += (volume - vc) * 0.0022651f;
+            if (fm_fabsf(volume - vc) < 1e-5f)
+                vc = volume;
+        }
+        s *= vc;
+        sr *= vc;
         if (m->pot[MST_LIMIT]) {
             /* look ahead MST_LA samples: a peak is seen when it enters, the gain eases down over the
              * MST_LA samples it takes to come out, and is held for them. (It used to halve the
@@ -341,6 +347,7 @@ void master_process_st(master_t *m, float *xl, float *xr, int n, float volume)
         xl[i] = s;
         xr[i] = sr;
     }
+    m->vol_cur = vc;
     m->gr_view = grmax > m->gr_view ? grmax : m->gr_view * 0.93f;   /* the meter: peak, falling */
 }
 

@@ -34,6 +34,7 @@ typedef struct {
     float a1;                         /* 1 / (1 + g (g + k)): recomputed only while g moves */
     float ic1, ic2;
     float ic1r, ic2r;                 /* X0X stereo: the right side's filter state */
+    float vol_cur;                    /* X0X: master_process_st's volume, gliding to the knob (< 0: unset) */
     /* limiter: looks MST_LA samples ahead, so it can lower the gain before a peak arrives */
 #define MST_LA 64
     float env, gain, inv_env;         /* inv_env = 1 / env, kept up as env moves (no divide a sample) */

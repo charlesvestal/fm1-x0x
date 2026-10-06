@@ -24,6 +24,21 @@ static inline void x0x_pan_gains(int pot, float *l, float *r)
     *r = q < 0.0f ? c : 1.0f;
 }
 
+/* a pan gain gliding toward its target over a block of n samples (one pole, ~10 ms): returns the
+ * per-sample step for a linear ramp from *cur, and moves *cur to where the block ends. Settled, the
+ * step is 0 and *cur is the target exactly */
+static inline float x0x_glide_block(float *cur, float tgt, int n)
+{
+    float c = *cur, e;
+    if (c == tgt)
+        return 0.0f;
+    e = (tgt - c) * (n >= 441 ? 1.0f : (float)n * (1.0f / 441.0f));   /* ~1 - exp(-n / 441) for small n */
+    if (tgt - (c + e) < 1e-5f && (c + e) - tgt < 1e-5f)
+        e = tgt - c;
+    *cur = c + e;
+    return e / (float)n;
+}
+
 typedef struct {
     const char *name;                 /* <= 6 characters: drawn above a knob */
     uint8_t max;                      /* 127 = continuous; else switch with max+1 positions */

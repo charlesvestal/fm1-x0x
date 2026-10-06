@@ -56,6 +56,8 @@ int main(void)
     drum909_set(&b9, DR_SD, drum909_nparams(DR_SD) - 1, 0);
     drum808_init(&b8);
     drum808_set(&b8, D8_CP, drum808_nparams(D8_CP) - 1, 0);
+    drum909_pan_settle(&b9);                         /* as the engine does while the kit is silent */
+    drum808_pan_settle(&b8);
     for (b = 0; b < 40; b++) {
         if (b == 0) {
             drum909_trigger(&b9, DR_SD, 1.0f);
