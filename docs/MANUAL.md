@@ -1,12 +1,12 @@
 # X0X
 
-X0X is groovebox firmware for the M-VAVE FM-1, version 0.1. It turns the FM-1 into a 909, an
-808, two 303s and a breakbeat player, all running at the same time. Each part can play its own
-pattern, you can arrange patterns into a song, and you can record knob moves.
+X0X turns the M-VAVE FM-1 into a groovebox: a 909, an 808, two 303s and a breakbeat player,
+all playing at once, in stereo. Each part can play its own pattern, you can arrange patterns
+into a song, and you can record knob moves.
 
-**Status.** X0X is a beta. It runs on the FM-1, but with every part playing a dense pattern at
-once it can still run out of processor time. When it gets close, it trades a little sound quality
-for headroom (see Performance).
+**X0X is in beta.** It's solid for everyday playing, but a very busy pattern can push the FM-1 to
+its limit. When that happens, X0X gives up a little sound quality to keep playing rather than drop
+out (see Performance in section 15).
 
 ---
 
@@ -56,7 +56,7 @@ GitHub, install Python 3 with the `mido` and `python-rtmidi` packages
 python3 tools/fm1_install.py x0x-0.10-beta.fwsc
 ```
 
-Note that the web installer on hugelton.github.io installs Felucca, not X0X.
+(The web installer on hugelton.github.io installs Felucca, not X0X.)
 
 To go back to the original firmware, use "Back to the stock firmware" at the bottom of the
 web installer: download M-VAVE's FM-1 V15 file from the link there, choose it, and press the
@@ -71,11 +71,11 @@ third-party firmware is at your own risk.
 Here's a five-minute tour, from switching on to saving your first beat. When X0X starts,
 the screen shows the 909, and every part is empty.
 
-1. **Add a kick.** Press black key 1 to select the bass drum; you hear it. Then press white keys
-   1, 5, 9 and 13.
+1. **Add a kick.** Press black key 1 to pick the bass drum (you'll hear it), then press white
+   keys 1, 5, 9 and 13.
 2. **Press PLAY.** The kick plays on every beat.
-3. **Add a clap.** Press black key 7, then white keys 5 and 13. While the pattern plays,
-   selecting a drum is silent, so it doesn't add a stray hit.
+3. **Add a clap.** Press black key 7, then white keys 5 and 13. While the pattern is playing,
+   picking a drum is silent, so you won't add a stray hit.
 4. **Add open hats.** Press black key 9, then white keys 3, 7, 11 and 15.
 5. **Write a 303 line.** Turn ALGORITHM two clicks clockwise to 303A, press ARP, then press
    OCT+. Each press writes a new line; keep pressing until you like one.
@@ -87,11 +87,11 @@ the screen shows the 909, and every part is empty.
    back.
 9. **Record a filter sweep.** Turn ALGORITHM back to 303A. Press REC, slowly turn KNOB 1 for a
    bar or two, then press REC again. The sweep now plays every time the pattern comes round.
-10. **Save.** Press SAVE. Everything you've done is kept when you switch off. (When the pattern is
-    stopped, X0X also saves by itself after a few seconds; see section 15.)
+10. **Save.** Press SAVE, and everything is kept when you switch off. (X0X also saves by itself
+    a few seconds after you stop playing; see section 15.)
 
-From here, Patterns (section 9) explains how to make more patterns and switch between them,
-and Song (section 12) how to arrange them.
+From here, section 9 shows how to make more patterns and switch between them, and section 12
+how to arrange them into a song.
 
 ---
 
@@ -126,24 +126,22 @@ These controls do the same thing on every screen:
 | Black keys | Drum tracks, or the break's slices. On HOME, they mute parts. |
 | MASTER | Volume. |
 
-The second button is printed SEL on the panel. Felucca calls it SCL.
+(The SEL button is labelled SCL in Felucca.)
 
-In a list, turn ALGORITHM to change the highlighted value. Rows with a return arrow are
-actions: press SEL to run them. Before doing anything that would lose notes, X0X asks first.
+In a list, turn ALGORITHM to change the highlighted value. Rows with a return arrow are actions:
+press SEL to run them. X0X always asks before doing anything that would lose notes.
 
-**Help on the FM-1:** hold any button for a second without pressing anything else, and a card
-shows what it does on the screen you're on, with its combinations (HOME's card, for example,
-lists tempo, patterns, undo and redo). Let go and nothing else happens. The card goes away as
-soon as you press a key, turn a knob or press another button, so holding a button to combine
-it works as always.
+**Help on the FM-1:** hold any button for a second on its own, and a card shows what it does on
+the screen you're on, including its combinations (HOME's card, for example, covers tempo,
+patterns, undo and redo). Let go and nothing happens. The card disappears as soon as you press
+anything else, so button combinations work as normal.
 
-**Undo:** hold HOME and press REC to take back the last change; the screen says what it undid,
-for example UNDO 909 P1. Hold HOME and press PLAY to redo it. You can go back up to 32 steps
-(fewer after very large changes). One step is one gesture: everything you did before pausing
-for a moment, such as a few steps tapped in a row or one turn of a knob, or a whole recording
-pass. Undo covers the sounds, the patterns, the song and the knob motion, including CLEAR
-PATTERN and FACTORY RESET. It doesn't cover the tempo or the settings, and the history starts
-again when you switch the FM-1 on.
+**Undo:** hold HOME and press REC to take back your last change. The screen tells you what it
+undid, for example UNDO 909 P1. Hold HOME and press PLAY to redo it. You can go back up to 32
+steps (fewer after very big changes). A step is whatever you did before pausing for a moment:
+a few steps tapped in a row, one turn of a knob, or a whole recording pass. Undo covers the
+sounds, patterns, song and knob motion, even CLEAR PATTERN and FACTORY RESET. It doesn't cover
+the tempo or the settings, and the history is cleared when you switch off.
 
 ![A list](img/screen-list.png)
 ![A question](img/screen-ask.png)
@@ -195,10 +193,11 @@ On the 808, the SOUND setting of a track switches it between tom and conga, rim 
 or clap and maracas. The 909's hats and cymbals are samples, as on the original machine.
 Every other sound on both machines is synthesized.
 
-Press a black key to select its track. When the pattern is stopped you also hear it; while it
-plays, selecting is silent, so it doesn't add a hit to the groove (GLO > KEY SOUND set to ALWAYS
-plays it every time). Then press white keys to turn the selected track on or off at those steps. To set accents instead, hold ENV while pressing white keys.
-An accent makes every drum on that step louder.
+Press a black key to pick its track. When the pattern is stopped you also hear it. While it
+plays, picking a track is silent, so you don't add a hit to the groove (set GLO > KEY SOUND to
+ALWAYS if you'd rather hear it every time). Then press white keys to turn the track on or off at
+those steps. To place accents instead, hold ENV while you press white keys. An accent makes
+every drum on that step louder.
 
 A pattern can be up to 32 steps long. The white keys show 16 steps at a time: press OCT- for
 steps 1–16 and OCT+ for steps 17–32.
@@ -206,11 +205,11 @@ steps 1–16 and OCT+ for steps 17–32.
 The closed hat cuts off the open hat. On the 808 you can change this with CHOKE on the KIT
 page.
 
-Press EDIT to step through the selected track's sound settings, the last of which is its PAN
-(on the 808, a track's alternate sound shares its pan: conga with tom, clave with rim shot,
-maracas with clap), followed by these pages:
+Press EDIT to step through the selected track's sound settings. The last one is the track's
+PAN, which places it left or right. (On the 808, the alternate sounds share their track's pan,
+so the conga sits where the tom does.) After the track's own pages come these:
 
-- SENDS: how much of the part goes to the reverb and the delay, its level and its PAN.
+- SENDS: how much of the whole part goes to the reverb and the delay, its level, and its pan.
 - PART: LENGTH (1–32 steps), RATE (1/16, 1/16 triplet, 1/32 or 1/8 triplet), SWING and
   ACCENT.
 - KIT: settings for the whole kit.
@@ -260,11 +259,11 @@ TB-3PO has three pages:
   OCTAVE, and MUTATE, which mutates the line by itself every 1–16 bars (or never).
 - LINE: the same as the 303's LINE page.
 
-The settings on GENERATE and SCALE don't change the line you hear: they are what the next
-**OCT+** (a new line) or **OCT-** (a mutation) will use, so the line stays as it is, hand edits
-and all, until you press one. While the settings differ from the line's, the screen shows
-NEW LINE with a star. The same settings and seed always produce the same line, and it is the
-same line that Schwung's TB-3PO module would write.
+Turning the GENERATE and SCALE knobs doesn't change the line you're hearing. They set up the
+next **OCT+** (new line) or **OCT-** (mutate), so your line stays exactly as it is, hand edits
+included, until you press one of them. When the knobs no longer match the line, the screen shows
+NEW LINE with a star. The same settings and seed always give the same line, the same one
+Schwung's TB-3PO module would write.
 
 ---
 
@@ -359,9 +358,8 @@ On HOME, the knobs are TEMPO, SWING, PUMP and CUTOFF.
 
 Press REC to turn recording on, and press it again to turn it off.
 
-- **Drums:** while the pattern plays, press black keys to record hits (with REC on they always
-  sound). Hold ENV to record
-  accented hits.
+- **Drums:** while the pattern plays, press black keys to record hits (with REC on, you always
+  hear them). Hold ENV to record accented hits.
 - **303, live:** switch the 303 to keyboard mode and play while the pattern runs.
 - **303, one step at a time:** switch the 303 to keyboard mode and stop playback. Each key you
   press fills the next step, starting from step 1. Hold ENV while pressing a key for an
@@ -443,9 +441,9 @@ sends, on that track's own page. The reverb is stereo: whatever you send it come
 ![MIX, with the compressor pumping](img/screen-mix.png)
 
 Press LFO to open MIX. It shows a level and a meter for each part, and the compressor's gain
-reduction in red. The PANS page places each part in the stereo field (C is the middle, L and R
-the sides); the break's pan is on its own SENDS page. A part stays at full level on the side
-it is turned toward and fades out of the other.
+reduction in red. The PANS page places the 909, 808 and both 303s left or right (C is the
+middle); the break's pan is on its own SENDS page. As you turn a pan, the part stays at full
+level on that side and fades out of the other.
 
 The factory mix is set up for big beat: the break is up front with the 909 kick under it, the
 303s run through RAT distortion into a tape delay, and the clap has reverb. The master
@@ -483,50 +481,45 @@ Press GLO for these settings:
 | CLOCK OUT | Sends MIDI clock and start/stop messages. |
 | NOTES OUT | Sends the patterns out as MIDI notes. |
 | KEY LIGHTS | Shows the steps on the key lights. |
-| KEY SOUND | STOPPED (the default): the black drum keys, and a 303 step you hold or edit, sound only when the pattern is stopped, or with REC on; while it plays they only select, and you hear the line. ALWAYS: they always sound. The 303 keyboard always plays. |
+| KEY SOUND | STOPPED (the default): picking a drum or editing a 303 step is silent while the pattern plays, unless REC is on. ALWAYS: you always hear it. The 303 keyboard always plays either way. |
 | THEME | The screen colour: green, amber, cyan, red or mono. |
 | ACCENT | How loud an unaccented drum hit is compared with an accented one. |
 | MODE | PATTERN, or SONG to play the song. |
 | SAVE PROJECT | Saves everything. |
 | AUTOSAVE | ON (the default): while the pattern is stopped, changes are saved by themselves once nothing has been touched for four seconds. OFF: only SAVE saves. |
 | CLEAR PATTERN | Clears all five parts of the current pattern. |
-| FACTORY RESET | Restores the factory sounds and empty patterns, with no song and no knob motion. Your saved project stays in memory until you save over it. |
+| FACTORY RESET | Goes back to the factory sounds and empty patterns, with no song and no knob motion. Your saved project is kept until you save over it. |
 | PERFORMANCE | Opens the performance page (below). |
 | ABOUT X0X | Shows the version and the audio load. |
 
 Press **SAVE** to save the sounds, all 16 patterns, the song, the knob motion, the tempo and
-the settings. A small dot at the top right of the screen means there are changes that aren't
-saved yet.
+the settings. A small dot at the top right of the screen means you have unsaved changes.
 
-With AUTOSAVE on (the default), you rarely need to: whenever the pattern is stopped and you
+With AUTOSAVE on (the default), you'll rarely need to. Whenever the pattern is stopped and you
 haven't touched anything for four seconds, X0X saves your changes and says AUTOSAVED. It never
-saves while the pattern plays, because writing to the FM-1's memory briefly silences the sound.
-Only the parts that changed are written, so a save is quick. Anything not yet saved is lost when
-you switch the FM-1 off. With AUTOSAVE off, only SAVE saves (turning it off saves once more, so
-the setting is kept).
+saves while the pattern plays, because writing to the FM-1's memory briefly cuts the sound.
+Anything unsaved is lost when you switch off. With AUTOSAVE off, only SAVE saves.
 
 ### Performance
 
-GLO > PERFORMANCE shows how hard the FM-1 is working, updated every second: its clock speed, the
-audio load and its peak, any dropouts, and how much of the processor each part uses.
+GLO > PERFORMANCE shows how hard the FM-1 is working, updated every second: the audio load and
+its peak, any dropouts, and how much of the processor each part is using.
 
-To measure it properly, press SEL and choose RUN PERF TEST. X0X plays three patterns of its own
-on the factory sound for about 15 seconds: a simple loop, all five parts, and everything as busy
-as it gets. Then it puts back your patterns, sound and tempo, and shows a table. Your project
-isn't changed. HOME or PLAY stops the test early.
+For a proper measurement, press SEL and choose RUN PERF TEST. X0X plays three patterns of its
+own for about 15 seconds, from a simple loop up to everything as busy as it gets, then puts your
+project back exactly as it was and shows the results. HOME or PLAY stops the test early.
 
-When the FM-1 is close to running out of processor time, X0X saves some on its own instead of
-dropping out. Both 303s stop oversampling, which costs a little brightness and aliasing on high,
-resonant notes, and the 808's sounds end a little sooner as they fade. GUARD lights in amber next
-to the audio load while this is on. It turns off again after three quiet seconds. The performance
-page shows how many times it has switched on (GUARD 3x). The test above runs without it, so it
-measures the full cost.
+When the FM-1 gets close to its limit, X0X lightens the load by itself instead of dropping out:
+the 303s stop oversampling (bright, resonant notes get a touch grittier) and the 808's sounds end
+a little sooner as they fade. While this is happening, GUARD lights up in amber next to the audio
+load; it switches off again after three quiet seconds. The performance page counts how often it
+has kicked in (GUARD 3x).
 
-If X0X drops out on your patterns, a photo of that table, and of the pattern, is the most useful
-thing you can send.
+If X0X drops out on one of your patterns, a photo of the test results and of the pattern is the
+most useful thing you can send.
 
-KNOB 1 switches on extra counters (STALLS). They're experimental: if the FM-1 misbehaves with
-them on, switch it off and on again.
+KNOB 1 turns on some extra counters (STALLS). They're experimental: if the FM-1 acts up with them
+on, switch it off and on again.
 
 ---
 
@@ -572,19 +565,24 @@ the FM-1 on. The screen then asks you to press each button and turn each knob in
 next start shows RESTARTED AFTER A CRASH and an address (PC ...) for a moment. If you report the
 problem, include that address and what you were doing.
 
-**Safe mode:** if X0X crashes twice in a row while starting, it starts in SAFE MODE instead: no
-sound, but USB works, so the web installer can reach it. Reinstall X0X from the installer, or
-put the stock firmware back from the same page. Press PLAY to try starting X0X normally again.
-If even safe mode fails twice, the FM-1 goes into the chip's own update mode, which only the
-rescue below can reach.
+**Safe mode:** if X0X crashes twice in a row while starting, it starts in SAFE MODE instead. There's
+no sound, but USB works, so the web installer can reach it: reinstall X0X, or put the stock
+firmware back from the same page. Press PLAY to try starting X0X normally again. If even safe
+mode fails twice, the FM-1 drops into the chip's own update mode, and only the rescue below can
+reach it.
+
+**Stuck on the start screen after changing BRIGHTNESS:** versions up to 0.9-beta had a brightness
+setting that could freeze the FM-1, and because the setting was saved, it stayed frozen at every
+start, even after reinstalling. Install 0.10-beta or later from the web installer: the setting is
+gone, the saved value is ignored, and the FM-1 starts normally.
 
 ### Recovering an FM-1 that won't start
 
-From version 0.5-beta, an FM-1 that keeps crashing starts in safe mode (above), and the web
-installer can fix it. Older versions (0.2-beta did: the X0X screen, a red X0X CRASH screen, then a
-blank screen) went into the chip's own update mode after two crashes, which neither the web
-installer nor M-VAVE's updater can see. A script can put
-M-VAVE's stock firmware back from there, on a Mac, with the USB cable you already have:
+Since 0.5-beta, an FM-1 that keeps crashing starts in safe mode (above), where the web installer
+can fix it. Older versions instead dropped into the chip's own update mode after two crashes (0.2-
+beta did this: the X0X screen, a red X0X CRASH screen, then a blank screen). Neither the web
+installer nor M-VAVE's updater can see an FM-1 in that state, but a script can put M-VAVE's
+firmware back, on a Mac, with the USB cable you already have:
 
 Open Terminal, paste this line and press Return:
 
@@ -614,28 +612,28 @@ RP2040 board wired to the USB lines) can still reach it.
 ## 18. Parameters
 
 Drum settings range from 0 to 127. DIST, the distortion type, can be DIODE, CLIP, SAT, BFZ,
-PDIST, FOLD or CRUSH.
+PDIST, FOLD or CRUSH. PAN goes from L64 through C (the middle) to R63.
 
 | 909 track | Settings |
 |---|---|
-| BD | Tune, Attack, Decay, Level, Pitch depth, Pitch, Drive, Dist |
-| SD | Tune, Tone, Snappy, Level, Drive, Dist, Rev, Dly |
-| LT, MT, HT | Tune, Decay, Level, Attack, Drive, Dist, Rev, Dly |
-| RS | Level, Tune, Drive, Dist, Rev, Dly |
-| CP | Level, Tune, Tail, Drive, Dist, Rev, Dly |
-| CH, OH | Decay, Level, Tune, Drive, Dist, Rev, Dly |
-| CR, RD | Tune, Level, Decay, Drive, Dist, Rev, Dly |
+| BD | Tune, Attack, Decay, Level, Pitch depth, Pitch, Drive, Dist, Pan |
+| SD | Tune, Tone, Snappy, Level, Drive, Dist, Rev, Dly, Pan |
+| LT, MT, HT | Tune, Decay, Level, Attack, Drive, Dist, Rev, Dly, Pan |
+| RS | Level, Tune, Drive, Dist, Rev, Dly, Pan |
+| CP | Level, Tune, Tail, Drive, Dist, Rev, Dly, Pan |
+| CH, OH | Decay, Level, Tune, Drive, Dist, Rev, Dly, Pan |
+| CR, RD | Tune, Level, Decay, Drive, Dist, Rev, Dly, Pan |
 | KIT | Accent, Velocity |
 
 | 808 track | Settings |
 |---|---|
-| BD | Level, Tone, Decay, Tune, Attack, Drive, Dist |
-| SD | Level, Tone, Snappy, Tune, Decay, Drive, Dist, Rev, Dly |
-| LT, MT, HT | Level, Tune, Decay, Sound, Drive, Dist, Rev, Dly |
-| RS | Level, Tune, Decay, Sound, Drive, Dist, Rev, Dly |
-| CP | Level, Tune, Decay, Attack, Sound, Drive, Dist, Rev, Dly |
-| CB, CH | Level, Tune, Decay, Drive, Dist, Rev, Dly |
-| CY, OH | Level, Decay, Tune, Drive, Dist, Rev, Dly |
+| BD | Level, Tone, Decay, Tune, Attack, Drive, Dist, Pan |
+| SD | Level, Tone, Snappy, Tune, Decay, Drive, Dist, Rev, Dly, Pan |
+| LT, MT, HT | Level, Tune, Decay, Sound, Drive, Dist, Rev, Dly, Pan |
+| RS | Level, Tune, Decay, Sound, Drive, Dist, Rev, Dly, Pan |
+| CP | Level, Tune, Decay, Attack, Sound, Drive, Dist, Rev, Dly, Pan |
+| CB, CH | Level, Tune, Decay, Drive, Dist, Rev, Dly, Pan |
+| CY, OH | Level, Decay, Tune, Drive, Dist, Rev, Dly, Pan |
 | KIT | Level, Accent, Choke (off, closed cuts open, or both) |
 
 | 303 setting | Range |
@@ -667,11 +665,10 @@ PDIST, FOLD or CRUSH.
 | TAPE | Type (DIGI or TAPE), Wear, HPF, Ping (off or on) |
 | KIT DRIVE | Volume, Dist, Drive, Comp |
 
-The delay follows the tempo, including an external MIDI clock. A delay time longer than two
-seconds (1/2. below 90 BPM, 1/2 below 60) plays at half that length, which is still on the beat.
-TAPE's Wear sets how much the echoes wow and flutter around the beat. With PING on, the first
-echo comes from the left and the next from the right, one delay time apart; a delay time longer
-than one second plays centred instead.
+The delay follows the tempo, including an external MIDI clock. A delay longer than two seconds
+(1/2. below 90 BPM, 1/2 below 60) plays at half that length, which still lands on the beat. With
+PING on, the echoes bounce from left to right, one delay time apart; delays longer than one
+second play in the middle instead.
 
 ---
 
