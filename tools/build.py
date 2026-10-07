@@ -69,14 +69,45 @@ def use_docker():
     return os.environ.get("JIELI_DOCKER", "0" if native else "1") == "1"
 
 
+_BUILDER = None
+_BUILDER_LOCK = __import__("threading").Lock()
+
+
+def builder():
+    """one long-lived toolchain container per source tree (starting a container per tool call cost
+    most of the build); it stops by itself after an hour without a build"""
+    global _BUILDER
+    with _BUILDER_LOCK:            # the loader and the app build in parallel: start it once
+        return _builder_start()
+
+
+def _builder_start():
+    global _BUILDER
+    if _BUILDER:
+        return _BUILDER
+    name = "jieli-" + hashlib.sha1(str(SRC).encode()).hexdigest()[:10]
+    st = subprocess.run(["docker", "inspect", "-f", "{{.State.Running}}", name], capture_output=True, text=True)
+    if st.stdout.strip() != "true":
+        subprocess.run(["docker", "rm", "-f", name], capture_output=True)
+        r = subprocess.run(["docker", "run", "-d", "--rm", "--name", name, "--platform", "linux/amd64",
+                            "-v", f"{SRC}:/work", "-v", f"{toolchain()}:/opt/jieli:ro", "-w", "/work",
+                            DOCKER_IMAGE, "sh", "-c", "sleep 3600"], capture_output=True, text=True)
+        if r.returncode:
+            sys.stderr.write(r.stderr)
+            raise SystemExit("build: cannot start the toolchain container")
+    else:                           # an hour from now again
+        subprocess.run(["docker", "exec", "-d", name, "sh", "-c", "sleep 3600 && kill 1"], capture_output=True)
+    _BUILDER = name
+    return name
+
+
 def tc(tool, *args):
     """run a toolchain binary (pi32v2/bin/..., common/bin/...) with cwd SRC; paths relative to SRC"""
     rel = [str(Path(a).resolve().relative_to(SRC)) if isinstance(a, Path) else a for a in args]
     if tool == "cc":                # the toolchain's cc wrapper needs python3; call clang directly
         tool, rel = "pi32v2/bin/clang", ["-target", "pi32v2", *rel]
     if use_docker():
-        cmd = ["docker", "run", "--rm", "--platform", "linux/amd64", "-v", f"{SRC}:/work",
-               "-v", f"{toolchain()}:/opt/jieli:ro", "-w", "/work", DOCKER_IMAGE, f"/opt/jieli/{tool}", *rel]
+        cmd = ["docker", "exec", "-w", "/work", builder(), f"/opt/jieli/{tool}", *rel]
     else:
         cmd = [str(toolchain() / tool), *rel]
     r = subprocess.run(cmd, cwd=SRC, capture_output=True, text=True)
