@@ -2697,8 +2697,15 @@ static void draw_perf(int band)
             q = put_s(q, "%  WRITE ");
             put_s(put_i(q, perf.stall[2]), "%");
         } else
-            put_s(t, "STALL COUNTERS OFF (KNOB 1)");
+            put_s(t, "STALLS OFF (KNOB 1)");
         cv_text(4, 46, &FONT_XS, t, perf.stalls_on ? C_GRAY : C_DIM);
+        if (!perf.stalls_on && plat_irq_stack_size()) {   /* the interrupts' 8 KiB: the deepest so far */
+            q = put_s(t, "IRQ STACK ");
+            q = put_i(q, (int)plat_irq_stack_used());
+            q = put_s(q, " / ");
+            put_s(put_i(q, (int)plat_irq_stack_size()), " B");
+            text_r(236, 46, &FONT_XS, t, plat_irq_stack_used() * 4u > plat_irq_stack_size() * 3u ? RGB(255, 80, 60) : C_GRAY);
+        }
         return;
     }
     if (perf.test >= 0) {                             /* the table, so far */

@@ -4,9 +4,13 @@
  * ends in the fault report of fm1_irq.h, so install that first.
  *
  *   EMU stack limit   sp outside [_ustack_lo, _sstack_top] -> EMU_MSG bit 3.
- *                     One window for both stacks: which of EMU_SSP/EMU_USP
- *                     the core applies to our supervisor-mode main loop is
- *                     not known, so both get the same range.
+ *                     One window for both stacks. Interrupts run on the system
+ *                     stack (_sstack_lo.._sstack_top, 8 KiB): the crash records
+ *                     of an interrupt (the audio render) always had sp there,
+ *                     near its top, whatever the main loop was doing; the main
+ *                     loop runs on the user stack. So the audio render and
+ *                     everything nested on it share those 8 KiB (PERF shows the
+ *                     deepest it has gone: plat_irq_stack_used).
  *   write limits      CPU0 writes into the two 256-byte stack guard bands and
  *                     into 0x01C7FD50..0x01C7FFFF (boot info, mailbox, vectors)
  *                     -> DBG_MSG bit 13. The top window is armed separately

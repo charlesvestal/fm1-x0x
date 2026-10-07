@@ -95,6 +95,27 @@ uint32_t plat_cycles(void) { return perf_cyc_ok ? fm1_perf_cycles() : fm1_ticks(
 int plat_cycles_cpu(void) { return perf_cyc_ok; }
 uint32_t plat_cycles_hz(void) { return 24000000u; }   /* the timer; the CPU's rate is measured */
 uint32_t plat_ticks24(void) { return fm1_ticks(); }
+/* the interrupts' stack (fm1_guard.h): filled with a mark before any interrupt runs (irq_stack_mark,
+ * fm1_cstart), so the deepest point reached is the lowest word no longer marked */
+#define IRQ_STACK_MARK 0x49525153u                  /* "IRQS" */
+static void irq_stack_mark(void)
+{
+    uint32_t *p = (uint32_t *)(void *)_sstack_lo, *top = (uint32_t *)(void *)_sstack_top - 16;
+    uint32_t here = (uint32_t)(uintptr_t)&p;        /* never mark below a live frame of our own */
+    if (here > (uint32_t)(uintptr_t)p && here < (uint32_t)(uintptr_t)top)
+        top = (uint32_t *)(uintptr_t)((here - 256u) & ~3u);
+    for (; p < top; p++)
+        *p = IRQ_STACK_MARK;
+}
+uint32_t plat_irq_stack_size(void) { return (uint32_t)(_sstack_top - _sstack_lo); }
+uint32_t plat_irq_stack_used(void)
+{
+    const uint32_t *p = (const uint32_t *)(const void *)_sstack_lo, *top = (const uint32_t *)(const void *)_sstack_top;
+    while (p < top && *p == IRQ_STACK_MARK)
+        p++;
+    return (uint32_t)((const char *)top - (const char *)p);
+}
+
 uint32_t plat_cpu_peak_pct(void)
 {
     uint32_t p = audio_peak_pct;

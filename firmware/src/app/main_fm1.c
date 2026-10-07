@@ -394,6 +394,7 @@ void fm1_cstart(void)
     }
     p3 |= (bootguard.failed >= 2u) << 8;            /* two failed boots: safe mode (kept past the .bss clear) */
     fm1_irq_init();
+    irq_stack_mark();                               /* before any interrupt: PERF's IRQ STACK */
     for (d = _bss_start; d < _bss_end; d++)
         *d = 0;
     for (d = _pool_start; d < _pool_end; d++)

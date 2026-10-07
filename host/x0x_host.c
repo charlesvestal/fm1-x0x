@@ -202,6 +202,8 @@ uint32_t plat_cycles(void) { return (uint32_t)host_ns(); }
 uint32_t plat_cycles_hz(void) { return 1000000000u; }
 int plat_cycles_cpu(void) { return 0; }
 uint32_t plat_ticks24(void) { return (uint32_t)(host_ns() * 24u / 1000u); }
+uint32_t plat_irq_stack_used(void) { return 0; }
+uint32_t plat_irq_stack_size(void) { return 0; }
 uint32_t plat_cpu_peak_pct(void)
 {
     uint32_t p = cpu_peak;

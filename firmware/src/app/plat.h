@@ -65,5 +65,7 @@ int plat_cycles_cpu(void);
 uint32_t plat_cycles_hz(void);           /* the counter's rate when it is not the CPU's */
 uint32_t plat_ticks24(void);
 uint32_t plat_cpu_peak_pct(void);
+uint32_t plat_irq_stack_used(void);      /* the deepest the interrupts' stack has gone, bytes (0: unknown) */
+uint32_t plat_irq_stack_size(void);
 int plat_stalls(uint32_t s[3]);
 void plat_stalls_enable(int on);
