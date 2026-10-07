@@ -2726,6 +2726,13 @@ static void draw_perf(int band)
         }
         if (perf.phase == 4)
             cv_text(4, 50, &FONT_XS, "SEL: RUN IT AGAIN", C_DIM);
+        if (plat_irq_stack_size()) {                 /* the interrupts' stack, the deepest so far (after the test too) */
+            q = put_s(t, "IRQ STACK ");
+            q = put_i(q, (int)plat_irq_stack_used());
+            q = put_s(q, " / ");
+            put_s(put_i(q, (int)plat_irq_stack_size()), " B");
+            text_r(236, 50, &FONT_XS, t, plat_irq_stack_used() * 4u > plat_irq_stack_size() * 3u ? RGB(255, 80, 60) : C_GRAY);
+        }
         return;
     }
     for (k = 0; k < ENG_PROF_N; k++) {                /* each stage's share of the CPU */
