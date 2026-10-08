@@ -21,7 +21,7 @@
 
 typedef struct {
     uint32_t magic, format;
-    uint8_t palette, keyled, clk_out, notes_out;
+    uint8_t palette, keyled, clk_out, notes_out;   /* keyled: 0 off, 1 keys and the buttons' glow, 2 keys only */
     uint16_t bpm_x10;
     uint8_t accent_q7, keysound;         /* black drum keys sound: 0 = only when stopped or recording, 1 = always */
     uint8_t autosave_off;                /* 0: save by itself while stopped and idle (ui.c autosave) */

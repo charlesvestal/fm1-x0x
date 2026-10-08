@@ -25,6 +25,7 @@
  * quadrature cycle. fm1_enc_take() returns the steps.
  * LEDs: set fm1_led[col] (packed row bits, bit1 PA5..bit4 PA8); they are lit
  * while that column is selected. fm1_led_key/btn helpers address them by id.
+ * fm1_led_dim[col] / fm1_led_dim_div: the same, dim (see there).
  */
 #pragma once
 #include <stdint.h>
@@ -79,6 +80,11 @@ static volatile struct {
     uint32_t frames;
 } fm1_in;
 static uint8_t fm1_led[FM1_NCOL];
+/* dim LEDs, lit on one scan frame in fm1_led_dim_div (tick mode only; 0 = off). The frame rate is
+ * ~900 Hz, so up to a divisor of ~6 they read as steady, at 1/div of full brightness. */
+static uint8_t fm1_led_dim[FM1_NCOL];
+static volatile uint8_t fm1_led_dim_div;
+static uint8_t fm1__dim_frame;
 
 static void fm1__led_lines(uint32_t rowmask)
 {
@@ -265,10 +271,13 @@ static void fm1_input_tick(void)
     fm1__led_lines(0);
     fm1_in.raw[p] = (uint8_t)fm1__rows();          /* column p has been latched one tick */
     fm1__sr_word(0xFFFFu ^ (1u << n) ^ (n < 2u ? 1u << (11u + n) : 0u));
-    fm1__led_lines(fm1_led[n]);
+    fm1__led_lines(fm1_led[n] | (fm1_led_dim_div && fm1__dim_frame == 0u ? fm1_led_dim[n] : 0u));
     fm1__tick_col = (uint8_t)n;
-    if (n == 0u)
+    if (n == 0u) {
+        if (++fm1__dim_frame >= fm1_led_dim_div)
+            fm1__dim_frame = 0;
         fm1__frame();
+    }
 }
 
 /* main-loop critical section against fm1_input_tick (main loop only: it

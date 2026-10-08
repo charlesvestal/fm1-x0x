@@ -180,11 +180,12 @@ static const x0x_param_t GEN_P[NGEN] = {
 enum { SQ_SWING, SQ_DLEN, SQ_DRATE, SQ_BLEN, SQ_BRATE, SQ_BDIR, SQ_BTRANS, SQ_TEMPO, SQ_ACCENT, SQ_CLK, SQ_NOTES,
        SQ_THEME, SQ_KEYLED, SQ_KEYSOUND, SQ_AUTOSAVE, NSQ };
 static const char *const KEYSOUND_N[] = {"STOPPED", "ALWAYS"};
+static const char *const LIGHTS_N[] = {"OFF", "ON", "KEYS"};   /* ON: the keys, and the unlit buttons glow */
 static const x0x_param_t SEQ_P[NSQ] = {
     {"SWING", 100, 0, 0}, {"LENGTH", 31, 15, 0}, {"RATE", 3, 0, RATE_N}, {"LENGTH", 31, 15, 0},
     {"RATE", 3, 0, RATE_N}, {"DIR", 3, 0, DIR_N}, {"TRANSP", 48, 24, 0}, {"TEMPO", 255, 105, 0},
     {"ACCENT", 127, 88, 0}, {"CLOCK OUT", 1, 1, ONOFF_N}, {"NOTES OUT", 1, 0, ONOFF_N}, {"THEME", 4, 1, THEME_N},
-    {"KEY LIGHTS", 1, 1, ONOFF_N}, {"KEY SOUND", 1, 0, KEYSOUND_N},
+    {"LIGHTS", 2, 1, LIGHTS_N}, {"KEY SOUND", 1, 0, KEYSOUND_N},
     {"AUTOSAVE", 1, 1, ONOFF_N},
 };
 static const x0x_param_t ACT_P[] = {
@@ -3116,6 +3117,7 @@ static void leds(void)
         }
     }
     k |= ui.keys;
+    plat_glow(proj.set.keyled == 1);
     plat_leds(b, k);
 }
 

@@ -30,6 +30,7 @@ uint32_t plat_keys(void);              /* held: bit k = key k (0 = F3) */
 int32_t plat_enc(int role);            /* detents since the last call, + = clockwise; EN_* */
 uint32_t plat_master(void);            /* MASTER pot, 0..4096 gain Q12 */
 void plat_leds(uint32_t buttons, uint32_t keys);   /* lit: bit B_*, bit key */
+void plat_glow(int on);                /* the unlit buttons glow dimly, readable in the dark (call before plat_leds) */
 
 /* USB MIDI, 4-byte USB-MIDI event packets (cable 0) */
 int plat_midi_in(uint32_t *pkt);       /* 1 = got one (called from the audio ISR) */

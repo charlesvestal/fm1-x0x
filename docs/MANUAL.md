@@ -480,7 +480,7 @@ Press GLO for these settings:
 |---|---|
 | CLOCK OUT | Sends MIDI clock and start/stop messages. |
 | NOTES OUT | Sends the patterns out as MIDI notes. |
-| KEY LIGHTS | Shows the steps on the key lights. |
+| LIGHTS | ON: the key lights show the steps, and the unlit buttons glow dimly so they can be read. KEYS: the key lights only. OFF: neither. |
 | KEY SOUND | STOPPED (the default): picking a drum or editing a 303 step is silent while the pattern plays, unless REC is on. ALWAYS: you always hear it. The 303 keyboard always plays either way. |
 | THEME | The screen colour: green, amber, cyan, red or mono. |
 | ACCENT | How loud an unaccented drum hit is compared with an accented one. |
