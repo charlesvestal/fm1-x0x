@@ -3118,6 +3118,7 @@ static void leds(void)
     }
     k |= ui.keys;
     plat_glow(proj.set.keyled == 1);
+    plat_play_red(ui.rec);                           /* PLAY green; red while recording */
     plat_leds(b, k);
 }
 

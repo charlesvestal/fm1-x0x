@@ -43,6 +43,10 @@ static void led_pos_init(void)
 #define GLOW_DIV 4u
 static uint8_t glow_on = 1;
 void plat_glow(int on) { glow_on = (uint8_t)(on != 0); }
+/* PLAY has two LEDs: its red at the button's own position, a green at the keyless matrix position
+ * column 8, row PA5 (found on the device). Green, unless recording. */
+static uint8_t play_red;
+void plat_play_red(int red) { play_red = (uint8_t)(red != 0); }
 void plat_leds(uint32_t buttons, uint32_t keys)
 {
     uint8_t nl[FM1_NCOL] = {0}, dl[FM1_NCOL] = {0};
@@ -51,6 +55,8 @@ void plat_leds(uint32_t buttons, uint32_t keys)
         uint32_t id = i < NB ? panel.btn[i] : 14u + (i - NB);
         int on = i < NB ? (buttons >> i) & 1u : (keys >> (i - NB)) & 1u;
         uint8_t q = led_pos[id];
+        if (i == B_PLAY && !play_red)            /* PLAY's green LED instead (keyless position col 8, row PA5) */
+            q = (uint8_t)((8u << 3) | 1u);
         if (q == 0xFF)
             continue;
         if (on)

@@ -89,6 +89,7 @@ void plat_leds(uint32_t b, uint32_t k)
 }
 static int glow_on = 1;                 /* the device's button glow (plat_glow); the lights printed are the bright ones */
 void plat_glow(int on) { glow_on = on; }
+void plat_play_red(int red) { (void)red; }      /* the device's PLAY colour: green, red while recording */
 
 #define MQ 256
 static uint32_t min_q[MQ], mi_w, mi_r;
