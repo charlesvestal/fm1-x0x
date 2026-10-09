@@ -71,8 +71,9 @@ tapkey b4
 expect mute 16777216
 tapkey b4
 expect mute 0
-# 9. record a filter sweep: ALGORITHM back to 303A, REC, turn KNOB 1, REC
+# 9. record a filter sweep: ALGORITHM back to 303A, EDIT, REC, turn KNOB 1, REC
 turn ALGO -2
+tap EDIT
 expect part 2
 expect view 1
 tap REC

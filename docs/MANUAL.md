@@ -85,7 +85,7 @@ the screen shows the 909, and every part is empty.
    the break plays the whole bar.
 8. **Mute a part.** Press HOME, then black key 5 to mute the break. Press it again to bring it
    back.
-9. **Record a filter sweep.** Turn ALGORITHM back to 303A. Press REC, slowly turn KNOB 1 for a
+9. **Record a filter sweep.** Turn ALGORITHM back to 303A and press EDIT. Press REC, slowly turn KNOB 1 for a
    bar or two, then press REC again. The sweep now plays every time the pattern comes round.
 10. **Save.** Press SAVE, and everything is kept when you switch off. (X0X also saves by itself
     a few seconds after you stop playing; see section 15.)
@@ -101,7 +101,10 @@ how to arrange them into a song.
 
 ![What the keys do](img/fm1-keys.svg)
 
-These controls do the same thing on every screen:
+These controls do the same thing on every screen. Each button that opens a screen always opens the
+same one (HOME the pattern, EDIT the part, ARP TB-3PO, SEQ the song, LFO the mixer, FX the effects,
+GLO the settings); pressing it again steps through that screen's pages. ALGORITHM only picks the
+part.
 
 | Control | What it does |
 |---|---|
@@ -110,17 +113,17 @@ These controls do the same thing on every screen:
 | SELECT | Moves to the next or previous page. In a list, it moves up and down. Hold HOME and turn SELECT to set the tempo. |
 | KNOB 1–4 | Change the four values shown at the bottom of the screen. Turn slowly for single steps, quickly to sweep: a fast half turn covers the whole range. |
 | SEL | Shows everything on the current screen as a list. In a list, it runs the highlighted action. When X0X asks a question, SEL means yes. |
-| HOME | Goes to the HOME screen. In a list, it goes back. When X0X asks a question, HOME means no. |
-| EDIT | Shows the part's own screen. Press it again for the next page. |
-| ARP | Opens TB-3PO, the 303 line generator (on a 303 only); press it again to go back. |
+| HOME | The pattern: all five parts. Press it again for the next page. In a list, it goes back; when X0X asks a question, HOME means no. |
+| EDIT | The selected part: its steps and its sound. Press it again for the next page. |
+| ARP | TB-3PO, the 303 line generator (on a 303 only). Press it again for the next page. |
 | FX | Opens the effects. |
 | LFO | Opens the mixer and the master. |
 | GLO | Opens the settings. |
-| SEQ | On a 303, switches the keys between steps and keyboard. On HOME, opens the song. |
+| SEQ | The song. Press it again for the next page. |
 | PLAY | Starts and stops. Hold HOME and press PLAY to redo. |
-| REC | Turns recording on and off. Hold HOME and press REC to undo. |
+| REC | Turns recording on and off: what you play is written (drum hits, 303 notes, knob moves; in SONG mode, the song). On a 303, the keys become a keyboard while it's on. Hold HOME and press REC to undo. |
 | SAVE | Saves everything. |
-| ENV, LFO | Hold one of these while pressing keys to add an accent (ENV) or a slide (LFO). |
+| ENV, LFO | Hold one of these while pressing keys to add an accent (ENV) or a slide (LFO). (LFO on its own opens the mixer.) |
 | OCT-, OCT+ | Page through the steps, 16 at a time (1–16, 17–32, 33–48, 49–64). On HOME and SONG they show patterns 1–16 or 17–32. On the 303 keyboard they change the octave. In TB-3PO they mutate the line or write a new one. |
 | White keys | Steps. On HOME, they choose patterns. |
 | Black keys | Drum tracks, or the break's slices. On HOME, they mute parts. Hold HOME and press one on the 909 or 808 to mute just that track. |
@@ -254,9 +257,10 @@ A **tie** holds the note before it through the step, so the note doesn't play ag
 screen a tied note joins the note it holds in one long bar. Turning KNOB 1 on a tie makes it a
 note of its own.
 
-**Keyboard.** Press SEQ to turn all 27 keys into a keyboard; KEYS appears on the top line.
+**Keyboard.** Press REC and all 27 keys become a keyboard (KEYS appears on the top line): the
+notes you play are written, step by step while the pattern is stopped, live while it plays.
 OCT- and OCT+ change the octave. If you play a key while still holding another, the 303
-slides between them. Press SEQ again to go back to steps.
+slides between them. Press REC again to go back to steps.
 
 Press EDIT to step through these pages:
 
@@ -413,11 +417,12 @@ Press REC to turn recording on, and press it again to turn it off.
 
 - **Drums:** while the pattern plays, press black keys to record hits (with REC on, you always
   hear them). Hold ENV to record accented hits.
-- **303, live:** switch the 303 to keyboard mode and play while the pattern runs.
-- **303, one step at a time:** switch the 303 to keyboard mode and stop playback. Each key you
-  press fills the next step, starting from step 1. Hold ENV while pressing a key for an
-  accent, or LFO for a slide. To enter a rest, tap ENV on its own. To enter a tie, hold LFO
-  and press OCT- or OCT+.
+- **303, live:** with REC on, the 303's keys are a keyboard: play while the pattern runs.
+- **303, one step at a time:** with REC on and the pattern stopped, each key you press fills the
+  next step, starting from step 1. Hold ENV while pressing a key for an accent, or LFO for a
+  slide. To enter a rest, hold ENV and press OCT- or OCT+; for a tie, hold LFO and press OCT-
+  or OCT+.
+- **Knob moves:** with REC on and the pattern playing, turn any sound knob (see Knob motion).
 
 ---
 
@@ -452,7 +457,7 @@ top line says MOTION FULL.
 ![SONG](img/screen-song.png)
 
 A song is a list of up to 192 bars. Each bar says which pattern each part plays and which
-parts are muted. To open the song, press SEQ on HOME.
+parts are muted. To open the song, press SEQ.
 
 - **Write bars:** press a white key. The selected bar gets that pattern for all five parts,
   and the next bar is selected. Pressing keys at the end of the song adds new bars.

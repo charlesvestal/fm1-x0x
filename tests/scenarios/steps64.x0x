@@ -21,7 +21,7 @@ expect hit0.0.32 1
 tap HOME
 turn SELECT 1
 spin K1 48
-tap HOME
+tap EDIT
 tap PLAY
 wait 7500
 expect playhead0 64
@@ -35,7 +35,7 @@ tap OCT+
 tapkey w3
 wait 50
 expect pattern 20
-tap HOME
+tap EDIT
 tapkey w2
 expect hit0.0.2 1
 # copy it to pattern 31 (SAVE held: the bank is the one HOME showed)

@@ -20,7 +20,7 @@ tapkey b0
 tapkey b0
 expect vmute 2050
 expect mute 0
-tap HOME
+tap EDIT
 turn ALGO -1
 press HOME
 tapkey b1

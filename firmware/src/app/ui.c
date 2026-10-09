@@ -40,7 +40,6 @@ typedef struct {
     uint8_t spage;                     /* the 16 steps the white keys show: 0 = 1-16 .. 3 = 49-64 */
     uint8_t pbank;                     /* the 16 patterns HOME's white keys choose: 0 = 1-16, 1 = 17-32 */
     uint8_t mixsel;                    /* MIX's PARTS: the part the knobs set (black keys 1-5) */
-    uint8_t kbd[NBASS];
     int8_t oct;
     uint8_t rec;
     uint8_t wpos[NBASS];
@@ -698,6 +697,12 @@ static void add_track_pages(int t, int v)
         add_page(nm, snd[i], i + 1 < n ? snd[i + 1] : NONE, i + 2 < n ? snd[i + 2] : NONE, i + 3 < n ? snd[i + 3] : NONE);
 }
 
+/* where a screen's page is kept: per part on the part's screens (and TB-3PO), else one per screen */
+static uint8_t *page_of(int view)
+{
+    return &ui.page[view][view == V_PART || view == V_GEN ? ui.part : 0];
+}
+
 static void build_pages(void)
 {
     int p = ui.part, b = bidx();
@@ -804,11 +809,11 @@ static void build_pages(void)
     }
     if (pg.n == 0)
         add_page("", NONE, NONE, NONE, NONE);
-    if (ui.page[ui.view][ui.part] >= pg.n)
-        ui.page[ui.view][ui.part] = 0;
+    if (*page_of(ui.view) >= pg.n)
+        *page_of(ui.view) = 0;
 }
 
-static int cur_page(void) { return ui.page[ui.view][ui.part]; }
+static int cur_page(void) { return *page_of(ui.view); }
 
 /* MIX's page of a drum machine's tracks: which machine (0 / 1), -1 = not one */
 static int drum_mix_page(void)
@@ -1025,13 +1030,13 @@ static const char *const BTN_LABEL[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GL
 
 static int help_lines(int b, const char *l[HELP_LINES])
 {
-    int n = 0, gen = ui.view == V_GEN, kbd = is_303() && ui.kbd[bidx()];
+    int n = 0, gen = ui.view == V_GEN, kbd = is_303() && ui.rec;
 #define L(s) (l[n++] = (s))
     switch (b) {
     case B_FX: L("THE EFFECTS: REVERB, DELAY,"); L("TAPE AND KIT DRIVE"); L("AGAIN: THE NEXT PAGE"); break;
     case B_SEL: L("THIS SCREEN AS A LIST"); L("IN A LIST: RUN THE ACTION"); L("IN A QUESTION: YES"); break;
     case B_ENV:
-        if (is_303()) { L("HOLD + KEY: AN ACCENT"); if (kbd) L("STEP WRITE: TAP FOR A REST"); }
+        if (is_303()) { L("HOLD + KEY: AN ACCENT"); if (kbd) L("WRITING: + OCT: A REST"); }
         else if (is_drum()) { L("HOLD + WHITE KEY: ACCENT"); L("HOLD + BLACK KEY: LOUD HIT"); }
         else L("HOLD + KEY: AN ACCENT");
         break;
@@ -1039,10 +1044,10 @@ static int help_lines(int b, const char *l[HELP_LINES])
         L("THE MIXER AND THE MASTER"); L("AGAIN: THE NEXT PAGE");
         if (is_303()) { L("HOLD + KEY: A SLIDE"); if (kbd) L("HOLD + OCT: A TIE"); }
         break;
-    case B_EDIT: L("THE PART'S OWN SCREEN"); L("AGAIN: THE NEXT PAGE"); break;
+    case B_EDIT: L("THE PART: ITS STEPS, ITS SOUND"); L("AGAIN: THE NEXT PAGE"); break;
     case B_GLO: L("SETTINGS, SAVE, CLEAR,"); L("FACTORY RESET, PERFORMANCE"); L("AGAIN: CLOSE"); break;
     case B_HOME:
-        L("HOME: ALL FIVE PARTS"); L("+ SELECT: TEMPO"); L("+ WHITE KEY: PATTERN");
+        L("THE PATTERN: ALL FIVE PARTS"); L("AGAIN: THE NEXT PAGE   + SELECT: TEMPO"); L("+ WHITE KEY: PATTERN");
         if (is_drum() && part_view()) L("+ BLACK KEY: MUTE THE TRACK");
         L("+ REC: UNDO   + PLAY: REDO"); L("LIST: BACK   QUESTION: NO");
         break;
@@ -1063,19 +1068,17 @@ static int help_lines(int b, const char *l[HELP_LINES])
         L("AGAIN: THE NEXT PAGE");
         break;
     case B_SEQ:
-        if (ui.view == V_HOME || ui.view == V_SONG) L("HOME <-> THE SONG");
-        else if (is_303()) { L("KEYS: STEPS OR KEYBOARD"); L(kbd ? "NOW: KEYBOARD" : "NOW: STEPS"); }
-        else L("ON HOME: THE SONG");
+        L("THE SONG: PATTERNS, BAR BY BAR"); L("AGAIN: THE NEXT PAGE");
         break;
     case B_PLAY: L("START / STOP"); L("HOME + PLAY: REDO"); break;
     case B_REC:
-        L("RECORD ON / OFF:"); L(is_303() ? "THE KEYBOARD, KNOB MOVES" : "BLACK KEYS, KNOB MOVES");
+        L("RECORD ON / OFF:"); L(is_303() ? "THE KEYS PLAY AND WRITE NOTES" : "BLACK KEYS, KNOB MOVES");
         L("HOME + REC: UNDO"); L("SAVE + REC: CLEAR PART");
         break;
     case B_OCTDN:
     case B_OCTUP:
         if (gen) L(b == B_OCTUP ? "A NEW 303 LINE" : "MUTATE THE LINE");
-        else if (kbd) { L("THE KEYBOARD'S OCTAVE"); L("LFO + OCT: A TIE"); }
+        else if (kbd) { L("THE KEYBOARD'S OCTAVE"); L("LFO + OCT: A TIE  ENV + OCT: A REST"); }
         else if (ui.view == V_HOME || ui.view == V_SONG) L(b == B_OCTUP ? "PATTERNS 17-32" : "PATTERNS 1-16");
         else { L(b == B_OCTUP ? "THE NEXT 16 STEPS" : "THE 16 STEPS BEFORE"); L("PAGES: 1-16 17-32 33-48 49-64"); }
         break;
@@ -1841,7 +1844,7 @@ static void key_event(int k, int down)
         else if (down)
             drum_step(w);
     } else if (is_303()) {
-        if (ui.kbd[bidx()])
+        if (ui.rec)                                    /* REC: the keys play and write notes */
             bass_kbd(k, down);
         else if (w >= 0)
             bass_step_key(w, down);
@@ -1964,11 +1967,13 @@ static void button_tap(int b)
             ui.wpos[bidx()] = 0;
         say(ui.rec ? "RECORD ON: KEYS + KNOBS" : "RECORD OFF", 0);
         break;
-    case B_HOME:
+    case B_HOME:                                      /* the pattern; again: its next page (a list: back) */
         if (ui.overlay != O_NONE || ui.view == V_GLO)
             close_overlay();
+        else if (ui.view == V_HOME)
+            *page_of(V_HOME) = (uint8_t)((cur_page() + 1) % pg.n);
         else
-            set_view(ui.view == V_HOME ? V_PART : V_HOME);
+            set_view(V_HOME);
         break;
     case B_SEL:
         if (ui.overlay == O_LIST)
@@ -1978,7 +1983,7 @@ static void button_tap(int b)
         break;
     case B_EDIT:
         if (ui.view == V_PART && ui.overlay == O_NONE)
-            ui.page[V_PART][ui.part] = (uint8_t)((cur_page() + 1) % pg.n);
+            *page_of(V_PART) = (uint8_t)((cur_page() + 1) % pg.n);
         else
             set_view(V_PART);
         break;
@@ -1987,17 +1992,20 @@ static void button_tap(int b)
             say("TB-3PO: PICK 303A OR 303B", 0);
             break;
         }
-        set_view(ui.view == V_GEN ? V_PART : V_GEN);   /* the generator, on and off (SELECT: its pages) */
+        if (ui.view == V_GEN && ui.overlay == O_NONE)  /* the generator; again: its next page */
+            *page_of(V_GEN) = (uint8_t)((cur_page() + 1) % pg.n);
+        else
+            set_view(V_GEN);
         break;
     case B_FX:
         if (ui.view == V_FX && ui.overlay == O_NONE)
-            ui.page[V_FX][ui.part] = (uint8_t)((cur_page() + 1) % pg.n);
+            *page_of(V_FX) = (uint8_t)((cur_page() + 1) % pg.n);
         else
             set_view(V_FX);
         break;
     case B_LFO:
         if (ui.view == V_MIX && ui.overlay == O_NONE)
-            ui.page[V_MIX][ui.part] = (uint8_t)((cur_page() + 1) % pg.n);
+            *page_of(V_MIX) = (uint8_t)((cur_page() + 1) % pg.n);
         else
             set_view(V_MIX);
         break;
@@ -2009,21 +2017,11 @@ static void button_tap(int b)
             open_global();
         }
         break;
-    case B_SEQ:
-        if (ui.view == V_HOME || ui.view == V_SONG) {      /* HOME <-> SONG */
-            set_view(ui.view == V_HOME ? V_SONG : V_HOME);
-            break;
-        }
-        if (is_303()) {
-            ui.kbd[bidx()] = !ui.kbd[bidx()];
-            say(ui.kbd[bidx()] ? "303: KEYBOARD" : "303: STEPS", 0);
-        }
-        if (ui.view != V_PART)
-            set_view(V_PART);
-        break;
-    case B_ENV:
-        if (is_303() && ui.kbd[bidx()] && ui.rec && !seq.playing)
-            bass_write(bidx(), 0, G_REST);
+    case B_SEQ:                                       /* the song; again: its next page */
+        if (ui.view == V_SONG && ui.overlay == O_NONE)
+            *page_of(V_SONG) = (uint8_t)((cur_page() + 1) % pg.n);
+        else
+            set_view(V_SONG);
         break;
     case B_SAVE: save_project(); break;
     case B_OCTUP:
@@ -2050,10 +2048,13 @@ static void button_tap(int b)
                 say("MUTATED", 0);
             }
             mark_dirty();
-        } else if (is_303() && ui.kbd[bidx()]) {
-            if (ui.btn & (1u << B_LFO)) {
+        } else if (is_303() && ui.rec && ui.view == V_PART) {   /* pitch entry: the keyboard's octave */
+            if (ui.btn & (1u << B_LFO)) {                 /* LFO + OCT: a tie; ENV + OCT: a rest */
                 ui.btn_used |= 1u << B_LFO;
                 bass_write(bidx(), 0, G_TIE);
+            } else if (ui.btn & (1u << B_ENV)) {
+                ui.btn_used |= 1u << B_ENV;
+                bass_write(bidx(), 0, G_REST);
             } else {
                 char t[12];
                 ui.oct = (int8_t)(ui.oct + (up ? 1 : -1));
@@ -2129,7 +2130,7 @@ static void input(void)
             list_move(e > 0 ? 1 : -1);
         } else {
             int p = cur_page() + (e > 0 ? 1 : -1);
-            ui.page[ui.view][ui.part] = (uint8_t)(p < 0 ? 0 : p >= pg.n ? pg.n - 1 : p);
+            *page_of(ui.view) = (uint8_t)(p < 0 ? 0 : p >= pg.n ? pg.n - 1 : p);
         }
     }
     if ((e = enc(EN_ALGO)) != 0) {               /* ALGORITHM: the part; in a list, the value */
@@ -2138,7 +2139,7 @@ static void input(void)
         } else {
             int p = ui.part + (e > 0 ? 1 : -1);
             ui.part = (uint8_t)(p < 0 ? 0 : p >= NPARTS ? NPARTS - 1 : p);
-            if (ui.view == V_HOME || ui.view == V_SONG || (ui.view == V_GEN && !is_303()))
+            if (ui.view == V_GEN && !is_303())         /* TB-3PO is a 303's */
                 set_view(V_PART);
             ui.outline_ok = 0;
             build_pages();
@@ -2148,7 +2149,7 @@ static void input(void)
                 build_pages();
                 for (k = 0; k < pg.n; k++)
                     if (is_drum() ? pg.title[k][0] == PART_N[ui.part][0] && pg.title[k][4] == 'M' : !k)
-                        ui.page[V_MIX][ui.part] = (uint8_t)k;
+                        *page_of(V_MIX) = (uint8_t)k;
             }
         }
     }
@@ -2551,7 +2552,7 @@ static int steps_len(void)
 {
     if (is_drum())
         return cur_pat()->drum[ui.part].len;
-    if (is_303() && !ui.kbd[bidx()])
+    if (is_303() && !ui.rec)
         return cur_pat()->bass[bidx()].len;
     return 0;
 }
@@ -2577,7 +2578,7 @@ static void draw_header(void)
         x = w + 6;
         if (ui.view == V_GEN)
             x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, "TB-3PO", C_HI) + 6;
-        else if (is_303() && ui.kbd[bidx()])
+        else if (is_303() && ui.rec)
             x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, "KEYS", C_AMB) + 6;
     } else {
         x = cv_text(4, vc(&FONT_B, 1, 17), &FONT_B, VIEW_N[ui.view], C_HI) + 6;
@@ -2727,7 +2728,7 @@ static void draw_303(int band, int gen)
     }
     cv_text(3, vc(&FONT_XS, 99, 8) - o, &FONT_XS, "AC", C_GRAY);
     cv_text(3, vc(&FONT_XS, 111, 8) - o, &FONT_XS, "SL", C_GRAY);
-    if (ui.held_step >= 0 || (ui.kbd[b] && ui.rec)) {   /* the step held (or being written) */
+    if (ui.held_step >= 0 || ui.rec) {   /* the step held (or being written) */
         int s = ui.held_step >= 0 ? ui.held_step : ui.wpos[b];
         const bstep_t *st = &bp->step[s];
         q = put_s(q, ui.held_step >= 0 ? "STEP " : "WRITE ");
@@ -3258,7 +3259,7 @@ static int help_fits(void)
                 for (b = 0; b < NB; b++) {
                     ui.view = views[v];
                     ui.part = (uint8_t)p;
-                    ui.kbd[0] = ui.kbd[1] = (uint8_t)kb;
+                    ui.rec = (uint8_t)kb;
                     {
                         const char *fa, *fb, *fc;
                         int32_t w;
@@ -3330,7 +3331,7 @@ static uint16_t footer_text(const char **a, const char **b, const char **c)
         *a = "BLACK: TRACK";
         *b = "WHITE: STEP";
         *c = "HOME+BLK: MUTE";
-    } else if (is_303() && ui.kbd[bidx()]) {
+    } else if (is_303() && ui.rec) {
         *a = ui.rec ? "KEYS WRITE STEPS" : "KEYS PLAY";
         *b = ui.rec ? "ENV: REST" : "SEQ: STEPS";
         *c = ui.rec ? "LFO+OCT: TIE" : 0;
@@ -3580,7 +3581,7 @@ static void leds(void)
         b |= 1u << B_SEQ;
     if (ui.overlay != O_NONE)
         b |= 1u << B_SEL;
-    if (is_303() && ui.kbd[bidx()])
+    if (is_303() && ui.rec)
         b |= 1u << B_SEQ;
     if (ui.view == V_HOME || ui.view == V_SONG ? ui.pbank : ui.spage)
         b |= 1u << B_OCTUP;
@@ -3618,7 +3619,7 @@ static void leds(void)
                     k |= 1u << WHITE_KEY[i];
             }
             k |= 1u << BLACK_KEY[ui.sel[ui.part]];
-        } else if (is_303() && !ui.kbd[bidx()]) {
+        } else if (is_303() && !ui.rec) {
             const bpart_t *bp = &cur_pat()->bass[bidx()];
             int ph = eng_step[TRK_BASS0 + bidx()];
             for (i = 0; i < 16; i++) {
