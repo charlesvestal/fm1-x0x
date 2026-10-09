@@ -30,7 +30,7 @@ The factory sound is set up for big beat, so it should make noise the moment you
 | 303 A and B | Open303 with Devilfish-style ranges, each with a TB-3PO line generator | [schwung-303](https://github.com/charlesvestal/schwung-303), [schwung-tb3po](https://github.com/charlesvestal/schwung-tb3po) |
 | Break | A loop cut into eight slices and rearranged as it plays | [BB Gen](https://github.com/mestela/schwung-breakbeat) |
 
-Each part has its own step length (up to 32 steps) and rate, so parts can drift against each
+Each part has its own step length (up to 64 steps) and rate, so parts can drift against each
 other. Pattern changes wait for the end of the bar, and patterns can be chained.
 
 X0X is a fork of [Felucca](https://github.com/hugelton/Felucca) by Leo Kuroshita (Hügelton
@@ -40,7 +40,9 @@ installer and the storage) and replaces the instrument on top.
 ## Your own breaks
 
 X0X doesn't ship with any recorded breaks, only two loops played by its own 909. You can load
-your own into the FM-1's three sample slots, which hold about nine one-bar loops in total:
+your own into the FM-1's three sample slots, which hold about nine one-bar loops in total.
+The [break loops page](https://charlesvestal.github.io/fm1-x0x/breaks/) does it from Chrome or
+Edge (drop the files, press Upload); from the command line:
 
 ```
 tools/upload_breaks.py --bars amen.wav think.wav ...   # take one bar of each and upload them
