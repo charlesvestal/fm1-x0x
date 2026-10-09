@@ -2471,6 +2471,9 @@ static void draw_header(void)
             x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, "KEYS", C_AMB) + 6;
     } else {
         x = cv_text(4, vc(&FONT_B, 1, 17), &FONT_B, VIEW_N[ui.view], C_HI) + 6;
+        if (drum_mix_page() >= 0)                     /* MIX: 909 / MIX: 808 (whose tracks these are) */
+            x = cv_text(x - 6, vc(&FONT_B, 1, 17), &FONT_B, drum_mix_page() ? ": 808" : ": 909",
+                        PART_COL[drum_mix_page()]) + 6;
     }
     if (pg.n > 1 && ui.overlay == O_NONE && ui.view != V_GLO) {   /* page dots */
         int i, p = cur_page();
