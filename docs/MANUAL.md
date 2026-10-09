@@ -247,8 +247,7 @@ kick), then KIT, for the whole machine: ACCENT, how much louder accented steps a
 
 A drum machine's LENGTH and RATE are on SEQ. SWING is on HOME: it swings every part. Each track's level, pan and reverb and delay sends are on the mixer: press
 LFO and go to the 909 MIX or 808 MIX page, which shows all eleven tracks' levels at once. The
-black keys pick a track there, and the knobs are its LEVEL, PAN, REV and DLY (the 909's kick has
-no sends). On the 808 the alternate sounds share their track's pan, so the conga sits where the
+black keys pick a track there, and the knobs are its LEVEL, PAN, REV and DLY. On the 808 the alternate sounds share their track's pan, so the conga sits where the
 tom does.
 
 ---

@@ -22,6 +22,7 @@ volatile uint32_t eng_prof[ENG_PROF_N], eng_prof_frames;
 seq_t seq;
 volatile uint8_t eng_step[NTRACKS];
 volatile uint16_t eng_peak[NPARTS];
+volatile uint8_t eng_hit[NKIT][NDRUM];
 int16_t eng_scope[SCOPE_N];
 volatile uint32_t eng_scope_w;
 
@@ -292,6 +293,8 @@ static void s_drum(void *x, int kit, int v, float vel)
     (void)x;
     if (v == 0)                          /* BD (both kits' track 1): the master's PUMP key */
         master_key(&mst, kit, vel);
+    if ((unsigned)kit < NKIT && (unsigned)v < NDRUM)   /* MIX's drum pages: the track's meter jumps */
+        eng_hit[kit][v] = (uint8_t)(vel >= 1.0f ? 255 : (int)(vel * 255.0f));
     if (kit == 0)
         drum909_trigger(&d909, v, vel);
     else                                 /* the 808's unaccented hit sits at D8_VEL_NORMAL, not at our 909 level */

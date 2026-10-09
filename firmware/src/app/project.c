@@ -403,6 +403,21 @@ static void sound_rev2(void)
     proj.sound.v[T_FX][1][0] = (uint8_t)(proj.sound.v[T_FX][0][FX_DL_TYPE] ? 16 + proj.sound.v[T_FX][0][FX_DL_WEAR] * 111 / 127 : 0);
 }
 
+/* the 909 BD gained REV and DLY before its PAN (8 -> 10): the pan and its motion move, the sends start
+ * at none (as the kick had) */
+static void sound_rev3(void)
+{
+    uint8_t *bd = proj.sound.v[T_909][DR_BD];
+    int i;
+    bd[10] = bd[8];
+    bd[8] = bd[9] = 0;
+    for (i = 0; i < NLANE; i++) {
+        lane_t *l = &proj.arr.lane[i];
+        if (l->used && l->t == T_909 && l->v == DR_BD && l->i == 8)
+            l->i = 10;
+    }
+}
+
 static void patterns_defaults(void)
 {
     int i;
@@ -425,6 +440,8 @@ int project_load(void)
     sound_ok = load_obj(OBJ_SOUND, &proj.sound, sizeof proj.sound) == 0;
     if (!sound_ok)
         bad = 1;
+    if (sound_ok && proj.set.snd_rev < 3)             /* before the 909 BD's sends: its pan moves up two */
+        sound_rev3();                                 /* (first: the pans' own fixes below see the new place) */
     if (proj.set.stereo < 1)                          /* saved mono: no pans there (zeros = hard left) */
         for (i = 0; i < NPARTS; i++)
             proj.sound.v[T_MIX][i][MX_PAN] = 64;

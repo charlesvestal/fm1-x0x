@@ -20,7 +20,7 @@
 
 enum { DR_BD, DR_SD, DR_LT, DR_MT, DR_HT, DR_RS, DR_CP, DR_CH, DR_OH, DR_CR, DR_RD, DR_NUM, DR_KIT = DR_NUM };
 
-#define DR_MAX_PARAMS 10         /* most params any voice (or the kit) has (X0X: + PAN, the SD's DECAY) */
+#define DR_MAX_PARAMS 11         /* most params any voice (or the kit) has (X0X: + PAN, the SD's DECAY, the BD's sends) */
 #define DR_NZ_HIST 256           /* noise history kept across blocks (filter warm-up) */
 #define DR_NZ_BUF (DR_NZ_HIST + 2 * 256)
 

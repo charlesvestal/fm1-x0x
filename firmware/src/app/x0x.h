@@ -18,8 +18,9 @@
 #define PROJ_MAGIC 0x50305830u           /* "0X0P" */
 #define PROJ_FORMAT 1u
 #define PROJ_STEREO 2u
-#define PROJ_SND_REV 2u                  /* 1: the 909 SD has a DECAY pot (index 3; LEVEL.. moved up one);
-                                          * 2: the master's one-knob COMP and FILTER, the delay's TAPE */
+#define PROJ_SND_REV 3u                  /* 1: the 909 SD has a DECAY pot (index 3; LEVEL.. moved up one);
+                                          * 2: the master's one-knob COMP and FILTER, the delay's TAPE;
+                                          * 3: the 909 BD has sends (REV, DLY at 8, 9; PAN moved to 10) */
 
 typedef struct {
     uint32_t magic, format;

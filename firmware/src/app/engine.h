@@ -44,6 +44,7 @@ int engine_guard_active(void);
 extern volatile uint32_t eng_guard_count;                   /* times it engaged (PERF screen) */
 extern volatile uint8_t eng_step[NTRACKS];   /* playheads for the UI */
 extern volatile uint16_t eng_peak[NPARTS];   /* part meters, Q15, decaying (UI) */
+extern volatile uint8_t eng_hit[NKIT][NDRUM]; /* each drum track's last hit, 255 = full velocity (the UI lets it fall) */
 #define SCOPE_N 256u
 extern int16_t eng_scope[SCOPE_N];     /* the last output samples, for the screen */
 extern volatile uint32_t eng_scope_w;

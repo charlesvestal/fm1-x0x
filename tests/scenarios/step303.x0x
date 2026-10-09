@@ -26,3 +26,13 @@ key w2 down
 turn K1 2
 key w2 up
 expect gate0.2 1
+# a held step + OCT+ / OCT-: its note an octave up, then down; the step stays on
+expect note0.2 35
+key w2 down
+tap OCT+
+expect note0.2 47
+tap OCT-
+tap OCT-
+expect note0.2 23
+key w2 up
+expect gate0.2 1

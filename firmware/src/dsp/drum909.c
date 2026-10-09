@@ -50,7 +50,7 @@ static const char *const d9_dist_names[7] = { "Diode", "Clip", "SAT", "BFZ", "PD
 static const d9_pspec_t d9_bd_p[] = {
     LIN("Tune", F_TUNE, 34, 6.0f, 32.0f), LIN("Attack", F_ATTACK, 13, 0.0f, 1.0f),
     EXP("Decay", F_DECAY, 90, BD_DECAY), LEVEL(94),
-    LIN("P.Dpth", F_PDEPTH, 0, 0.0f, 1.0f), EXP("Pitch", F_PITCH, 45, BD_PITCH), DRIVE(0), DIST, PAN,
+    LIN("P.Dpth", F_PDEPTH, 0, 0.0f, 1.0f), EXP("Pitch", F_PITCH, 45, BD_PITCH), DRIVE(0), DIST, SENDS, PAN,
 };
 static const d9_pspec_t d9_sd_p[] = {
     EXP("Tune", F_TUNE, 64, SD_TUNE), EXP("Tone", F_TONE, 68, SD_TONE),

@@ -1086,7 +1086,10 @@ static int help_lines(int b, const char *l[HELP_LINES])
         if (gen) L(b == B_OCTUP ? "A NEW 303 LINE" : "MUTATE THE LINE");
         else if (kbd) { L("THE KEYBOARD'S OCTAVE"); L("LFO + OCT: A TIE  ENV + OCT: A REST"); }
         else if (ui.view == V_HOME || ui.view == V_SONG) L(b == B_OCTUP ? "PATTERNS 17-32" : "PATTERNS 1-16");
-        else { L(b == B_OCTUP ? "THE NEXT 16 STEPS" : "THE 16 STEPS BEFORE"); L("PAGES: 1-16 17-32 33-48 49-64"); }
+        else {
+            L(b == B_OCTUP ? "THE NEXT 16 STEPS" : "THE 16 STEPS BEFORE"); L("PAGES: 1-16 17-32 33-48 49-64");
+            if (is_303()) L("HOLDING A STEP: ITS OCTAVE");
+        }
         break;
     default: break;
     }
@@ -1750,6 +1753,24 @@ static int part_muted(int p) { return (seq.mute & MUTE_MASK[p]) == MUTE_MASK[p];
 
 static int perf_testing(void) { return perf.test >= 0 && perf.phase != 4; }
 
+/* the held 303 step's note, moved by `by` semitones (KNOB 1: one; OCT: twelve); a rest or a tie
+ * becomes a note of its own */
+static void held_note_by(int by)
+{
+    bpart_t *bp = &cur_pat()->bass[bidx()];
+    bstep_t *st = &bp->step[ui.held_step];
+    int n = held_note_of(bp, ui.held_step) + by;
+    st->note = (uint8_t)(n < 12 ? 12 : n > 108 ? 108 : n);
+    if (bstep_gate(st) != G_NOTE)
+        st->flags = (uint8_t)((st->flags & ~BS_GATE_MASK) | G_NOTE);
+    ui.step_edited = 1;
+    mark_dirty();
+    if (key_sounds()) {                                /* as the drum keys: playing, the line is heard */
+        engine_bass_on(bidx(), st->note + bp->transpose - 24, 0, 1);
+        ui.step_preview = 1;
+    }
+}
+
 static void mute_part(int p)                         /* a whole part on / off (HOME, MIX's PARTS) */
 {
     seq.mute = part_muted(p) ? seq.mute & ~MUTE_MASK[p] : seq.mute | MUTE_MASK[p];
@@ -2050,6 +2071,8 @@ static void button_tap(int b)
             ui.pbank = (uint8_t)up;
             say(up ? "COPY TO P17-32" : "COPY TO P1-16", 0);
             ui.help = 0;
+        } else if (steps_view() && is_303() && !ui.rec && ui.held_step >= 0) {   /* a held step: its octave */
+            held_note_by(up ? 12 : -12);
         } else if (ui.view == V_GEN) {
             bpart_t *bp = &cur_pat()->bass[bidx()];
             if (up) {
@@ -2190,15 +2213,8 @@ static void input(void)
             bstep_t *st = &bp->step[ui.held_step];
             ui.step_edited = 1;
             mark_dirty();
-            if (i == 0) {                               /* a rest or a tie becomes a note of its own */
-                int n = held_note_of(bp, ui.held_step) + e;
-                st->note = (uint8_t)(n < 12 ? 12 : n > 108 ? 108 : n);
-                if (bstep_gate(st) != G_NOTE)
-                    st->flags = (uint8_t)((st->flags & ~BS_GATE_MASK) | G_NOTE);
-                if (key_sounds()) {                     /* as the drum keys: playing, the line is heard */
-                    engine_bass_on(bidx(), st->note + bp->transpose - 24, 0, 1);
-                    ui.step_preview = 1;
-                }
+            if (i == 0) {
+                held_note_by(e);
             } else if (i == 1) {
                 st->flags = (uint8_t)((st->flags & ~BS_GATE_MASK) | (bstep_gate(st) + (e > 0 ? 1 : 2)) % 3);
             } else if (i == 2) {
@@ -2971,8 +2987,13 @@ static void draw_drum_mix(int band, int k)
         if (sel)
             box(x, 0 - o, 19, 134, dim(col, 3));
         rbox(x + 7, 4 - o, 5, fh, 2, C_LINE);
-        if (f)
-            rbox(x + 7, 4 + fh - f - o, 5, f, 2, muted ? C_DIM : sel ? col : dim(col, 9));
+        if (f)                                        /* the level, dim; a hit lights it up to the level */
+            rbox(x + 7, 4 + fh - f - o, 5, f, 2, muted ? C_DIM : dim(col, sel ? 6 : 4));
+        {
+            int hf = f * eng_hit[k][v] / 255;
+            if (hf > 1 && !muted)
+                rbox(x + 7, 4 + fh - hf - o, 5, hf, 2, sel ? C_WHITE : col);
+        }
         text_c(x + 10, vc(&FONT_XS, 104, 12) - o, &FONT_XS, engine_voice_name(t, v), sel ? C_WHITE : muted ? C_LINE : C_GRAY);
         rbox(x + 3, 123 - o, 13, 3, 1, C_LINE);          /* the pan, a mark from the middle */
         rbox(x + 3 + (pa * 10) / 127, 121 - o, 3, 7, 1, sel ? C_WHITE : C_GRAY);
@@ -3754,6 +3775,10 @@ void ui_frame(void)
         perf_window(0);
     for (i = 0; i < NPARTS; i++)
         eng_peak[i] = (uint16_t)(eng_peak[i] - (eng_peak[i] >> 3));
+    for (i = 0; i < NKIT * NDRUM; i++) {              /* the drum tracks' hits fall as the part meters do */
+        volatile uint8_t *h = &eng_hit[i / NDRUM][i % NDRUM];
+        *h = (uint8_t)(*h - (*h >> 3) - (*h ? 1 : 0));
+    }
     draw_header();
     draw_main();
     draw_knobs();
