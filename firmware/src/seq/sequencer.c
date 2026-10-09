@@ -131,11 +131,12 @@ static void bass_release(seq_t *s, int b, const seq_sink_t *o)
 static void fire_drum(seq_t *s, int k, int p, const seq_sink_t *o)
 {
     const dpart_t *d = dpart(s, k);
-    uint32_t bit = 1u << p;
-    float vel = (d->accent & bit) ? 1.0f : (float)s->accent_q7 / 127.0f;
+    uint32_t bit = 1u << (p & 31);
+    int w = p >> 5;
+    float vel = (d->accent[w] & bit) ? 1.0f : (float)s->accent_q7 / 127.0f;
     int v;
     for (v = 0; v < NDRUM; v++) {
-        if (!(d->hit[v] & bit) || ((s->mute | s->vmute) & (1u << (k * NDRUM + v))))
+        if (!(d->hit[v][w] & bit) || ((s->mute | s->vmute) & (1u << (k * NDRUM + v))))
             continue;
         o->drum(o->ctx, k, v, vel);
         if (s->send_notes) {

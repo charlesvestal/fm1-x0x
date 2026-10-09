@@ -648,6 +648,10 @@ static int expect(const char *what, const char *val)
             printf("  (lane %d)\n", k);
         }
     }
+    else if (!strncmp(what, "playhead", 8))        /* playheadT: track T's step (1-based) */
+        got = eng_step[atoi(what + 8)] + 1;
+    else if (!strcmp(what, "mempct"))
+        got = project_mem_pct();
     else if (!strcmp(what, "part"))
         got = ui.part;
     else if (!strcmp(what, "help"))                 /* the help card's button + 1, 0 none */
@@ -685,7 +689,7 @@ static int expect(const char *what, const char *val)
     } else if (!strncmp(what, "hit", 3)) {         /* hitK.V.S: kit K voice V step S set */
         int k, v, s;
         sscanf(what, "hit%d.%d.%d", &k, &v, &s);
-        got = (int)((proj.pat[seq.ppat[k]].drum[k].hit[v] >> s) & 1u);
+        got = sm_get(proj.pat[seq.ppat[k]].drum[k].hit[v], s);
     } else if (!strncmp(what, "gate", 4)) {        /* gateB.S: 303 B step S gate */
         int b, s;
         sscanf(what, "gate%d.%d", &b, &s);
@@ -903,6 +907,51 @@ int main(int argc, char **argv)
             project_save();
             memset(&proj, 0, sizeof proj);
             boot();
+        } else if (!strcmp(cmd, "storedump") || !strcmp(cmd, "storeload")) {   /* the simulated flash, whole */
+            FILE *f;
+            int o, ld = cmd[5] == 'l';
+            if (!(f = fopen(a, ld ? "rb" : "wb"))) {
+                fprintf(stderr, "%s: cannot open %s\n", cmd, a);
+                return 1;
+            }
+            for (o = 0; o < OBJ_NOBJ; o++) {
+                int32_t n = store_len[o];
+                if (ld ? fread(&n, 4, 1, f) != 1 || fread(store[o], 1, PLAT_STORE_MAX, f) != PLAT_STORE_MAX
+                       : fwrite(&n, 4, 1, f) != 1 || fwrite(store[o], 1, PLAT_STORE_MAX, f) != PLAT_STORE_MAX) {
+                    fprintf(stderr, "%s: %s is short\n", cmd, a);
+                    return 1;
+                }
+                store_len[o] = n;
+            }
+            fclose(f);
+            if (ld) {                                    /* boot on it */
+                memset(&proj, 0, sizeof proj);
+                boot();
+            }
+        } else if (!strcmp(cmd, "noise")) {             /* noise SEED: every step and lane random (no room to save) */
+            uint32_t r = (uint32_t)atoi(a) | 1u, i;
+            uint8_t *raw = (uint8_t *)proj.pat;
+            for (i = 0; i < sizeof proj.pat + sizeof proj.arr; i++) {
+                r ^= r << 13;
+                r ^= r >> 17;
+                r ^= r << 5;
+                raw[i] = (uint8_t)r;
+            }
+            for (i = 0; i < NPAT; i++) {
+                int k;
+                for (k = 0; k < NKIT; k++) {
+                    proj.pat[i].drum[k].len = 64;
+                    proj.pat[i].drum[k].rate = 0;
+                }
+                for (k = 0; k < NBASS; k++) {
+                    proj.pat[i].bass[k].len = 64;
+                    proj.pat[i].bass[k].rate = 0;
+                    proj.pat[i].bass[k].dir = 0;
+                }
+            }
+            proj.arr.song.len = 0;
+            for (i = 0; i < NLANE; i++)
+                proj.arr.lane[i].used = 0;
         } else if (!strcmp(cmd, "reboot")) {
             memset(&proj, 0, sizeof proj);
             boot();

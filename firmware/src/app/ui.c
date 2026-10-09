@@ -36,7 +36,8 @@ typedef struct {
     uint8_t view, part, prev_view;
     uint8_t sel[NKIT];
     uint8_t page[NVIEWS][NPARTS];
-    uint8_t spage;
+    uint8_t spage;                     /* the 16 steps the white keys show: 0 = 1-16 .. 3 = 49-64 */
+    uint8_t pbank;                     /* the 16 patterns HOME's white keys choose: 0 = 1-16, 1 = 17-32 */
     uint8_t kbd[NBASS];
     int8_t oct;
     uint8_t rec;
@@ -56,7 +57,8 @@ typedef struct {
     uint32_t touch_until;
     uint8_t overlay;
     uint8_t list_sel, list_top, list_n;
-    uint8_t ask_act, ask_arg;
+    uint8_t ask_act;
+    uint16_t ask_arg;
     char ask_q[2][28];
     uint32_t frame;
     uint32_t dirty;
@@ -184,7 +186,7 @@ enum { SQ_SWING, SQ_DLEN, SQ_DRATE, SQ_BLEN, SQ_BRATE, SQ_BDIR, SQ_BTRANS, SQ_TE
 static const char *const KEYSOUND_N[] = {"STOPPED", "ALWAYS"};
 static const char *const LIGHTS_N[] = {"OFF", "ON", "KEYS"};   /* ON: the keys, and the unlit buttons glow */
 static const x0x_param_t SEQ_P[NSQ] = {
-    {"SWING", 100, 0, 0}, {"LENGTH", 31, 15, 0}, {"RATE", 3, 0, RATE_N}, {"LENGTH", 31, 15, 0},
+    {"SWING", 100, 0, 0}, {"LENGTH", NSTEPS - 1, 15, 0}, {"RATE", 3, 0, RATE_N}, {"LENGTH", NSTEPS - 1, 15, 0},
     {"RATE", 3, 0, RATE_N}, {"DIR", 3, 0, DIR_N}, {"TRANSP", 48, 24, 0}, {"TEMPO", 255, 105, 0},
     {"ACCENT", 127, 88, 0}, {"CLOCK OUT", 1, 1, ONOFF_N}, {"NOTES OUT", 1, 0, ONOFF_N}, {"THEME", 4, 1, THEME_N},
     {"LIGHTS", 2, 1, LIGHTS_N}, {"KEY SOUND", 1, 0, KEYSOUND_N},
@@ -198,7 +200,8 @@ static const x0x_param_t ACT_P[] = {
 static const x0x_param_t STALLS_P = {"STALLS", 1, 0, ONOFF_N};
 static const char *const MODE_N[] = {"PATTERN", "SONG"};
 static const x0x_param_t SONG_P[] = {
-    {"909", 15, 0, 0}, {"808", 15, 0, 0}, {"303A", 15, 0, 0}, {"303B", 15, 0, 0}, {"BREAK", 15, 0, 0},
+    {"909", NPAT - 1, 0, 0}, {"808", NPAT - 1, 0, 0}, {"303A", NPAT - 1, 0, 0}, {"303B", NPAT - 1, 0, 0},
+    {"BREAK", NPAT - 1, 0, 0},
     {"MODE", 1, 0, MODE_N}, {"LENGTH", NSONG, 0, 0},
 };
 
@@ -729,7 +732,7 @@ static void open_global(void)
 static void ask(int act, int arg, const char *q1, const char *q2)
 {
     ui.ask_act = (uint8_t)act;
-    ui.ask_arg = (uint8_t)arg;
+    ui.ask_arg = (uint16_t)arg;
     put_s(ui.ask_q[0], q1);
     put_s(ui.ask_q[1], q2 ? q2 : "");
     ui.overlay = O_ASK;
@@ -741,7 +744,7 @@ static int part_used(const pattern_t *pt, int part)
     int v, s;
     if (part < NKIT) {
         for (v = 0; v < NDRUM; v++)
-            if (pt->drum[part].hit[v])
+            if (sm_any(pt->drum[part].hit[v]))
                 return 1;
         return 0;
     }
@@ -757,7 +760,7 @@ static int pattern_used(const pattern_t *pt)
 {
     int v, s, used = pt->brk.steps != 0;
     for (v = 0; v < NDRUM; v++)
-        used |= (pt->drum[0].hit[v] | pt->drum[1].hit[v]) != 0;
+        used |= sm_any(pt->drum[0].hit[v]) | sm_any(pt->drum[1].hit[v]);
     for (s = 0; s < NSTEPS; s++)
         used |= bstep_gate(&pt->bass[0].step[s]) != G_REST || bstep_gate(&pt->bass[1].step[s]) != G_REST;
     return used;
@@ -810,14 +813,19 @@ static void clear_part(pattern_t *p, int part)
 {
     int i;
     if (part < NKIT) {
-        for (i = 0; i < NDRUM; i++)
-            p->drum[part].hit[i] = 0;
-        p->drum[part].accent = 0;
+        int w;
+        for (w = 0; w < NSW; w++) {
+            for (i = 0; i < NDRUM; i++)
+                p->drum[part].hit[i][w] = 0;
+            p->drum[part].accent[w] = 0;
+        }
     } else if (part < PART_BRK) {
         for (i = 0; i < NSTEPS; i++)
             p->bass[part - NKIT].step[i].flags = G_REST;
     } else {
         p->brk.steps = 0;
+        for (i = 0; i < 16; i++)
+            p->brk.slice[i] = 0;
     }
 }
 
@@ -862,7 +870,7 @@ static int help_lines(int b, const char *l[HELP_LINES])
         else
             put_s(cp, "+ WHITE KEY: COPY ALL FIVE PARTS");
         put_s(put_s(cl, "+ REC: CLEAR "), PART_N[ui.part]);
-        L("TAP: SAVE EVERYTHING"); L(cp); L("    TO THAT PATTERN"); L(cl);
+        L("TAP: SAVE EVERYTHING"); L(cp); L(ui.pbank ? "    TO P17-32 (+ OCT-: P1-16)" : "    TO P1-16 (+ OCT+: P17-32)"); L(cl);
         L("+ KNOB: FORGET ITS MOTION"); L(proj.set.autosave_off ? "AUTOSAVE IS OFF" : "STOPPED: SAVES BY ITSELF");
         break;
     }
@@ -885,7 +893,8 @@ static int help_lines(int b, const char *l[HELP_LINES])
     case B_OCTUP:
         if (gen) L(b == B_OCTUP ? "A NEW 303 LINE" : "MUTATE THE LINE");
         else if (kbd) { L("THE KEYBOARD'S OCTAVE"); L("LFO + OCT: A TIE"); }
-        else L(b == B_OCTUP ? "STEPS 17-32" : "STEPS 1-16");
+        else if (ui.view == V_HOME || ui.view == V_SONG) L(b == B_OCTUP ? "PATTERNS 17-32" : "PATTERNS 1-16");
+        else { L(b == B_OCTUP ? "THE NEXT 16 STEPS" : "THE 16 STEPS BEFORE"); L("PAGES: 1-16 17-32 33-48 49-64"); }
         break;
     default: break;
     }
@@ -1005,7 +1014,7 @@ static void do_undo(int redo)
 static void save_project(void)
 {
     int rc = project_save();
-    say(rc ? "SAVE FAILED" : "SAVED", 0);
+    say(rc == -7 ? "MEMORY FULL: NOT SAVED" : rc ? "SAVE FAILED" : "SAVED", 0);
     if (!rc)
         ui.dirty = 0;
 }
@@ -1075,28 +1084,28 @@ static void perf_build(void)
         if (i)
             tb3po_generate(&p->bass[1]);
         p->brk.steps = 0xFFFFu;
-        a->hit[DR_BD] = 0x1111u;
-        a->hit[DR_CP] = 0x1010u;
-        a->hit[DR_OH] = 0x4444u;
-        a->accent = 0x0101u;
+        a->hit[DR_BD][0] = 0x1111u;
+        a->hit[DR_CP][0] = 0x1010u;
+        a->hit[DR_OH][0] = 0x4444u;
+        a->accent[0] = 0x0101u;
         if (i >= 1) {
-            b->hit[D8_BD] = 0x1111u;
-            b->hit[D8_CP] = 0x1010u;
-            b->hit[D8_CH] = 0x1111u;
-            b->hit[D8_OH] = 0x4444u;
-            b->hit[D8_CB] = 0x0808u;
+            b->hit[D8_BD][0] = 0x1111u;
+            b->hit[D8_CP][0] = 0x1010u;
+            b->hit[D8_CH][0] = 0x1111u;
+            b->hit[D8_OH][0] = 0x4444u;
+            b->hit[D8_CB][0] = 0x0808u;
         }
         if (i == 2) {
-            a->hit[DR_SD] = 0x1010u;
-            a->hit[DR_CH] = 0xFFFFu;
-            a->hit[DR_CR] = 0x0001u;
-            a->hit[DR_RD] = 0x1111u;
-            a->hit[DR_LT] = 0x4000u;
-            a->accent = 0x1111u;
-            b->hit[D8_SD] = 0x1010u;
-            b->hit[D8_CH] = 0xFFFFu;
-            b->hit[D8_CY] = 0x0101u;
-            b->hit[D8_LT] = 0x8080u;
+            a->hit[DR_SD][0] = 0x1010u;
+            a->hit[DR_CH][0] = 0xFFFFu;
+            a->hit[DR_CR][0] = 0x0001u;
+            a->hit[DR_RD][0] = 0x1111u;
+            a->hit[DR_LT][0] = 0x4000u;
+            a->accent[0] = 0x1111u;
+            b->hit[D8_SD][0] = 0x1010u;
+            b->hit[D8_CH][0] = 0xFFFFu;
+            b->hit[D8_CY][0] = 0x0101u;
+            b->hit[D8_LT][0] = 0x8080u;
         }
     }
 }
@@ -1251,8 +1260,8 @@ static void run_action(int act, int arg)
         say("PATTERN CLEARED", 0);
         break;
     }
-    case ACT_COPY: {                                  /* arg: pattern | (part + 1) << 4, part 0 = all five */
-        int dst = arg & 15, part = (arg >> 4) - 1, i, rc = 0;
+    case ACT_COPY: {                                  /* arg: pattern | (part + 1) << 8, part 0 = all five */
+        int dst = arg & 0xFF, part = (arg >> 8) - 1, i, rc = 0;
         for (i = 0; i < NPARTS; i++)
             if ((part < 0 || i == part) && seq.ppat[i] != dst)
                 rc |= copy_part(dst, seq.ppat[i], i);
@@ -1307,7 +1316,8 @@ static void run_action(int act, int arg)
         say("PERF TEST: 15 SECONDS", 0);
         break;
     case ACT_ABOUT:
-        q = put_s(t, "X0X " X0X_VERSION "  AUDIO ");
+        q = put_s(t, "X0X " X0X_VERSION "  MEM ");
+        q = put_s(put_i(q, project_mem_pct()), "%  CPU ");
         put_s(put_i(q, (int)plat_cpu_pct()), "%");
         say(t, 0);
         break;
@@ -1432,9 +1442,9 @@ static void drum_key(int v, int down)
         ui.btn_used |= 1u << B_ENV;
     if (ui.rec && seq.playing) {
         int s = rec_step(TRK_DRUM + k);
-        cur_pat()->drum[k].hit[v] |= 1u << s;
+        sm_set(cur_pat()->drum[k].hit[v], s);
         if (ui.btn & (1u << B_ENV))
-            cur_pat()->drum[k].accent |= 1u << s;
+            sm_set(cur_pat()->drum[k].accent, s);
         mark_dirty();
     }
 }
@@ -1446,10 +1456,10 @@ static void drum_step(int white)
     if (s >= NSTEPS)
         return;
     if (ui.btn & (1u << B_ENV)) {
-        d->accent ^= 1u << s;
+        sm_flip(d->accent, s);
         ui.btn_used |= 1u << B_ENV;
     } else {
-        d->hit[ui.sel[k]] ^= 1u << s;
+        sm_flip(d->hit[ui.sel[k]], s);
     }
     mark_dirty();
 }
@@ -1549,17 +1559,17 @@ static int perf_testing(void) { return perf.test >= 0 && perf.phase != 4; }
 
 static void key_event(int k, int down)
 {
-    int w = KEY_WHITE[k], bl = KEY_BLACK[k];
+    int w = KEY_WHITE[k], bl = KEY_BLACK[k], wp = w >= 0 ? ui.pbank * 16 + w : -1;   /* wp: a white key's pattern */
     if (ui.overlay == O_ASK || ui.view == V_PERF || perf_testing())
         return;
     if (down && w >= 0 && (ui.btn & (1u << B_SAVE))) {     /* SAVE held + white key: copy here */
-        int part = part_view() ? ui.part : -1, arg = w | (part + 1) << 4;   /* a part's screen: that part */
+        int part = part_view() ? ui.part : -1, arg = wp | (part + 1) << 8;   /* a part's screen: that part */
         ui.btn_used |= 1u << B_SAVE;
-        if (part >= 0 ? seq.ppat[part] == w : all_on(w))
+        if (part >= 0 ? seq.ppat[part] == wp : all_on(wp))
             return;
-        if (pattern_used(&proj.pat[w])) {
+        if (pattern_used(&proj.pat[wp])) {
             char t[24];
-            put_s(put_i(put_s(t, "COPY OVER P"), w + 1), "?");
+            put_s(put_i(put_s(t, "COPY OVER P"), wp + 1), "?");
             ask(ACT_COPY, arg, t, "IT HAS NOTES");
         } else
             run_action(ACT_COPY, arg);
@@ -1573,7 +1583,7 @@ static void key_event(int k, int down)
         if (w >= 0) {
             int p;
             for (p = 0; p < NPARTS; p++)
-                song()->bar[k].pat[p] = (uint8_t)w;
+                song()->bar[k].pat[p] = (uint8_t)wp;
             if (k + 1 < NSONG)
                 ui.song_sel = (uint8_t)(k + 1);
         } else {
@@ -1586,19 +1596,19 @@ static void key_event(int k, int down)
         if (ui.btn & (1u << B_HOME))
             ui.btn_used |= 1u << B_HOME;
         if (down) {
-            if (ui.chain_first >= 0 && ui.chain_first != w) {
+            if (ui.chain_first >= 0 && ui.chain_first != wp) {
                 char t[16], *q = t;
-                seq_chain(&seq, ui.chain_first, w);
-                q = put_i(q, (ui.chain_first < w ? ui.chain_first : w) + 1);
+                seq_chain(&seq, ui.chain_first, wp);
+                q = put_i(q, (ui.chain_first < wp ? ui.chain_first : wp) + 1);
                 *q++ = '-';
-                put_i(q, (ui.chain_first < w ? w : ui.chain_first) + 1);
+                put_i(q, (ui.chain_first < wp ? wp : ui.chain_first) + 1);
                 say("CHAIN P", t);
             } else {
-                ui.chain_first = (int8_t)w;
+                ui.chain_first = (int8_t)wp;
                 seq_chain(&seq, 0, 0);
-                seq_cue(&seq, w);
+                seq_cue(&seq, wp);
             }
-        } else if (ui.chain_first == w) {
+        } else if (ui.chain_first == wp) {
             ui.chain_first = -1;
         }
         return;
@@ -1800,7 +1810,12 @@ static void button_tap(int b)
     case B_OCTUP:
     case B_OCTDN: {
         int up = b == B_OCTUP;
-        if (ui.view == V_GEN) {
+        if (ui.btn & (1u << B_SAVE)) {               /* SAVE + OCT: the bank a copy goes to */
+            ui.btn_used |= 1u << B_SAVE;
+            ui.pbank = (uint8_t)up;
+            say(up ? "COPY TO P17-32" : "COPY TO P1-16", 0);
+            ui.help = 0;
+        } else if (ui.view == V_GEN) {
             bpart_t *bp = &cur_pat()->bass[bidx()];
             if (up) {
                 char t[20];
@@ -1827,9 +1842,15 @@ static void button_tap(int b)
                 put_i(put_s(t, "OCTAVE "), ui.oct);
                 say(t, 0);
             }
+        } else if (ui.view == V_HOME || ui.view == V_SONG) {   /* the pattern bank: 1-16, 17-32 */
+            ui.pbank = (uint8_t)up;
+            say(up ? "PATTERNS 17-32" : "PATTERNS 1-16", 0);
         } else {
-            ui.spage = (uint8_t)up;
-            say(up ? "STEPS 17-32" : "STEPS 1-16", 0);
+            char t[20];
+            int pg_ = ui.spage + (up ? 1 : -1);
+            ui.spage = (uint8_t)(pg_ < 0 ? 0 : pg_ > NSTEPS / 16 - 1 ? NSTEPS / 16 - 1 : pg_);
+            put_i(put_s(put_i(put_s(t, "STEPS "), ui.spage * 16 + 1), "-"), ui.spage * 16 + 16);
+            say(t, 0);
         }
         break;
     }
@@ -1912,6 +1933,7 @@ static void input(void)
             seq_cue_part(&seq, part, p);
         else
             seq_cue(&seq, p);
+        ui.pbank = (uint8_t)(p / 16);                 /* HOME shows the bank it is in */
     }
     for (i = 0; i < 4; i++) {
         if ((e = enc(EN_K1 + (int)i)) == 0)
@@ -2296,6 +2318,16 @@ static void play_icon(int32_t x, int32_t y, uint16_t c)
         }
 }
 
+/* the length of the part on screen, when its keys are steps (0: they are not) */
+static int steps_len(void)
+{
+    if (is_drum())
+        return cur_pat()->drum[ui.part].len;
+    if (is_303() && !ui.kbd[bidx()])
+        return cur_pat()->bass[bidx()].len;
+    return 0;
+}
+
 /* -------------------------------------------------------------- header --- */
 static void draw_header(void)
 {
@@ -2350,6 +2382,9 @@ static void draw_header(void)
             cv_text(x + 2, vc(&FONT_S, 1, 17), &FONT_S, b, (ui.frame & 16u) ? C_WHITE : C_GRAY);
         } else if (seq.chain_a != seq.chain_b && !seq.song_on) {
             cv_text(x + 3, vc(&FONT_XS, 1, 17), &FONT_XS, "CHN", C_AMB);
+        } else if (ui.view == V_PART && steps_len() > 16) {   /* the 16 steps the keys show */
+            put_i(put_s(put_i(b, ui.spage * 16 + 1), "-"), ui.spage * 16 + 16);
+            cv_text(x + 4, vc(&FONT_XS, 1, 17), &FONT_XS, b, C_GRAY);
         }
     }
     put_i(b, (int)(seq_tempo(&seq) + 0.5f));
@@ -2377,13 +2412,13 @@ static void draw_drum(int band)
     for (v = band * 6; v < (band ? NDRUM + 1 : 6); v++) {
         int y = (v - band * 6) * 12 + 1, sel = v < NDRUM && v == ui.sel[k];
         const char *nm = v < NDRUM ? engine_voice_name(k == PART_909 ? T_909 : T_808, v) : "AC";
-        uint32_t bits = v < NDRUM ? d->hit[v] : d->accent;
+        const uint32_t *bits = v < NDRUM ? d->hit[v] : d->accent;
         int muted = v < NDRUM && ((seq.mute | seq.vmute) & (1u << (k * NDRUM + v)));
         if (sel)
             box(0, y - 1, 24, 12, col);
         cv_text(5, vc(&FONT_XS, y - 1, 12), &FONT_XS, nm, sel ? C_BLACK : muted ? C_LINE : v < NDRUM ? C_GRAY : C_WHITE);
         for (c = 0; c < 16; c++) {
-            int s = step_of(c), x = col_x(c), hit = (bits >> s) & 1u;
+            int s = step_of(c), x = col_x(c), hit = s < NSTEPS && sm_get(bits, s);
             if (s >= len) {
                 cv_rect(x + 5, y + 4, 2, 2, C_LINE);
                 continue;
@@ -2400,8 +2435,6 @@ static void draw_drum(int band)
                 box(x + 2, y + 2, 8, 6, C_WHITE);
         }
     }
-    if (band == 1 && len > 16)
-        cv_text(2, 60, &FONT_XS, ui.spage ? "17-32" : "1-16", C_GRAY);
 }
 
 static int note_y(int n, int lo, int hi) { return 64 - (n - lo) * 58 / (hi - lo); }
@@ -2562,11 +2595,12 @@ static void draw_break(int band)
     }
 }
 
-static void lane(int y, int p, uint32_t bits, int ph, int len)
+/* a part's lane on HOME: the 16 steps of the page its playhead is on (bits: those 16, from base) */
+static void lane(int y, int p, uint32_t bits, int ph, int len, int base)
 {
     int c, muted = part_muted(p);
     cv_text(3, y, &FONT_XS, PART_S[p], muted ? C_DIM : PART_COL[p]);
-    for (c = 0; c < 16 && c < len; c++) {
+    for (c = 0; c < 16 && base + c < len; c++) {
         uint16_t fc = (bits >> c & 1u) ? (muted ? C_DIM : PART_COL[p]) : C_LINE;
         box(col_x(c), y + 2, 12, 9, fc);
         if (seq.playing && (ph & 15) == c)
@@ -2578,9 +2612,9 @@ static void draw_home(int band)
 {
     int p, c;
     if (band == 0) {                                   /* the 16 patterns; in each, a bar per part playing it */
-        int cue = seq_cue_of(&seq, PART_909);
-        for (c = 0; c < NPAT; c++) {
-            int x = 4 + c * 14 + (c >= 8 ? 4 : 0);
+        int cue = seq_cue_of(&seq, PART_909), c0 = ui.pbank * 16;
+        for (c = c0; c < c0 + 16; c++) {
+            int x = 4 + (c - c0) * 14 + (c - c0 >= 8 ? 4 : 0);
             int in_chain = seq.chain_a != seq.chain_b &&
                            c >= (seq.chain_a < seq.chain_b ? seq.chain_a : seq.chain_b) &&
                            c <= (seq.chain_a < seq.chain_b ? seq.chain_b : seq.chain_a);
@@ -2593,13 +2627,15 @@ static void draw_home(int band)
             if (in_chain)
                 cv_rect(x, 23, 12, 2, C_AMB);
         }
+        if (ui.pbank)                                   /* the second bank: say so */
+            text_r(236, 22, &FONT_XS, "P17-32", C_AMB);
         for (p = 0; p < 2; p++) {
             const dpart_t *d = &pat_of(p)->drum[p];
             uint32_t bits = 0;
-            int v;
+            int v, base = seq.playing ? (eng_step[TRK_DRUM + p] & ~15) : 0;
             for (v = 0; v < NDRUM; v++)
-                bits |= d->hit[v];
-            lane(32 + p * 16, p, bits, eng_step[TRK_DRUM + p], d->len);
+                bits |= d->hit[v][base >> 5] >> (base & 31);
+            lane(32 + p * 16, p, bits & 0xFFFFu, eng_step[TRK_DRUM + p], d->len, base);
         }
     } else {
         for (p = 2; p < NPARTS; p++) {
@@ -2607,16 +2643,17 @@ static void draw_home(int band)
             int s;
             if (p < PART_BRK) {
                 const bpart_t *bp = &pat_of(p)->bass[p - NKIT];
-                for (s = 0; s < NSTEPS; s++)
-                    if (bstep_gate(&bp->step[s]) != G_REST)
+                int base = seq.playing ? (eng_step[TRK_BASS0 + p - NKIT] & ~15) : 0;
+                for (s = 0; s < 16; s++)
+                    if (bstep_gate(&bp->step[base + s]) != G_REST)
                         bits |= 1u << s;
-                lane((p - 2) * 16 + 1, p, bits, eng_step[TRK_BASS0 + p - NKIT], bp->len);
+                lane((p - 2) * 16 + 1, p, bits, eng_step[TRK_BASS0 + p - NKIT], bp->len, base);
             } else {
-                lane((p - 2) * 16 + 1, p, pat_of(p)->brk.steps, eng_step[TRK_BRK], 16);
+                lane((p - 2) * 16 + 1, p, pat_of(p)->brk.steps, eng_step[TRK_BRK], 16, 0);
             }
         }
         segs(4, 50, &FONT_XS, C_DIM, 14, "WHITE: PATTERN", "TWO HELD: CHAIN", 0, 0);
-        segs(4, 60, &FONT_XS, C_DIM, 14, "BLACK 1-5: MUTE", "SEQ: SONG", 0, 0);
+        segs(4, 60, &FONT_XS, C_DIM, 14, "BLACK 1-5: MUTE", "SEQ: SONG", ui.pbank ? "OCT-: P1-16" : "OCT+: P17-32", 0);
     }
 }
 
@@ -3154,32 +3191,36 @@ static void leds(void)
         b |= 1u << B_SEL;
     if (is_303() && ui.kbd[bidx()])
         b |= 1u << B_SEQ;
-    if (ui.spage)
+    if (ui.view == V_HOME || ui.view == V_SONG ? ui.pbank : ui.spage)
         b |= 1u << B_OCTUP;
     if (ui.dirty && blink && ui.view == V_GLO)
         b |= 1u << B_SAVE;
     if (proj.set.keyled) {
         if (ui.view == V_HOME) {
-            k |= 1u << WHITE_KEY[seq.ppat[PART_909]];
-            if (seq_cue_of(&seq, PART_909) >= 0 && blink)
-                k |= 1u << WHITE_KEY[seq_cue_of(&seq, PART_909)];
+            int pp = seq.ppat[PART_909] - ui.pbank * 16, cu = seq_cue_of(&seq, PART_909) - ui.pbank * 16;
+            if (pp >= 0 && pp < 16)
+                k |= 1u << WHITE_KEY[pp];
+            if (seq_cue_of(&seq, PART_909) >= 0 && blink && cu >= 0 && cu < 16)
+                k |= 1u << WHITE_KEY[cu];
             for (i = 0; i < NPARTS; i++)
                 if (!part_muted((int)i))
                     k |= 1u << BLACK_KEY[i];
         } else if (ui.view == V_SONG) {               /* the selected bar: its 909 pattern, its unmuted parts */
             const song_t *sg = song();
             if (ui.song_sel < sg->len) {
-                k |= 1u << WHITE_KEY[sg->bar[ui.song_sel].pat[PART_909] & 15u];
+                int sp = sg->bar[ui.song_sel].pat[PART_909] - ui.pbank * 16;
+                if (sp >= 0 && sp < 16)
+                    k |= 1u << WHITE_KEY[sp];
                 for (i = 0; i < NPARTS; i++)
                     if (!(sg->bar[ui.song_sel].mute >> i & 1u))
                         k |= 1u << BLACK_KEY[i];
             }
         } else if (is_drum()) {
             const dpart_t *d = &cur_pat()->drum[ui.part];
-            uint32_t bits = (ui.btn & (1u << B_ENV)) ? d->accent : d->hit[ui.sel[ui.part]];
+            const uint32_t *bits = (ui.btn & (1u << B_ENV)) ? d->accent : d->hit[ui.sel[ui.part]];
             int ph = eng_step[TRK_DRUM + ui.part];
             for (i = 0; i < 16; i++) {
-                int s = step_of((int)i), on = (bits >> s) & 1u;
+                int s = step_of((int)i), on = s < d->len && sm_get(bits, s);
                 if (seq.playing && s == ph)
                     on = !on;
                 if (on)
@@ -3252,9 +3293,16 @@ static void autosave(void)
         return;
     ui.saved_t = now;
     ui.last_autosave = 0;
-    if (project_save() == 0) {
+    switch (project_save()) {
+    case 0:
         ui.dirty = 0;
         say("AUTOSAVED", 0);
+        break;
+    case -7:
+        say("MEMORY FULL: NOT SAVED", 0);
+        break;
+    default:
+        break;
     }
 }
 

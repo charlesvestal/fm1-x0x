@@ -76,9 +76,9 @@ static void test_drum_timing(void)
     reset();
     S.bpm = 120.0f;
     for (i = 0; i < 16; i += 4)
-        P[0].drum[0].hit[0] |= 1u << i;                 /* BD on the quarters */
-    P[0].drum[0].hit[7] = 0xAAAAu;                      /* CH on the off-16ths */
-    P[0].drum[0].accent = 1u;                           /* accent on step 1 */
+        P[0].drum[0].hit[0][0] |= 1u << i;                 /* BD on the quarters */
+    P[0].drum[0].hit[7][0] = 0xAAAAu;                      /* CH on the off-16ths */
+    P[0].drum[0].accent[0] = 1u;                           /* accent on step 1 */
     seq_start(&S);
     run(44100 * 4 - 1);                              /* 2 bars, not the downbeat of the 3rd */
     for (i = 0, k = 0; (i = find(E_DRUM, 0, i)) >= 0; i++, k++) {
@@ -104,7 +104,7 @@ static void test_swing_and_rates(void)
     reset();
     S.bpm = 120.0f;
     P[0].swing = 100;                                /* 75 %: odd 16ths half a step late */
-    P[0].drum[0].hit[7] = 0xFFFFu;
+    P[0].drum[0].hit[7][0] = 0xFFFFu;
     seq_start(&S);
     run(44100 * 2);
     for (i = 0, k = 0; (i = find(E_DRUM, 7, i)) >= 0 && k < 16; i++, k++) {
@@ -117,7 +117,7 @@ static void test_swing_and_rates(void)
     P[0].swing = 100;
     P[0].drum[0].rate = RATE_16T;
     P[0].drum[0].len = 12;
-    P[0].drum[0].hit[7] = 0xFFFu;
+    P[0].drum[0].hit[7][0] = 0xFFFu;
     seq_start(&S);
     run(44100);
     for (i = 0, k = 0; (i = find(E_DRUM, 7, i)) >= 0 && k < 12; i++, k++) {
@@ -169,8 +169,8 @@ static void test_polymeter_cue_chain(void)
     S.bpm = 120.0f;
     P[0].bass[0].len = 3;
     P[0].bass[0].step[0] = (bstep_t){36, G_NOTE};
-    P[0].drum[0].hit[0] = 1u;
-    P[1].drum[0].hit[1] = 1u;                                    /* SD only in pattern 2 */
+    P[0].drum[0].hit[0][0] = 1u;
+    P[1].drum[0].hit[1][0] = 1u;                                    /* SD only in pattern 2 */
     seq_start(&S);
     run((uint32_t)(step * 15) - 1);                         /* not the note due exactly at step 15 */
     for (i = 0, n = 0; (i = find(E_ON, 0, i)) >= 0; i++, n++)
@@ -192,7 +192,7 @@ static void test_polymeter_cue_chain(void)
     reset();
     S.bpm = 120.0f;
     for (i = 0; i < NPAT; i++)
-        P[i].drum[0].hit[0] = 1u;
+        P[i].drum[0].hit[0][0] = 1u;
     for (i = 0; i < NTRACKS; i++)
         S.ppat[i] = 3;
     seq_chain(&S, 3, 5);
@@ -215,7 +215,7 @@ static void test_part_cue(void)
     double step = 44100.0 * 60.0 / 120.0 / 4.0;
     reset();
     S.bpm = 120.0f;
-    P[0].drum[0].hit[0] = 1u;
+    P[0].drum[0].hit[0][0] = 1u;
     P[0].bass[1].len = 3;                                       /* 303 B: a 3-step loop */
     P[0].bass[1].step[0] = (bstep_t){40, G_NOTE};
     P[1].bass[0].step[0] = (bstep_t){50, G_NOTE};               /* 303 A in pattern 2 */
@@ -298,7 +298,7 @@ static void test_ext_clock_and_midi_out(void)
     int i, k, clocks;
     uint32_t per_tick = 919;                                  /* ~120 BPM: 44100*60/120/24 = 918.75 */
     reset();
-    P[0].drum[0].hit[0] = 0xFFFFu;
+    P[0].drum[0].hit[0][0] = 0xFFFFu;
     for (i = 0; i < 2; i++) {                                 /* clocks before start: tempo only */
         seq_ext_clock(&S);
         run(per_tick);

@@ -1,0 +1,73 @@
+# 64 steps and 32 patterns: OCT- / OCT+ page through the steps four pages of 16; HOME's OCT- / OCT+
+# choose patterns 1-16 or 17-32; everything saves packed and comes back; a project too big to
+# pack is not saved (MEMORY FULL) and the flash keeps what it had.
+wait 300
+tapkey b0
+tapkey w0
+tap OCT+
+tap OCT+
+tap OCT+
+tapkey w15
+expect hit0.0.63 1
+expect hit0.0.0 1
+# OCT+ stops at the last page, OCT- goes back one page at a time
+tap OCT+
+tapkey w14
+expect hit0.0.62 1
+tap OCT-
+tapkey w0
+expect hit0.0.32 1
+# LENGTH to 64 (the PART page: BD's three pages, SENDS, PART), and it plays to step 64
+tap EDIT
+tap EDIT
+tap EDIT
+tap EDIT
+spin K1 48
+tap PLAY
+wait 7500
+expect playhead0 64
+tap PLAY
+# back to steps 1-16
+tap OCT-
+tap OCT-
+# a pattern in the second bank
+tap HOME
+tap OCT+
+tapkey w3
+wait 50
+expect pattern 20
+tap HOME
+tapkey w2
+expect hit0.0.2 1
+# copy it to pattern 31 (SAVE held: the bank is the one HOME showed)
+press SAVE
+tapkey w14
+release SAVE
+tap HOME
+tapkey w14
+wait 50
+expect pattern 31
+expect hit0.0.2 1
+tap SAVE
+reboot
+wait 300
+tap HOME
+tap OCT+
+tapkey w3
+wait 50
+expect pattern 20
+expect hit0.0.2 1
+tap OCT-
+tapkey w0
+wait 50
+expect pattern 1
+expect hit0.0.63 1
+expect hit0.0.32 1
+# too much to pack: not saved, the flash keeps the last save
+noise 7
+tap SAVE
+reboot
+wait 300
+expect pattern 1
+expect hit0.0.63 1
+expect hit0.0.32 1

@@ -1,15 +1,17 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* X0X pattern model: 16 patterns, each holding the 909, the 808, two 303s and the break.
+/* X0X pattern model: 32 patterns, each holding the 909, the 808, two 303s and the break.
  *
  * Plain data, no pointers, so a pattern copies with an assignment and the project
  * stores the bytes. The UI edits these in place from the main loop while the
  * sequencer reads them in the audio ISR: every field the sequencer reads is a
- * single byte or an aligned 32-bit word, so a read never sees half a write. */
+ * single byte or an aligned 32-bit word, so a read never sees half a write. A drum row is
+ * two words (steps 1-32, 33-64): sm_get / sm_flip below. */
 #pragma once
 #include <stdint.h>
 
-#define NPAT 16
-#define NSTEPS 32
+#define NPAT 32
+#define NSTEPS 64
+#define NSW (NSTEPS / 32)            /* 32-bit words in a row of steps */
 #define NDRUM 11                     /* tracks per drum machine: the 11 black keys */
 #define NKIT 2                       /* 0 = 909 (drum909.h order), 1 = 808 (drum808.h order) */
 #define NBASS 2                      /* 303 A, 303 B */
@@ -40,7 +42,7 @@ typedef struct {
 
 typedef struct {
     bstep_t step[NSTEPS];
-    uint8_t len;                      /* 1..32 */
+    uint8_t len;                      /* 1..64 */
     uint8_t rate;                     /* RATE_* */
     uint8_t dir;                      /* DIR_* */
     uint8_t transpose;                /* semitones + 24 (24 = none), applied when played */
@@ -48,9 +50,9 @@ typedef struct {
 } bpart_t;
 
 typedef struct {
-    uint32_t hit[NDRUM];              /* bit s = instrument plays on step s */
-    uint32_t accent;                  /* the 909's total-accent row */
-    uint8_t len;                      /* 1..32 */
+    uint32_t hit[NDRUM][NSW];         /* step s (sm_get): the instrument plays */
+    uint32_t accent[NSW];             /* the total-accent row */
+    uint8_t len;                      /* 1..64 */
     uint8_t rate;
     uint8_t rsv[2];
 } dpart_t;
@@ -63,6 +65,7 @@ typedef struct {
     uint8_t set[BRK_NSET];            /* breaks.h param values, in BRK_* order */
     uint8_t slot_a, slot_b;           /* loop A / B: the built-in bank, then the user slots (engine_brk_slot_names) */
     uint8_t rsv[2];
+    uint8_t slice[16];                /* per 16th: 0 = the generator chooses, 1..8 = loop A's slice 1..8 */
 } brkpart_t;
 
 typedef struct {
@@ -74,6 +77,19 @@ typedef struct {
 } pattern_t;
 
 static inline int bstep_gate(const bstep_t *s) { return s->flags & BS_GATE_MASK; }
+
+/* a row of steps (NSW words): step s */
+static inline int sm_get(const uint32_t *m, int s) { return (int)((m[s >> 5] >> (s & 31)) & 1u); }
+static inline void sm_flip(uint32_t *m, int s) { m[s >> 5] ^= 1u << (s & 31); }
+static inline void sm_set(uint32_t *m, int s) { m[s >> 5] |= 1u << (s & 31); }
+static inline int sm_any(const uint32_t *m)
+{
+    uint32_t a = 0;
+    int k;
+    for (k = 0; k < NSW; k++)
+        a |= m[k];
+    return a != 0;
+}
 
 /* default empty pattern: 16 steps, straight, 303 lines empty with TB-3PO defaults */
 void pattern_init(pattern_t *p, uint32_t seed_a, uint32_t seed_b);

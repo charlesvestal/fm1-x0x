@@ -1,0 +1,44 @@
+# A project saved by X0X 0.10 (tests/fixtures/v1_store.bin: 16 patterns of 32 steps, 32-step lanes,
+# the 909 SD before its DECAY) loads into 64 steps and 32 patterns as it was, and saves packed.
+storeload tests/fixtures/v1_store.bin
+wait 100
+# pattern 1: BD on steps 1 and 32, the 303's note on step 1, nothing past 32
+expect pattern 1
+expect hit0.0.0 1
+expect hit0.0.31 1
+expect hit0.0.32 0
+expect hit0.0.63 0
+expect gate0.0 1
+expect gate0.32 0
+# the SD's pots moved up one for DECAY (its default, 41): LEVEL (100, turned to 105 recording), PAN 30
+expect sound0.1.3 41
+expect sound0.1.4 105
+expect sound0.1.9 30
+# the lane on the SD's LEVEL followed it, its 32 steps kept, the new ones empty
+expect lanes 1
+expect laneval0.1.4.3 102
+expect laneval0.1.4.5 105
+expect laneval0.1.4.40 255
+# the song
+expect songlen 2
+expect songbar2.0 16
+# pattern 16
+tap HOME
+tapkey w15
+wait 50
+expect pattern 16
+expect hit0.0.1 1
+# saved in the new format and booted again: all the same
+tap SAVE
+reboot
+wait 100
+expect pattern 1
+expect hit0.0.31 1
+expect hit0.0.1 0
+expect laneval0.1.4.5 105
+tap HOME
+tapkey w15
+wait 50
+expect hit0.0.1 1
+expect sound0.1.4 105
+expect songbar2.0 16

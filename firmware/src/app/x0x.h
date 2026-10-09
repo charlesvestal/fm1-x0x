@@ -50,7 +50,8 @@ extern project_t proj;
 
 void project_defaults(void);
 int project_load(void);                  /* 0 = loaded; else defaults are in place */
-int project_save(void);                  /* 0 = saved and verified */
+int project_save(void);                  /* 0 = saved and verified; -7 = too much to fit (nothing written) */
+int project_mem_pct(void);               /* how full the room for patterns, song and motion is, % */
 
 void ui_init(void);
 void ui_frame(void);
