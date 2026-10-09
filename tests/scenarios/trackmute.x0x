@@ -44,3 +44,12 @@ release HOME
 expect vmute 2056
 expect view 4
 leds
+# MASTER (MIX's last page) and FX: the keys do nothing (no steps written, no mutes)
+turn SELECT 9
+tapkey w5
+tapkey b2
+expect hit0.0.5 0
+expect vmute 2056
+tap FX
+tapkey w6
+expect hit0.0.6 0

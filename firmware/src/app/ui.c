@@ -2066,6 +2066,8 @@ static void key_event(int k, int down)
             mute_part(bl);
         return;
     }
+    if (ui.view == V_MIX || ui.view == V_FX)          /* MASTER, FX: the keys choose nothing (they used to */
+        return;                                       /* play the part's steps or the break's slices) */
     if (is_drum() && bl >= 0 && (ui.btn & (1u << B_HOME))) {   /* HOME + black key: mute that track */
         ui.btn_used |= 1u << B_HOME;
         if (down)
