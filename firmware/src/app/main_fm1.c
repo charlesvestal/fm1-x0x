@@ -24,7 +24,15 @@ struct x0x_dbg {
     uint32_t last_us, cpu_q8, boots, stage;
     uint32_t crash_seen;                            /* the crash count already reported at a boot */
 } x0x_dbg __attribute__((section(".noinit")));
-static uint8_t safe_mode;                           /* two failed boots: no audio, USB on (safe_main) */
+static uint8_t safe_mode;
+#if X0X_DEBUG
+/* development: the slowest block since boot, taken apart (read over USB: tools/fm1_debug.py) */
+extern volatile uint32_t eng_dbg_wait, eng_dbg_nsub;
+static volatile uint32_t dbg_tmr;                   /* 24 MHz ticks of TIMER5 nested in the render */
+struct x0x_worst_s {
+    uint32_t magic, us, wait, tmr, nsub, half_no, over90, over100, blocks, late_in;
+} x0x_worst;
+#endif                           /* two failed boots: no audio, USB on (safe_main) */
 
 static void render_block(int32_t *o)                /* ALNK0: one half, measured */
 {
@@ -43,6 +51,23 @@ static void render_block(int32_t *o)                /* ALNK0: one half, measured
         }
     }
     us = (fm1_ticks() - t0) / FM1_TICKS_PER_US;
+#if X0X_DEBUG
+    x0x_worst.magic = 0x57525354u;                  /* "WRST" */
+    x0x_worst.blocks++;
+    if (us * 100u > budget * 90u)
+        x0x_worst.over90++;
+    if (us > budget)
+        x0x_worst.over100++;
+    if (us > x0x_worst.us) {
+        x0x_worst.us = us;
+        x0x_worst.wait = eng_dbg_wait;
+        x0x_worst.tmr = dbg_tmr;
+        x0x_worst.nsub = eng_dbg_nsub;
+        x0x_worst.half_no = x0x_dbg.halves;
+    }
+    eng_dbg_wait = eng_dbg_nsub = 0;
+    dbg_tmr = 0;
+#endif
     x0x_dbg.cpu_q8 = (x0x_dbg.cpu_q8 * 15u + (us * 256u) / budget) / 16u;
     audio_cpu_pct = (x0x_dbg.cpu_q8 * 100u) >> 8;
     if (us * 100u / budget > audio_peak_pct)
@@ -64,6 +89,9 @@ void fm1_alnk0_irq(void)                            /* via isr_alnk0 (hal/fm1_is
         render_block(&abuf[half * HALF_WORDS]);
         fm1_audio_ack_half();
         if (fm1_audio_free_half() != half) {
+#if X0X_DEBUG
+            x0x_worst.late_in++;
+#endif
             x0x_dbg.late++;                         /* the DMA moved on while we rendered */
             audio_xruns++;
         }
@@ -91,6 +119,9 @@ static uint8_t usb_due;
 void fm1_timer5_irq(void)
 {
     static uint32_t sub;
+#if X0X_DEBUG
+    uint32_t tt0 = fm1_ticks();
+#endif
     fm1_timer5_ack();
     x0x_dbg.timer_irqs++;
     if (x0x_dbg.in_audio)
@@ -128,6 +159,10 @@ void fm1_timer5_irq(void)
             fm1_ms++;
         }
     }
+#if X0X_DEBUG
+    if (x0x_dbg.in_audio)
+        dbg_tmr += fm1_ticks() - tt0;
+#endif
 }
 extern void isr_timer5(void);
 

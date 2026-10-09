@@ -19,8 +19,16 @@ github.com/keremimo/melodee, GPL-3.0):
   (it was missing at first: core 1 ran into erased flash, 0xFFFFFFFF).
 - Hold before a reset: C1_CON bit 1 set, then bit 3 cleared.
 
-Measured (PERF TEST, one FM-1): factory loop 43 -> 32 %, all five 83 -> 53 %, worst case 115 -> 82 %
-(peak 100 %). Core 1's stack: 828 of 2816 bytes at the deepest.
+Measured (PERF TEST, one FM-1), core 1 = 909 + 808: factory loop 43 -> 32 %, all five 83 -> 53 %,
+worst case 115 -> 81 % (peak 100 %). Core 1's stack: 828 of 2816 bytes at the deepest.
+
+The worst block, taken apart (X0X_DEBUG's x0x_worst, read over USB): 11 639 us of an 11 609 us
+half, of which core 0 waited 5 086 us for core 1; 84 blocks over 90 %, one dropout. Core 1 was the
+critical path. Rebalanced: **core 1 = 808 + break; core 0 = 909 (rendered into the mix in place,
+scaled by its glides: 0 + x * c is x * c, so still bit for bit) + both 303s**. Then: 39 / 54 / 68 %,
+peak 84 %, the worst block 9 806 us with 2 us of waiting, no block over 90 %, no dropout. The factory
+loop (909 + 303 A + break, no 808) costs more than with the drums together (32 -> 39 %): core 1
+has little to do there. A split chosen per block by what sounds would recover it.
 
 Research for using the AC79's second core, from JieLi's AC79 SDK
 ([gitee: Jieli-Tech/fw-AC79_AIoT_SDK](https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK), Apache-2.0): its

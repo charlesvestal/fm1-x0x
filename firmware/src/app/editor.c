@@ -119,6 +119,7 @@ static void ed_w35(uint32_t v)
 static int ed_debug(uint32_t cmd, const uint8_t *a, uint32_t na)
 {
     uint32_t addr, i;
+#if X0X_DEBUG > 1                                     /* the clock work's timing loop: level 2 (room) */
     if (cmd == ED_CLOCK) {
         uint32_t it, c0, c1;
         if (na < 5u)
@@ -131,6 +132,7 @@ static int ed_debug(uint32_t cmd, const uint8_t *a, uint32_t na)
         ed_w35(c1);
         return 1;
     }
+#endif
     if (na < 10u)
         return 0;
     addr = ed_u35(a);
