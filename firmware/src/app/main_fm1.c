@@ -322,10 +322,9 @@ static void fm1_main(void)
     seq.send_clock = proj.set.clk_out;
     seq.send_notes = proj.set.notes_out;
     engine_brk_loops();
-    if (!proj.set.cpu2_off)                         /* the second core: at power-on, before the audio and the
+    plat_cpu2_set(1);                               /* the second core: at power-on, before the audio and the
                                                      * timers, as Melodee starts it (started later, it does not
                                                      * reach its entry); if it does not answer, one core */
-        plat_cpu2_set(1);
     audio_init();
     usb_start();
 #if X0X_TRS

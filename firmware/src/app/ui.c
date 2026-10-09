@@ -167,7 +167,7 @@ static void say(const char *a, const char *b)
 /* =============================================================== param refs === */
 enum { R_NONE, R_ENG, R_SWING, R_DLEN, R_DRATE, R_BLEN, R_BRATE, R_BDIR, R_BTRANS, R_GEN, R_BRKSET,
        R_BRKSLOT, R_TEMPO, R_ACCENT, R_CLKOUT, R_NOTEOUT, R_PALETTE, R_KEYLED, R_KEYSOUND, R_AUTOSAVE, R_ACT, R_SBAR, R_SPAT, R_SMODE,
-       R_SLEN, R_STALLS, R_CPU2 };
+       R_SLEN, R_STALLS };
 typedef struct { uint8_t kind, a, b, c; } pref_t;
 #define PR(k, a, b, c) ((pref_t){(k), (a), (b), (c)})
 #define NONE PR(R_NONE, 0, 0, 0)
@@ -200,7 +200,6 @@ static const x0x_param_t ACT_P[] = {
     {"DELETE BAR", 0, 0, 0}, {"CLEAR SONG", 0, 0, 0}, {"PERFORMANCE", 0, 0, 0}, {"RUN PERF TEST", 0, 0, 0},
 };
 static const x0x_param_t STALLS_P = {"STALLS", 1, 0, ONOFF_N};
-static const x0x_param_t CPU2_P = {"2ND CORE", 1, 0, ONOFF_N};
 static const char *const MODE_N[] = {"PATTERN", "SONG"};
 static const x0x_param_t SONG_P[] = {
     {"909", NPAT - 1, 0, 0}, {"808", NPAT - 1, 0, 0}, {"303A", NPAT - 1, 0, 0}, {"303B", NPAT - 1, 0, 0},
@@ -263,7 +262,6 @@ static const x0x_param_t *pref_desc(pref_t r)
     case R_SMODE: return &SONG_P[5];
     case R_SLEN: return &SONG_P[6];
     case R_STALLS: return &STALLS_P;
-    case R_CPU2: return &CPU2_P;
     default: return 0;
     }
 }
@@ -312,7 +310,6 @@ static int pref_get(pref_t r)
     case R_SMODE: return seq.song_on;
     case R_SLEN: return song()->len;
     case R_STALLS: return perf.stalls_on;
-    case R_CPU2: return !proj.set.cpu2_off;
     default: return 0;
     }
 }
@@ -376,13 +373,6 @@ static void pref_set(pref_t r, int v)
         song()->bar[ui.song_sel].pat[r.a] = (uint8_t)v;
         break;
     case R_SMODE: seq.song_on = (uint8_t)v; break;
-    case R_CPU2:                                      /* off at once; on from the next power-on */
-        proj.set.cpu2_off = (uint8_t)!v;
-        if (!v)
-            plat_cpu2_set(0);
-        say(!v ? "ONE CORE" : plat_cpu2_on() ? "2ND CORE ON" : "2ND CORE: SAVE, RESTART", 0);
-        perf.have = 0;
-        break;
     case R_STALLS:
         perf.stalls_on = (uint8_t)v;
         plat_stalls_enable(v);
@@ -733,7 +723,6 @@ static void open_global(void)
     list_add(PR(R_AUTOSAVE, 0, 0, 0));
     list_add(PR(R_ACT, ACT_CLEAR_PAT, 0, 0));
     list_add(PR(R_ACT, ACT_RESET, 0, 0));
-    list_add(PR(R_CPU2, 0, 0, 0));
     list_add(PR(R_ACT, ACT_PERF, 0, 0));
     list_add(PR(R_ACT, ACT_ABOUT, 0, 0));
     put_s(list_title, "GLOBAL");

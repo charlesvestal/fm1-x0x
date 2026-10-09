@@ -530,7 +530,6 @@ Press GLO for these settings:
 | AUTOSAVE | ON (the default): while the pattern is stopped, changes are saved by themselves once nothing has been touched for four seconds. OFF: only SAVE saves. |
 | CLEAR PATTERN | Clears all five parts of the current pattern. |
 | FACTORY RESET | Goes back to the factory sounds and empty patterns, with no song and no knob motion. Your saved project is kept until you save over it. |
-| 2ND CORE | ON (the default): the FM-1's second processor core plays the 808 and the break while the first plays the rest, which takes up to 40% off the audio load of a busy pattern. OFF: one core, straight away. Switched back ON, it starts the next time you switch the FM-1 on. |
 | PERFORMANCE | Opens the performance page (below). |
 | ABOUT X0X | Shows the version, how full the memory for patterns is (MEM), and the audio load. |
 
@@ -557,7 +556,7 @@ For a proper measurement, press SEL and choose RUN PERF TEST. X0X plays three pa
 own for about 15 seconds, from a simple loop up to everything as busy as it gets, then puts your
 project back exactly as it was and shows the results. HOME or PLAY stops the test early.
 
-With 2ND CORE on, the 808 and the break run on the FM-1's second core, so the 808's share on the
+X0X uses both of the FM-1's processor cores: the 808 and the break run on the second, so the 808's share on the
 performance page is the time the first core waits for them, and the whole load is lower: on
 one FM-1 the test's three patterns went from 43%, 83% and 115% on one core to 39%, 54% and 68%,
 and the busiest moment of the worst case from over the limit to 84%.
