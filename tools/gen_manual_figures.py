@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """The manual's figures, drawn (no photographs: M-VAVE's and Felucca's are not ours to use):
 
-  (into docs/next/img: the manual for the next release; at a release, docs/next/ replaces docs/)
   docs/img/fm1-panel.svg   the FM-1 front panel, with the firmware's real screen in it
   docs/img/fm1-keys.svg    the key bed: what the black and white keys do in X0X
   docs/img/screen-*.png    screenshots from the simulator (2x, nearest neighbour)
@@ -20,7 +19,7 @@ from pathlib import Path
 from PIL import Image
 
 SRC = Path(__file__).resolve().parents[1]
-OUT = SRC / "docs" / "next" / "img"                   # the next release's manual (docs/ is the released one)
+OUT = SRC / "docs" / "img"
 FONT = "'Barlow Semi Condensed', 'Arial Narrow', Arial, sans-serif"
 
 BODY, TRAY, KEY_W, KEY_B, KNOB, BTN, LABEL = "#3a3d42", "#26282c", "#d9dadc", "#c9cacd", "#1f2124", "#2e3135", "#e8e8ea"
