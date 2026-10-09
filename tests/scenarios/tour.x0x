@@ -68,12 +68,12 @@ tapkey b1
 shot t11_home_mute.png
 tapkey b1
 tap FX
+wait 1600
 shot t12_fx.png
 tap LFO
-tap LFO
+turn SELECT 9
 turn K2 4
 shot t13_mix_comp.png
-tap LFO
 turn K3 40
 wait 1200
 shot t14_mix_pump.png
@@ -85,7 +85,7 @@ shot t16_list_edit.png
 tap HOME
 tap GLO
 shot t17_global.png
-turn SELECT 7
+turn SELECT 9
 shot t18_global_reset.png
 tap SEL
 shot t19_ask.png

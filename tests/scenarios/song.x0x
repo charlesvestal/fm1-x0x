@@ -70,6 +70,14 @@ tap HOME
 tap EDIT
 expect part 2
 expect sound2.0.0 48
+# a line to hear the sweep on (the manual's picture)
+tapkey w0
+tapkey w3
+tapkey w6
+tapkey w8
+tapkey w10
+tapkey w12
+tapkey w14
 tap REC
 tap PLAY
 wait 60
