@@ -238,12 +238,10 @@ next 16 and OCT- back, and the top line shows which 16 you're on.
 back. A muted track's row turns grey. Track mutes aren't saved, and they stay as they are when
 you mute or unmute the whole part on HOME.
 
-The closed hat cuts off the open hat. On the 808 you can change this with CHOKE on the KIT
-page.
+The closed hat cuts off the open hat, on both machines.
 
 Press EDIT to step through the pages: the selected track's sound (one page, two for the 909's
-kick), then KIT, for the whole machine: ACCENT, how much louder accented steps are, and on the
-808 CHOKE. Each track's DRIVE and DIST are in SEL's list, under MORE.
+kick), then KIT, for the whole machine: ACCENT, how much louder accented steps are. Each track's DRIVE and DIST are in SEL's list, under MORE.
 
 A drum machine's LENGTH and RATE are on SEQ. SWING is on HOME: it swings every part. Each track's level, pan and reverb and delay sends are on the mixer: press
 LFO and go to the 909 MIX or 808 MIX page, which shows all eleven tracks' levels at once. The
@@ -333,6 +331,9 @@ settings control how the generator rearranges the loop:
 - ANCHOR: how strongly it keeps the kick and snare slices on beats 1 and 3.
 - ROLL: how often it repeats a slice or moves to the slice next to it.
 - FILL: how much the last bar of a phrase breaks these rules.
+
+COMPLEXITY is the amount: at 0 the loop plays straight, and ROLL and FILL come in with it, at
+their full effect from 25%. Low settings stay close to the loop.
 - RETRIG 2X, 3X, 4X and 8X: the chance, in each bar, of stuttering a beat.
 - PHRASE: the length of a phrase, 2, 4, 8 or 16 bars, or off.
 - B CHANCE: the chance of switching to loop B in the last bar of a phrase. With PHRASE off, the
@@ -341,7 +342,7 @@ settings control how the generator rearranges the loop:
 
 These settings, and the loops, are saved with the pattern. The break's level, pan and sends in
 the mix are on the mixer's PARTS page (LFO, black key 5). X0X comes with two loops of its own, 909 GR and 909 FL, played by its 909.
-Loops you upload appear after them. Loops are stretched to fit the tempo.
+Loops you upload appear after them. Loops follow the tempo by playing faster or slower, so their pitch follows it too, as on a sampler (PITCH sets it on top).
 
 ### Your own breaks
 
@@ -724,7 +725,7 @@ in SEL's list; the rest are its sound pages.
 | CP | Level, Tune, Decay, Attack, Sound, Drive, Dist, Rev, Dly, Pan |
 | CB, CH | Level, Tune, Decay, Drive, Dist, Rev, Dly, Pan |
 | CY, OH | Level, Decay, Tune, Drive, Dist, Rev, Dly, Pan |
-| KIT | Accent, Choke (off, closed cuts open, or both) |
+| KIT | Accent |
 
 | 303 setting | Range |
 |---|---|

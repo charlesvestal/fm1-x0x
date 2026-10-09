@@ -360,10 +360,11 @@ static void fire_trigger(breaks_t *b, int bp, int forced)
         int pb = PHRASE_BARS[b->set[BRK_PHRASE] % 5u];
         in.current_slice = b->current_slice;
         in.beat_position = bp;
-        in.complexity = (float)b->set[BRK_COMPLEX] * 0.01f;
-        in.anchor = (float)b->set[BRK_ANCHOR] * 0.01f;
-        in.roll = (float)b->set[BRK_ROLL] * 0.01f;
-        in.fill = (float)b->set[BRK_FILL] * 0.01f;
+        float ramp = fm_minf((float)b->set[BRK_COMPLEX] * 0.04f, 1.0f);   /* X0X: COMPLEXITY is the amount: */
+        in.complexity = (float)b->set[BRK_COMPLEX] * 0.01f;      /* ROLL and FILL come in with it, full */
+        in.anchor = (float)b->set[BRK_ANCHOR] * 0.01f;           /* from 25 % (low settings stay gentle) */
+        in.roll = (float)b->set[BRK_ROLL] * 0.01f * ramp;
+        in.fill = (float)b->set[BRK_FILL] * 0.01f * ramp;
         in.phrase_bars = pb;
         in.bar_in_phrase = pb ? b->bar % pb : 0;
         slice = brk_select_next(&in, b);

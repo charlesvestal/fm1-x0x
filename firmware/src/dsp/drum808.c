@@ -1254,7 +1254,6 @@ static const char *const k_dist_names[7] = {"DIODE", "CLIP", "SAT", "BFZ", "PDIS
 static const char *const k_tom_names[2] = {"TOM", "CONGA"};
 static const char *const k_rim_names[2] = {"RIM", "CLAVE"};
 static const char *const k_clap_names[2] = {"CLAP", "MARAC"};
-static const char *const k_choke_names[3] = {"OFF", "CH>OH", "BOTH"};
 
 #define PP(name, def) {name, 127, def, 0}
 #define P_DRIVE {"Drive", 127, 0, 0}
@@ -1298,8 +1297,9 @@ static const x0x_param_t k_p_oh[] = {PP("Level", 64), PP("Decay", 74), PP("Tune"
 static const d8_pmap_t k_m_decay_tune[] = {{K_POT, D8P_LEVEL, 0}, {K_POT, D8P_DECAY, 0}, {K_POT, D8P_TUNE, 0},
                                            {K_POT, D8P_DRIVE, 0}, {K_POT, D8P_DIST, 0}, {K_POT, D8P_REV, 0},
                                            {K_POT, D8P_DLY, 0}, {K_PAN, 0, 0}};
-static const x0x_param_t k_p_kit[] = {PP("Level", 100), PP("Accent", 127), {"Choke", 2, 1, k_choke_names}};
-static const d8_pmap_t k_m_kit[] = {{K_KIT, 0, 0}, {K_KIT, 1, 0}, {K_KIT, 2, 0}};
+/* (X0X: the hats' choke is the 909's, fixed: the closed hat cuts the open one) */
+static const x0x_param_t k_p_kit[] = {PP("Level", 100), PP("Accent", 127)};
+static const d8_pmap_t k_m_kit[] = {{K_KIT, 0, 0}, {K_KIT, 1, 0}};
 
 typedef struct { const x0x_param_t *p; const d8_pmap_t *m; uint8_t n; } d8_track_t;
 #define TRK(p, m) {p, m, (uint8_t)(sizeof(p) / sizeof(p[0]))}
@@ -1331,7 +1331,7 @@ static void kit_apply(drum808_t *d)
 {
     d->vol = (float)d->kpot[0] / 127.0f;
     d->vel_depth = (float)d->kpot[1] / 127.0f;
-    d->choke = d->kpot[2];
+    d->choke = 1;                                 /* CH cuts OH */
 }
 
 void drum808_set(drum808_t *d, int track, int i, int value)
@@ -1394,7 +1394,6 @@ void drum808_init(drum808_t *d)
     }
     d->kpot[0] = 100;
     d->kpot[1] = 127;
-    d->kpot[2] = 1;
     kit_apply(d);
 
     rng_seed(&d->sd.rng, 0x808D51Eu);

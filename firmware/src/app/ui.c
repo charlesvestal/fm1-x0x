@@ -456,8 +456,8 @@ static const char *pref_name(pref_t r)
         return ui.view == V_SEQ ? SEQN[r.kind - R_DLEN] : PATN[r.kind - R_DLEN][r.a & 1];
     if (r.kind == R_ENG && r.a == T_MIX && ui.view == V_MIX && r.c < MX_NPARAMS)
         return CHN[r.c];                               /* MIX's PARTS: the picked part's */
-    if (r.kind == R_ENG && (r.a == T_909 || r.a == T_808) && r.b == NDRUM)
-        return r.c == 1 ? "ACCENT" : "CHOKE";          /* the kits' depth of accents; the 808's choke */
+    if (r.kind == R_ENG && (r.a == T_909 || r.a == T_808) && r.b == NDRUM && r.c == 1)
+        return "ACCENT";                               /* the kits' depth of accents */
     if (r.kind == R_ENG && r.a == T_MIX && r.b < NPARTS && r.c < MX_NPARAMS)
         return MIXN[r.b][r.c];
     if (r.kind == R_ENG && r.a == T_FX) {               /* the page says which effect: the knob, what */
@@ -740,7 +740,7 @@ static void build_pages(void)
             if (p == PART_909)                         /* (the kit's gain: the mixer's level does it) */
                 add_page("KIT", PR(R_ENG, T_909, NDRUM, 1), NONE, NONE, NONE);
             else
-                add_page("KIT", PR(R_ENG, T_808, NDRUM, 1), PR(R_ENG, T_808, NDRUM, 2), NONE, NONE);
+                add_page("KIT", PR(R_ENG, T_808, NDRUM, 1), NONE, NONE, NONE);
         } else if (is_303()) {
             pg_grp = GR_SOUND;
             add_page("TONE", PR(R_ENG, T_303, b, BASS303_CUTOFF), PR(R_ENG, T_303, b, BASS303_RESO),

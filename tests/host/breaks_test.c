@@ -405,10 +405,10 @@ static void test_generator(void)
         CHECK(bars_hit > 170 && bars_hit < 230, "Retrig 4x 50: per-bar odds ~50 %% (%d/400 bars)", bars_hit);
     }
 
-    /* Phrase 4 + Fill 100: the 4th bar deviates. Complexity 10 (BB Gen bypasses the generator
-     * entirely at Complexity 0, so Fill does nothing there -- kept). */
+    /* Phrase 4 + Fill 100: the 4th bar deviates. Complexity 25, where X0X's ramp gives Fill its full
+     * effect (BB Gen bypasses the generator entirely at Complexity 0, so Fill does nothing there -- kept). */
     setup(&b);
-    breaks_set(&b, BRK_COMPLEX, 10);
+    breaks_set(&b, BRK_COMPLEX, 25);
     breaks_set(&b, BRK_PHRASE, 2);
     breaks_set(&b, BRK_FILL, 100);
     n = run_steps(&b, 160);
@@ -420,8 +420,22 @@ static void test_generator(void)
             if (d->bar % 4 == 3) { fn++; fm += d->slice == d->bp; }
             else { gn++; gm += d->slice == d->bp; }
         }
-        CHECK(gm > gn * 85 / 100, "Phrase 4: groove bars on their beat slice (%d/%d)", gm, gn);
+        CHECK(gm > gn * 65 / 100, "Phrase 4: groove bars mostly on their beat slice (%d/%d)", gm, gn);
         CHECK(fm < fn * 25 / 100, "Phrase 4 Fill 100: fill bar deviates (%d/%d on beat)", fm, fn);
+    }
+    /* X0X: Complexity 2 with Roll 55, Fill 100 (the stream's settings): ROLL and FILL ramp in with
+     * Complexity, so the loop stays nearly straight, fill bar included */
+    setup(&b);
+    breaks_set(&b, BRK_COMPLEX, 2);
+    breaks_set(&b, BRK_ROLL, 55);
+    breaks_set(&b, BRK_PHRASE, 2);
+    breaks_set(&b, BRK_FILL, 100);
+    n = run_steps(&b, 160);
+    {
+        int on = 0, all = 0;
+        for (int i = 0; i < n; i++)
+            if (!g_dec_log[i].forced) { all++; on += g_dec_log[i].slice == g_dec_log[i].bp; }
+        CHECK(on > all * 80 / 100, "Complexity 2, Roll 55, Fill 100: gentle (%d/%d on beat)", on, all);
     }
     /* Complexity 0 + Fill 100: no deviation (BB Gen's bypass) */
     setup(&b);
