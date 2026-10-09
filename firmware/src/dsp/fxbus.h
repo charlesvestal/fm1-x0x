@@ -34,29 +34,10 @@ enum { FX_VOLUME, FX_DIST, FX_DRIVE, FX_COMP,
        FX_DL_TIME, FX_DL_FDBK, FX_DL_TONE, FX_DL_LEVEL,
        FX_DL_HPF, FX_DL_TYPE, FX_DL_WEAR, FX_DL_PING, FX_NPARAMS };
 
-#if X0X_PLATE
-/* the plate (Dattorro, "Effect Design, Part 1", JAES 1997, as FoMni and Eno have it), at half the
- * sample rate, its tank half the paper's size, its lines 16-bit: the old reverb's RAM. Lengths are
- * the paper's (29761 Hz): FX_PS() for the half-size tank, FX_PD() for the full-size input diffusers */
-#define FX_PS(n) (((n) * 3705 + 5000) / 10000)       /* n x 22050 / 29761 / 2 */
-#define FX_PD(n) (((n) * 7409 + 5000) / 10000)       /* n x 22050 / 29761 */
-#define FX_PEXC FX_PS(16)
-#define FX_PL_TOTAL (FX_PD(142) + FX_PD(107) + FX_PD(379) + FX_PD(277) + FX_PS(672) + FX_PS(4453) + FX_PS(1800) + \
-                     FX_PS(3720) + FX_PS(908) + FX_PS(4217) + FX_PS(2656) + FX_PS(3163) + 2 * (FX_PEXC + 2))
-enum { FX_PIN1, FX_PIN2, FX_PIN3, FX_PIN4, FX_PAPL, FX_PD1L, FX_PAP2L, FX_PD2L, FX_PAPR, FX_PD1R, FX_PAP2R, FX_PD2R,
-       FX_PN };
-#endif
-
 struct fxbus {
     /* reverb */
     float rv_decay, rv_tone, rv_level;
     d9_biquad_t rv_hp;
-#if X0X_PLATE
-    int16_t pl[FX_PL_TOTAL];
-    int32_t pl_at[FX_PN], pl_pos[FX_PN], pl_len[FX_PN];
-    float pl_bw, pl_dl, pl_dr, pl_s, pl_c, pl_half, pl_ol, pl_or, pl_pl, pl_pr;
-    int32_t rv_quiet;
-#else
     int16_t comb[FX_RV_COMB_TOTAL];
     float ap[FX_RV_AP_TOTAL];
     int32_t cpos[4], apos[2];
@@ -65,7 +46,6 @@ struct fxbus {
     float apr[FX_RV_APR_TOTAL];       /* X0X stereo: the right side reads the combs with alternating
                                        * signs through its own allpasses (the left is 9W9's) */
     int32_t aposr[2];
-#endif
     /* delay */
     float dl_time_ms, dl_fdbk, dl_tone, dl_level, bpm, wear;
     int32_t dl_div, dl_type;
