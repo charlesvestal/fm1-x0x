@@ -79,8 +79,8 @@ the screen shows the 909, and every part is empty.
 4. **Add open hats.** Press black key 9, then white keys 3, 7, 11 and 15.
 5. **Write a 303 line.** Turn ALGORITHM two clicks clockwise to 303A, press ARP, then press
    OCT+. Each press writes a new line; keep pressing until you like one.
-6. **Shape the 303.** Press EDIT to show the FILTER page. Turn KNOB 1 to open or close the
-   filter, and KNOB 2 to change the resonance.
+6. **Shape the 303.** Press ARP again to leave TB-3PO; the knobs are the 303's TONE page. Turn
+   KNOB 1 to open or close the filter, and KNOB 2 to change the resonance.
 7. **Add the break.** Turn ALGORITHM two more clicks to BREAK, then press all 16 white keys so
    the break plays the whole bar.
 8. **Mute a part.** Press HOME, then black key 5 to mute the break. Press it again to bring it
@@ -112,9 +112,9 @@ These controls do the same thing on every screen:
 | SEL | Shows everything on the current screen as a list. In a list, it runs the highlighted action. When X0X asks a question, SEL means yes. |
 | HOME | Goes to the HOME screen. In a list, it goes back. When X0X asks a question, HOME means no. |
 | EDIT | Shows the part's own screen. Press it again for the next page. |
-| ARP | Opens TB-3PO, the 303 line generator (on a 303 only). |
+| ARP | Opens TB-3PO, the 303 line generator (on a 303 only); press it again to go back. |
 | FX | Opens the effects. |
-| LFO | Opens the mixer and master. |
+| LFO | Opens the mixer and the master. |
 | GLO | Opens the settings. |
 | SEQ | On a 303, switches the keys between steps and keyboard. On HOME, opens the song. |
 | PLAY | Starts and stops. Hold HOME and press PLAY to redo. |
@@ -168,18 +168,21 @@ TRACK, WHITE: STEP). Until you first press a button it says HOLD ANY BUTTON: WHA
 button held for a second shows a card about it.
 
 Above the footer are the four knobs, under a tag that says whose they are: the selected track
-(BD), the whole machine (909 KIT), the pattern (P3 PATTERN), a 303's sound (303A FILTER), a track
-on the mixer (909 MIX: CP), or a held 303 step (303A STEP 5). When a section has more than one
+(BD), the whole machine (909 KIT), a 303's sound (303A TONE), the generator (P3 GENERATE), a part
+on the mixer (PARTS: 303A), a track on the mixer (909 MIX: CP), or a held 303 step (303A STEP 5). When a section has more than one
 page, the tag counts them (BD (1/2)); the dots at the end of its line are all the screen's pages,
 the current one lit. Settings with only a few choices show a
 row of small squares instead of a ring. When you turn a knob, its value is also shown in
-large type for a second, with whose it is: the track's (BD Tune), or the pattern's (P3 LENGTH).
-A pattern's settings (its length, rate and swing, the 303's LINE and TB-3PO settings, the break's
-generator and loops) change when the pattern changes and are copied with it; everything else is
-the sound, which stays the same whatever pattern plays.
+large type for a second, with whose it is: the track's (BD TUNE), or the pattern's (P3 909 LEN).
 
-**SEL** shows the whole screen as a list, in sections: on the 909, for example, BD: THIS TRACK,
-909: ALL TRACKS and P1: THE PATTERN.
+Each button has one job. The part screens (ALGORITHM, EDIT) are the **sound**; HOME is the
+**pattern** (which one plays, and each part's length, rate and swing); LFO is the **mix** and the
+master; FX the reverb and delay. A pattern's settings change when the pattern changes and are
+copied with it; the sound stays the same whatever pattern plays.
+
+The pages hold the knobs you turn most. **SEL** shows the whole screen as a list, in sections:
+on the 909, for example, BD: THIS TRACK, 909: ALL TRACKS, and MORE, the settings no page has
+(here the track's DRIVE and DIST).
 
 ![The 909](img/screen-909.png)
 ![Turning a knob](img/screen-readout.png)
@@ -222,18 +225,16 @@ you mute or unmute the whole part on HOME.
 The closed hat cuts off the open hat. On the 808 you can change this with CHOKE on the KIT
 page.
 
-Press EDIT to step through the pages, in this order:
+Press EDIT to step through the pages: the selected track's sound (one page, two for the 909's
+kick), then KIT, for the whole machine: ACCENT, how much louder accented steps are, and on the
+808 CHOKE. Each track's DRIVE and DIST are in SEL's list, under MORE.
 
-- The selected track's sound (the top line shows its name). Its last page always ends with
-  DRIVE on KNOB 3 and DIST on KNOB 4.
-- KIT: settings for the whole drum machine.
-- PATTERN: LENGTH (1–64 steps), RATE (1/16, 1/16 triplet, 1/32 or 1/8 triplet) and SWING.
-
-Each track's level, pan and reverb and delay sends are on the mixer: press LFO and go to the
-909 MIX or 808 MIX page, which shows all eleven tracks' levels at once. The black keys pick a
-track there, and the knobs are its LEVEL, PAN, REV and DLY (the 909's kick has no sends). On the
-808 the alternate sounds share their track's pan, so the conga sits where the tom does. The whole
-drum machine's level and pan are on the mixer's LEVELS and PANS pages, and its sends on FX.
+A drum machine's length and rate are on HOME (its LENGTH page, and SEL's list); the swing is on
+HOME's PERFORM page. Each track's level, pan and reverb and delay sends are on the mixer: press
+LFO and go to the 909 MIX or 808 MIX page, which shows all eleven tracks' levels at once. The
+black keys pick a track there, and the knobs are its LEVEL, PAN, REV and DLY (the 909's kick has
+no sends). On the 808 the alternate sounds share their track's pan, so the conga sits where the
+tom does.
 
 ---
 
@@ -259,32 +260,30 @@ slides between them. Press SEQ again to go back to steps.
 
 Press EDIT to step through these pages:
 
-- FILTER: CUTOFF, RESO, ENVMOD and DECAY.
-- VOICE: ACCENT, WAVE (saw or square), TUNE and VOLUME.
-- DRIVE: DRIVE, DRIVE TYPE (off, soft or RAT), SLIDE time and ACCENT DECAY.
-- LINE, in amber (the pattern's): LENGTH (1–64 steps), RATE, DIRECTION (forward, reverse,
-  ping-pong or random) and TRANSPOSE.
+- TONE: CUTOFF, RESO, ENVMOD and DECAY.
+- VOICE: ACCENT, WAVE (saw or square), DRIVE and SLIDE time.
 
-Each 303's level and pan are on the mixer (LFO); its reverb and delay sends are on FX.
+TUNE, VOLUME, DRIVE TYPE (off, soft or RAT) and ACCENT DECAY are in SEL's list. The line's
+LENGTH (1–64 steps) is on HOME's LENGTH page; its RATE, DIRECTION (forward, reverse, ping-pong or
+random) and TRANSPOSE are in HOME's list. Each 303's level, pan and sends are on the mixer (LFO).
 
 ---
 
 ## 7. TB-3PO
 
-TB-3PO writes 303 lines for you. Select a 303 and press ARP.
+TB-3PO writes 303 lines for you. Select a 303 and press ARP; press ARP again to go back.
 
 ![TB-3PO](img/screen-tb3po.png)
 
 Press **OCT+** to write a completely new line. Press **OCT-** to mutate the current line,
 which changes about a quarter of its steps.
 
-TB-3PO has three pages:
+TB-3PO has two pages (SELECT moves between them):
 
 - GENERATE: DENS, ACCENT and SLIDE set how many steps play, are accented and slide. OCTS sets
   the range, from 1 to 3 octaves.
 - SCALE: ROOT, SCALE (minor, Phrygian, harmonic minor, minor pentatonic, Dorian or major),
   OCTAVE, and MUTATE, which mutates the line by itself every 1–16 bars (or never).
-- LINE: the same as the 303's LINE page.
 
 Turning the GENERATE and SCALE knobs doesn't change the line you're hearing. They set up the
 next **OCT+** (new line) or **OCT-** (mutate), so your line stays exactly as it is, hand edits
@@ -310,7 +309,9 @@ the slice's number. Press the same black key again (holding the step) to give th
 the generator. This way you can fix the kick and snare where you want them and let the generator
 play with the rest. A step's slice is saved with the pattern.
 
-These settings control how the generator rearranges the loop:
+Its three pages are GROOVE (COMPLEXITY, ANCHOR, ROLL, FILL), RETRIG (2X, 3X, 4X, 8X) and LOOPS
+(LOOP A, LOOP B, B CHANCE, PITCH); PHRASE, A LENGTH, B LENGTH and LEVEL are in SEL's list. These
+settings control how the generator rearranges the loop:
 
 - COMPLEXITY: how often it jumps to a different slice instead of playing the next one.
 - ANCHOR: how strongly it keeps the kick and snare slices on beats 1 and 3.
@@ -322,9 +323,8 @@ These settings control how the generator rearranges the loop:
   chance applies to every bar: at 50%, about half the bars play loop B.
 - A LENGTH and B LENGTH: how often a new slice is chosen, from every 1/4 bar to every 8 bars.
 
-These settings are saved with the pattern. The LOOPS page chooses loop A and loop B (also the
-pattern's), and the SOUND page has the break's LEVEL and PITCH. Its level and pan in the mix are
-on the mixer's BREAK page (LFO), its reverb and delay sends on FX. X0X comes with two loops of its own, 909 GR and 909 FL, played by its 909.
+These settings, and the loops, are saved with the pattern. The break's level, pan and sends in
+the mix are on the mixer's PARTS page (LFO, black key 5). X0X comes with two loops of its own, 909 GR and 909 FL, played by its 909.
 Loops you upload appear after them. Loops are stretched to fit the tempo.
 
 ### Your own breaks
@@ -401,7 +401,9 @@ Parts can have different lengths, so they drift against each other. The 909's le
 the length of a bar, and the 909's pattern sets the swing. Swing delays every second 16th
 note: 50% is straight, and 75% is the most swing.
 
-On HOME, the knobs are TEMPO, SWING, PUMP and CUTOFF.
+HOME's knobs are the pattern's: PERFORM has TEMPO, SWING, FILTER and PUMP (the master's, for
+playing live), and LENGTH each part's length (909, 808, 303A, 303B; the break is always 16
+steps). Each part's RATE and the 303s' DIRECTION and TRANSPOSE are in HOME's SEL list.
 
 ---
 
@@ -473,17 +475,17 @@ Press SEL on the SONG screen for LENGTH, INSERT BAR, DELETE BAR and CLEAR SONG.
 
 ![FX](img/screen-fx.png)
 
-There is one reverb and one delay, and every part can send to both. Press FX: the first pages
-set how much each part sends to the reverb and the delay. Each drum track also has its own
-sends, on that track's own page. The reverb is stereo: whatever you send it comes back wide.
+There is one reverb and one delay, and every part can send to both: each part's sends are on the
+mixer's PARTS page (LFO), each drum track's on 909 MIX and 808 MIX. FX shows how much every part
+sends, and has two pages:
 
-- REVERB: DECAY, TONE, HPF and LEVEL.
-- DELAY: TIME, in note values from 1/32 to a dotted half note, plus FEEDBACK, TONE and LEVEL.
-- TAPE: TYPE switches the delay between DIGI, a clean 12-bit digital delay, and TAPE, which
-  wobbles, saturates, and can feed back on itself at high feedback. WEAR sets how worn the
-  tape sounds. HPF cuts low end from the delay. PING makes the echoes bounce between left
-  and right.
-- KIT DRIVE: the 909's drive and glue compressor, applied to the whole mix.
+- REVERB: DECAY and TONE. The reverb is stereo: whatever you send it comes back wide.
+- DELAY: TIME (in note values from 1/32 to a dotted half note), FEEDBACK, TONE and TAPE. TAPE at
+  the far left (DIGI) is a clean 12-bit digital delay; turned up, it is a tape delay that wobbles,
+  saturates and wears more the further you turn it, and can feed back on itself at high feedback.
+
+In SEL's list, under MORE: each effect's low cut and return level, and PING-PONG, which bounces
+the echoes between left and right.
 
 ---
 
@@ -492,35 +494,36 @@ sends, on that track's own page. The reverb is stereo: whatever you send it come
 ![MIX, with the compressor pumping](img/screen-mix.png)
 
 Press LFO to open MIX. It shows a level and a meter for each part, and the compressor's gain
-reduction in red. The PANS page places the 909, 808 and both 303s left or right (C is the
-middle), and the BREAK page has the break's level and pan. The 909 MIX and 808 MIX pages are each
-drum machine's own mixer: every track's level at a glance; the black keys pick a track, and the
-knobs set its LEVEL, PAN, REV and DLY. On MIX, turning ALGORITHM goes to the part's own page: MIX: 909 or
-MIX: 808 for the drum machines, LEVELS for the 303s and the break. As you turn a pan, the part stays at full
-level on that side and fades out of the other.
+reduction in red. It has four pages:
+
+- **PARTS**: press black keys 1-5 to pick the 909, 808, 303A, 303B or the break; the knobs are
+  its LEVEL, PAN, REV and DLY. As you turn a pan, the part stays at full level on that side and
+  fades out of the other.
+- **909 MIX** and **808 MIX**: each drum machine's own mixer, every track's level at a glance;
+  the black keys pick a track, and the knobs set its LEVEL, PAN, REV and DLY.
+- **MASTER**: four knobs over the whole mix.
+
+On MIX, turning ALGORITHM goes to the part's own page: MIX: 909 or MIX: 808 for the drum
+machines, PARTS (with that part picked) for the 303s and the break.
+
+| MASTER | What it does |
+|---|---|
+| DRIVE | Saturates the whole mix (the 909's drive stage). |
+| COMP | One knob for the compressor: 0 is off; turning up lowers its threshold, raises its ratio and adds makeup gain together. Three quarters is the factory's hard squeeze (4:1 from -24 dB, +16 dB). |
+| PUMP | Lowers the whole mix each time the kick plays, by up to 24 dB, and lets it swell back up: the big-beat breathing. Accented kicks pump harder. It works even with COMP at 0, and even when the kick is muted. |
+| FILTER | One knob: in the middle it's off; to the left a low-pass closes down, to the right a high-pass opens up. |
+
+FILTER and PUMP are also on HOME's PERFORM page, for playing live.
 
 The factory mix is set up for big beat: the break is up front with the 909 kick under it, the
-303s run through RAT distortion into a tape delay, and the clap has reverb. The master
-compressor squeezes hard, at 4:1 from -24 dB with 16 dB of makeup gain into the limiter, and
-each 909 kick makes the whole mix pump by 4 dB. For a clean mix, set RATIO to 1:1 and PUMP
-to 0.
+303s run through RAT distortion into a tape delay, and the clap has reverb. For a clean mix, set
+COMP and PUMP to 0.
 
-| Compressor | Range |
-|---|---|
-| THRESH | -48 to 0 dB |
-| RATIO | 1:1 (off) to 20:1, and INF |
-| ATTACK | 0.1 to 100 ms |
-| RELEASE | 10 to 1500 ms |
-| MAKEUP | 0 to 24 dB |
-| MIX | from dry to fully compressed, for parallel compression |
-
-**PUMP** lowers the level of the whole mix each time the kick plays, by up to 24 dB, and lets
-it swell back up over the compressor's release time. PUMP BY chooses which kick does this:
-the 909's, the 808's, or both. Accented kicks pump harder. PUMP works even with the ratio at
-1:1, and even when the kick is muted.
-
-**FILTER** can be off, low pass, band pass or high pass, with CUTOFF and RESO. **LIMIT**
-prevents clipping; leave it on.
+The details are in SEL's list, under MORE: the compressor's THRESH (-48 to 0 dB), RATIO (1:1 to
+20:1 and INF), ATTACK (0.1 to 100 ms), RELEASE (10 to 1500 ms), MAKEUP (0 to 24 dB) and MIX (dry
+to fully compressed, for parallel compression); PUMP BY (the 909's kick, the 808's, or both); the
+filter's RESO; LIMIT, which prevents clipping (leave it on); and the drive stage's DIST type, its
+GLUE compressor and VOLUME. Turning COMP or FILTER sets their details again.
 
 ---
 
@@ -537,7 +540,6 @@ Press GLO for these settings:
 | LIGHTS | ON: the key lights show the steps, and the unlit buttons glow dimly so they can be read. KEYS: the key lights only. OFF: neither. |
 | KEY SOUND | STOPPED (the default): picking a drum or editing a 303 step is silent while the pattern plays, unless REC is on. ALWAYS: you always hear it. The 303 keyboard always plays either way. |
 | THEME | The screen colour: green, amber, cyan, red or mono. |
-| ACCENT | How loud an unaccented drum hit is compared with an accented one. |
 | MODE | PATTERN, or SONG to play the song. |
 | SAVE PROJECT | Saves everything. |
 | AUTOSAVE | ON (the default): while the pattern is stopped, changes are saved by themselves once nothing has been touched for four seconds. OFF: only SAVE saves. |
@@ -679,6 +681,9 @@ RP2040 board wired to the USB lines) can still reach it.
 Drum settings range from 0 to 127. DIST, the distortion type, can be DIODE, CLIP, SAT, BFZ,
 PDIST, FOLD or CRUSH. PAN goes from L64 through C (the middle) to R63.
 
+Each track's Level, Pan, Rev and Dly are on the mixer (909 MIX, 808 MIX); its Drive and Dist are
+in SEL's list; the rest are its sound pages.
+
 | 909 track | Settings |
 |---|---|
 | BD | Tune, Attack, Decay, Level, Pitch depth, Pitch, Drive, Dist, Pan |
@@ -688,7 +693,7 @@ PDIST, FOLD or CRUSH. PAN goes from L64 through C (the middle) to R63.
 | CP | Level, Tune, Tail, Drive, Dist, Rev, Dly, Pan |
 | CH, OH | Decay, Level, Tune, Drive, Dist, Rev, Dly, Pan |
 | CR, RD | Tune, Level, Decay, Drive, Dist, Rev, Dly, Pan |
-| KIT | Accent, Velocity |
+| KIT | Accent (how much louder accented steps are) |
 
 | 808 track | Settings |
 |---|---|
@@ -699,7 +704,7 @@ PDIST, FOLD or CRUSH. PAN goes from L64 through C (the middle) to R63.
 | CP | Level, Tune, Decay, Attack, Sound, Drive, Dist, Rev, Dly, Pan |
 | CB, CH | Level, Tune, Decay, Drive, Dist, Rev, Dly, Pan |
 | CY, OH | Level, Decay, Tune, Drive, Dist, Rev, Dly, Pan |
-| KIT | Level, Accent, Choke (off, closed cuts open, or both) |
+| KIT | Accent, Choke (off, closed cuts open, or both) |
 
 | 303 setting | Range |
 |---|---|
@@ -725,10 +730,9 @@ PDIST, FOLD or CRUSH. PAN goes from L64 through C (the middle) to R63.
 
 | Effect page | Settings |
 |---|---|
-| REVERB | Decay, Tone, HPF, Level |
-| DELAY | Time (1/32, 1/16T, 1/16, 1/8T, 1/16., 1/8, 1/4T, 1/8., 1/4, 1/2T, 1/4., 1/2, 1/2.), Feedback, Tone, Level |
-| TAPE | Type (DIGI or TAPE), Wear, HPF, Ping (off or on) |
-| KIT DRIVE | Volume, Dist, Drive, Comp |
+| REVERB | Decay, Tone; in the list: low cut, return level |
+| DELAY | Time (1/32, 1/16T, 1/16, 1/8T, 1/16., 1/8, 1/4T, 1/8., 1/4, 1/2T, 1/4., 1/2, 1/2.), Feedback, Tone, Tape (DIGI, then tape and its wear); in the list: low cut, return level, ping-pong |
+| MASTER | Drive, Comp, Pump, Filter; in the list: the compressor's details, pump by, resonance, limiter, the drive's type, glue and volume |
 
 The delay follows the tempo, including an external MIDI clock. A delay longer than two seconds
 (1/2. below 90 BPM, 1/2 below 60) plays at half that length, which still lands on the beat. With

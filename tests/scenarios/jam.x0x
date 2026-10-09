@@ -43,21 +43,22 @@ tapkey w14
 tapkey w15
 turn K3 20
 shot 20_break_amen.png
-# sends: FX opens on SENDS; page 1 = 909 / 808, page 2 = the 303s, page 3 = the break
-tap FX
-turn K1 25
-tap FX
-turn K2 -10
+# sends: MIX's PARTS, a part picked with its black key: knob 3 its reverb, knob 4 its delay
+tap LFO
+tapkey b0
+turn K3 25
+tapkey b2
+turn K4 -10
+tapkey b3
 turn K4 30
 shot 21_sends_303.png
-tap FX
-turn K1 30
+tapkey b4
+turn K3 30
 shot 22_sends_break.png
-# the delay's TAPE page: FX three more times (REVERB, DELAY, TAPE)
+# the delay's TAPE (FX, the DELAY page, knob 4): tape already (the factory's), a touch more worn
 tap FX
 tap FX
-tap FX
-turn K1 1
+turn K4 1
 shot 22b_tape.png
 expect sound5.2.2 70
 expect sound5.4.1 55

@@ -14,6 +14,7 @@
  * converted as it loads: its steps land on steps 1-32, its patterns on 1-16. */
 #include "x0x.h"
 #include "../dsp/drum909.h"            /* DR_SD (the sound's revisions) */
+#include "../dsp/master.h"             /* MST_* (the sound's revisions) */
 #include "lz.c"
 
 project_t proj;
@@ -389,6 +390,19 @@ static void sound_rev1(void)
     }
 }
 
+/* the master's one-knob COMP and FILTER and the delay's TAPE arrived: each set to its nearest to what
+ * the details say (the details themselves stay, and are applied after: the sound is as it was) */
+static void sound_rev2(void)
+{
+    uint8_t *m = proj.sound.v[T_MST][0];
+    int th = m[MST_THRESH], cut = m[MST_CUTOFF];
+    float thr = (float)th * (48.0f / 127.0f) - 48.0f, x = (-thr - 4.0f) / 28.0f;
+    m[MST_COMP1] = (uint8_t)(!m[MST_RATIO] ? 0 : x <= 0.0f ? 1 : x >= 1.0f ? 127 : (int)(x * 127.0f + 0.5f));
+    m[MST_DJF] = (uint8_t)(m[MST_MODE] == 0 ? 64 : m[MST_MODE] == 3 ? 69 + cut * 58 / 120
+                           : (cut < 8 ? 0 : (cut - 8) * 59 / 119));
+    proj.sound.v[T_FX][1][0] = (uint8_t)(proj.sound.v[T_FX][0][FX_DL_TYPE] ? 16 + proj.sound.v[T_FX][0][FX_DL_WEAR] * 111 / 127 : 0);
+}
+
 static void patterns_defaults(void)
 {
     int i;
@@ -438,6 +452,8 @@ int project_load(void)
         proj.arr.song.len = NSONG;
     if (sound_ok && proj.set.snd_rev < 1)             /* saved before the 909 SD's DECAY: its pots move up one */
         sound_rev1();
+    if (sound_ok && proj.set.snd_rev < 2)             /* before the one-knob COMP, FILTER, TAPE */
+        sound_rev2();
     proj.set.snd_rev = PROJ_SND_REV;
     return bad ? -1 : 0;
 }

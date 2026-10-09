@@ -35,6 +35,8 @@ static const x0x_param_t MST_P[MST_NPARAMS] = {
     {"CUTOFF", 127, 127, 0},
     {"RESO", 127, 20, 0},
     {"LIMIT", 1, 1, ONOFF_N},
+    {"COMP", 127, 0, 0},              /* X0X: one knob over THRESH, RATIO, MAKEUP (0 = off) */
+    {"FILTER", 127, 64, 0},           /* X0X: one knob over MODE, CUTOFF (64 = off) */
 };
 
 int master_nparams(void) { return MST_NPARAMS; }
@@ -106,10 +108,48 @@ void master_init(master_t *m)
     m->a1 = 1.0f / (1.0f + m->g * (m->g + m->k));
 }
 
+/* COMP x: the threshold falls (-4 .. -32 dB), the ratio climbs (1.5:1 .. 6:1), makeup follows (0.85 of
+ * the reduction at the threshold, at most 24 dB); 3/4 is the factory's -24 dB, 4:1, +16 dB */
+void master_comp1_pots(int v, uint8_t *thresh, uint8_t *ratio, uint8_t *makeup)
+{
+    static const float R[6] = {1.0f, 1.5f, 2.0f, 3.0f, 4.0f, 6.0f};
+    float x = (float)v * (1.0f / 127.0f), thr = -4.0f - 28.0f * x, mk;
+    int ri = v ? 1 + (int)(x * 4.0f + 0.5f) : 0;
+    mk = ri ? fm_minf(-thr * (1.0f - 1.0f / R[ri]) * 0.85f, 24.0f) : 0.0f;
+    *thresh = (uint8_t)((thr + 48.0f) * (127.0f / 48.0f) + 0.5f);
+    *ratio = (uint8_t)ri;
+    *makeup = (uint8_t)(mk * (127.0f / 24.0f) + 0.5f);
+}
+void master_djf_pots(int v, uint8_t *mode, uint8_t *cutoff)
+{
+    if (v < 60) {                                     /* low-pass: right of 0, the cutoff falls to the left */
+        *mode = 1;
+        *cutoff = (uint8_t)(8 + v * 119 / 59);
+    } else if (v > 68) {                              /* high-pass: the cutoff rises to the right */
+        *mode = 3;
+        *cutoff = (uint8_t)((v - 69) * 120 / 58);
+    } else {
+        *mode = 0;
+        *cutoff = 127;
+    }
+}
+
 void master_set(master_t *m, int i, int v)
 {
     if (i < 0 || i >= MST_NPARAMS)
         return;
+    if (i == MST_COMP1) {                             /* the macros: their pots, then as those */
+        m->pot[i] = (uint8_t)(v < 0 ? 0 : v > 127 ? 127 : v);
+        master_comp1_pots(m->pot[i], &m->pot[MST_THRESH], &m->pot[MST_RATIO], &m->pot[MST_MAKEUP]);
+        comp_coefs(m);
+        return;
+    }
+    if (i == MST_DJF) {
+        m->pot[i] = (uint8_t)(v < 0 ? 0 : v > 127 ? 127 : v);
+        master_djf_pots(m->pot[i], &m->pot[MST_MODE], &m->pot[MST_CUTOFF]);
+        filt_coefs(m);
+        return;
+    }
     m->pot[i] = (uint8_t)(v < 0 ? 0 : v > MST_P[i].max ? MST_P[i].max : v);
     if (i <= MST_PUMPSRC)
         comp_coefs(m);
@@ -385,6 +425,22 @@ void master_format(const master_t *m, int i, char *b)
     case MST_MAKEUP: put_num(b, makeup_db(p), 1, "dB"); return;
     case MST_PUMP: put_num(b, pump_db(p), 1, "dB"); return;
     case MST_MIX: put_num(b, (float)p * (100.0f / 127.0f), 0, "%"); return;
+    case MST_COMP1:
+        if (!p) {
+            b[0] = 'O'; b[1] = 'F'; b[2] = 'F'; b[3] = 0;
+        } else
+            put_num(b, (float)p * (100.0f / 127.0f), 0, "%");
+        return;
+    case MST_DJF: {                                   /* OFF, LP 40, HP 20: how far each way */
+        int a = p < 60 ? (60 - p) * 100 / 60 : p > 68 ? (p - 68) * 100 / 59 : 0;
+        b[0] = a ? (p < 60 ? 'L' : 'H') : 'O';
+        b[1] = a ? 'P' : 'F';
+        b[2] = a ? ' ' : 'F';
+        b[3] = 0;
+        if (a)
+            put_num(b + 3, (float)a, 0, "%");
+        return;
+    }
     case MST_CUTOFF: {
         float fc = 30.0f * fm_exp2f((float)p * (9.23f / 127.0f));
         if (fc >= 1000.0f)

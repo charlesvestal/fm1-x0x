@@ -17,11 +17,11 @@ expect hit0.0.62 1
 tap OCT-
 tapkey w0
 expect hit0.0.32 1
-# LENGTH to 64 (the PATTERN page: BD's two pages, KIT, PATTERN), and it plays to step 64
-tap EDIT
-tap EDIT
-tap EDIT
+# the 909's LENGTH to 64 (HOME's LENGTH page, knob 1), and it plays to step 64
+tap HOME
+turn SELECT 1
 spin K1 48
+tap HOME
 tap PLAY
 wait 7500
 expect playhead0 64

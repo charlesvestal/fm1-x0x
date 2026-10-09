@@ -11,7 +11,6 @@ turn ALGO 4
 expect part 4
 tap EDIT
 tap EDIT
-tap EDIT
 turn K1 2
 expect loop_a 2
 shot 30_loops_uploaded.png

@@ -47,7 +47,7 @@ async function run(load) {
     ex.web_slots_changed();
   }
   turn(1, 4);                                          // ALGORITHM to BREAK
-  tap(4); tap(4); tap(4);                              // EDIT to the LOOPS page
+  tap(4); tap(4);                                      // EDIT to the LOOPS page (GROOVE, RETRIG, LOOPS)
   turn(3, 2);                                          // KNOB 1: loop A two on (the first user loop)
   for (const k of [0, 7, 14, 21]) tapkey(k);           // white keys 1, 5, 9, 13
   tap(10);

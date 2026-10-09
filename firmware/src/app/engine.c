@@ -247,6 +247,8 @@ void engine_sound_defaults(sound_t *s)
     s->v[T_MST][0][MST_ATTACK] = 85;                 /* 10 ms: faster grabbed each kick hard enough to click */
     s->v[T_MST][0][MST_RELEASE] = 58;                /* 100 ms: it breathes with the beat */
     s->v[T_MST][0][MST_PUMP] = 21;                   /* 4 dB of 909-keyed pump */
+    s->v[T_MST][0][MST_COMP1] = 95;                  /* the one-knob COMP's nearest to the squash above */
+    s->v[T_FX][1][0] = (uint8_t)(16 + s->v[T_FX][0][FX_DL_WEAR] * 111 / 127);   /* TAPE (ui.c R_TAPE): on, its wear */
 }
 
 void engine_sound_centre_drum_pans(sound_t *s)
@@ -264,10 +266,13 @@ void engine_sound_centre_drum_pans(sound_t *s)
 void engine_apply_sound(const sound_t *s)
 {
     int t, v, i;
+    engine_set(T_MST, 0, MST_COMP1, s->v[T_MST][0][MST_COMP1]);   /* the macros first: the pots they set */
+    engine_set(T_MST, 0, MST_DJF, s->v[T_MST][0][MST_DJF]);       /* follow as saved (a project's own sound) */
     for (t = 0; t < NTARGETS; t++)
         for (v = 0; v < engine_nvoices(t) && v < NVOICES_MAX; v++)
             for (i = 0; i < engine_nparams(t, v) && i < NPARAMS_MAX; i++)
-                engine_set(t, v, i, s->v[t][v][i]);
+                if (t != T_MST || i < MST_COMP1)
+                    engine_set(t, v, i, s->v[t][v][i]);
 }
 
 void engine_drum(int kit, int voice, float vel)

@@ -1,11 +1,13 @@
-# Stereo: the MIX view's PANS page, and a part's pan on its SENDS page.
+# Stereo: MIX's PARTS page (a part picked with its black key, knob 2 its pan), and a drum track's pan
+# on MIX's 909 MIX page.
 wait 300
 tap LFO
-turn SELECT 1
 wait 100
 shot s01_pans.png
-turn K1 -40
-turn K3 30
+tapkey b0
+turn K2 -40
+tapkey b2
+turn K2 30
 wait 1200
 shot s02_panned.png
 expect sound5.0.3 24
@@ -14,7 +16,7 @@ expect sound5.2.3 94
 tap LFO
 expect part 0
 turn SELECT -9
-turn SELECT 3
+turn SELECT 1
 tapkey b0
 turn K2 -24
 wait 1200

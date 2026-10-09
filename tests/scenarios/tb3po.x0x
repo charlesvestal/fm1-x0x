@@ -17,7 +17,7 @@ expect linechg0 0
 wait 1200
 shot t01_stale.png
 # SCALE: root, scale, octave
-tap ARP
+turn SELECT 1
 turn K1 3
 turn K2 2
 turn K3 1

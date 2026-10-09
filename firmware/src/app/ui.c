@@ -13,6 +13,7 @@
 #include "x0x.h"
 #include "../dsp/fastmath.h"
 #include "../dsp/master.h"
+#include "../dsp/bass303.h"                    /* BASS303_* (the 303's pages) */
 #include "undo.c"
 
 /* ================================================================ model === */
@@ -38,6 +39,7 @@ typedef struct {
     uint8_t page[NVIEWS][NPARTS];
     uint8_t spage;                     /* the 16 steps the white keys show: 0 = 1-16 .. 3 = 49-64 */
     uint8_t pbank;                     /* the 16 patterns HOME's white keys choose: 0 = 1-16, 1 = 17-32 */
+    uint8_t mixsel;                    /* MIX's PARTS: the part the knobs set (black keys 1-5) */
     uint8_t kbd[NBASS];
     int8_t oct;
     uint8_t rec;
@@ -170,7 +172,7 @@ static void say(const char *a, const char *b)
 /* =============================================================== param refs === */
 enum { R_NONE, R_ENG, R_SWING, R_DLEN, R_DRATE, R_BLEN, R_BRATE, R_BDIR, R_BTRANS, R_GEN, R_BRKSET,
        R_BRKSLOT, R_TEMPO, R_ACCENT, R_CLKOUT, R_NOTEOUT, R_PALETTE, R_KEYLED, R_KEYSOUND, R_AUTOSAVE, R_ACT, R_SBAR, R_SPAT, R_SMODE,
-       R_SLEN, R_STALLS, R_HDR };          /* R_HDR: a list's section header (a = its group), never selected */
+       R_SLEN, R_STALLS, R_HDR, R_TAPE };   /* R_TAPE: FX's one-knob TAPE (DIGI .. worn tape) */          /* R_HDR: a list's section header (a = its group), never selected */
 typedef struct { uint8_t kind, a, b, c; } pref_t;
 #define PR(k, a, b, c) ((pref_t){(k), (a), (b), (c)})
 #define NONE PR(R_NONE, 0, 0, 0)
@@ -265,6 +267,10 @@ static const x0x_param_t *pref_desc(pref_t r)
     case R_SMODE: return &SONG_P[5];
     case R_SLEN: return &SONG_P[6];
     case R_STALLS: return &STALLS_P;
+    case R_TAPE: {
+        static const x0x_param_t d = {"TAPE", 127, 72, 0};
+        return &d;
+    }
     default: return 0;
     }
 }
@@ -275,12 +281,12 @@ static int pref_get(pref_t r)
     switch (r.kind) {
     case R_ENG: return proj.sound.v[r.a][r.b][r.c];
     case R_SWING: return pat_of(PART_909)->swing;
-    case R_DLEN: return p->drum[r.a].len - 1;
-    case R_DRATE: return p->drum[r.a].rate;
-    case R_BLEN: return p->bass[r.a].len - 1;
-    case R_BRATE: return p->bass[r.a].rate;
-    case R_BDIR: return p->bass[r.a].dir;
-    case R_BTRANS: return p->bass[r.a].transpose;
+    case R_DLEN: return pat_of(r.a)->drum[r.a].len - 1;
+    case R_DRATE: return pat_of(r.a)->drum[r.a].rate;
+    case R_BLEN: return pat_of(NKIT + r.a)->bass[r.a].len - 1;
+    case R_BRATE: return pat_of(NKIT + r.a)->bass[r.a].rate;
+    case R_BDIR: return pat_of(NKIT + r.a)->bass[r.a].dir;
+    case R_BTRANS: return pat_of(NKIT + r.a)->bass[r.a].transpose;
     case R_GEN: {
         const tb3po_cfg_t *g = &p->bass[r.a].gen;
         switch (r.c) {
@@ -313,6 +319,7 @@ static int pref_get(pref_t r)
     case R_SMODE: return seq.song_on;
     case R_SLEN: return song()->len;
     case R_STALLS: return perf.stalls_on;
+    case R_TAPE: return proj.sound.v[T_FX][1][0];       /* (kept in an engine slot nothing reads) */
     default: return 0;
     }
 }
@@ -329,14 +336,19 @@ static void pref_set(pref_t r, int v)
     case R_ENG:
         proj.sound.v[r.a][r.b][r.c] = (uint8_t)v;
         engine_set(r.a, r.b, r.c, v);
+        if (r.a == T_MST && r.c == MST_COMP1)          /* the macros: the details they set, for the list */
+            master_comp1_pots(v, &proj.sound.v[T_MST][0][MST_THRESH], &proj.sound.v[T_MST][0][MST_RATIO],
+                              &proj.sound.v[T_MST][0][MST_MAKEUP]);
+        else if (r.a == T_MST && r.c == MST_DJF)
+            master_djf_pots(v, &proj.sound.v[T_MST][0][MST_MODE], &proj.sound.v[T_MST][0][MST_CUTOFF]);
         break;
     case R_SWING: pat_of(PART_909)->swing = (uint8_t)v; break;
-    case R_DLEN: p->drum[r.a].len = (uint8_t)(v + 1); break;
-    case R_DRATE: p->drum[r.a].rate = (uint8_t)v; break;
-    case R_BLEN: p->bass[r.a].len = (uint8_t)(v + 1); break;
-    case R_BRATE: p->bass[r.a].rate = (uint8_t)v; break;
-    case R_BDIR: p->bass[r.a].dir = (uint8_t)v; break;
-    case R_BTRANS: p->bass[r.a].transpose = (uint8_t)v; break;
+    case R_DLEN: pat_of(r.a)->drum[r.a].len = (uint8_t)(v + 1); break;
+    case R_DRATE: pat_of(r.a)->drum[r.a].rate = (uint8_t)v; break;
+    case R_BLEN: pat_of(NKIT + r.a)->bass[r.a].len = (uint8_t)(v + 1); break;
+    case R_BRATE: pat_of(NKIT + r.a)->bass[r.a].rate = (uint8_t)v; break;
+    case R_BDIR: pat_of(NKIT + r.a)->bass[r.a].dir = (uint8_t)v; break;
+    case R_BTRANS: pat_of(NKIT + r.a)->bass[r.a].transpose = (uint8_t)v; break;
     case R_GEN: {
         tb3po_cfg_t *g = &p->bass[r.a].gen;
         switch (r.c) {
@@ -376,6 +388,15 @@ static void pref_set(pref_t r, int v)
         song()->bar[ui.song_sel].pat[r.a] = (uint8_t)v;
         break;
     case R_SMODE: seq.song_on = (uint8_t)v; break;
+    case R_TAPE: {                                    /* 0..15 the clean digital delay; above, tape, wearing */
+        uint8_t ty = (uint8_t)(v >= 16), we = (uint8_t)(ty ? (v - 16) * 127 / 111 : proj.sound.v[T_FX][0][FX_DL_WEAR]);
+        proj.sound.v[T_FX][1][0] = (uint8_t)v;
+        proj.sound.v[T_FX][0][FX_DL_TYPE] = ty;
+        proj.sound.v[T_FX][0][FX_DL_WEAR] = we;
+        engine_set(T_FX, 0, FX_DL_TYPE, ty);
+        engine_set(T_FX, 0, FX_DL_WEAR, we);
+        break;
+    }
     case R_STALLS:
         perf.stalls_on = (uint8_t)v;
         plat_stalls_enable(v);
@@ -391,6 +412,19 @@ static void pref_set(pref_t r, int v)
         break;
     default: break;
     }
+}
+
+/* a name in capitals (the engines' own are mixed case): two at a time */
+static const char *caps_of(const char *n)
+{
+    static char t[2][24];
+    static int w;
+    char *q = t[w ^= 1];
+    int i;
+    for (i = 0; n[i] && i < 23; i++)
+        q[i] = n[i] >= 'a' && n[i] <= 'z' ? (char)(n[i] - 32) : n[i];
+    q[i] = 0;
+    return q;
 }
 
 /* the value belongs to the pattern (it changes when the pattern does), not to the sound */
@@ -413,9 +447,40 @@ static const char *pref_name(pref_t r)
                                                          {"303 A", "A REV", "A DLY", "A PAN"},
                                                          {"303 B", "B REV", "B DLY", "B PAN"},
                                                          {"BREAK", "BRK RV", "BRK DL", "BRK PAN"}};
+    static const char *const PATN[6][2] = {{"909 LEN", "808 LEN"}, {"909 RATE", "808 RATE"}, {"A LEN", "B LEN"},
+                                           {"A RATE", "B RATE"}, {"A DIR", "B DIR"}, {"A TRANSP", "B TRANSP"}};
+    static const char *const CHN[MX_NPARAMS] = {"LEVEL", "REV", "DLY", "PAN"};
     const x0x_param_t *d = pref_desc(r);
+    if (r.kind >= R_DLEN && r.kind <= R_BTRANS)       /* HOME: whose */
+        return PATN[r.kind - R_DLEN][r.a & 1];
+    if (r.kind == R_ENG && r.a == T_MIX && ui.view == V_MIX && r.c < MX_NPARAMS)
+        return CHN[r.c];                               /* MIX's PARTS: the picked part's */
+    if (r.kind == R_ENG && (r.a == T_909 || r.a == T_808) && r.b == NDRUM)
+        return r.c == 1 ? "ACCENT" : "CHOKE";          /* the kits' depth of accents; the 808's choke */
     if (r.kind == R_ENG && r.a == T_MIX && r.b < NPARTS && r.c < MX_NPARAMS)
         return MIXN[r.b][r.c];
+    if (r.kind == R_ENG && r.a == T_FX) {               /* the page says which effect: the knob, what */
+        switch (r.c) {
+        case FX_RV_DECAY: return "DECAY";
+        case FX_RV_TONE: case FX_DL_TONE: return "TONE";
+        case FX_DL_TIME: return "TIME";
+        case FX_DL_FDBK: return "FEEDBACK";
+        case FX_RV_HPF: return "REV LOW CUT";
+        case FX_DL_HPF: return "DLY LOW CUT";
+        case FX_RV_LEVEL: return "REV RETURN";
+        case FX_DL_LEVEL: return "DLY RETURN";
+        case FX_DL_PING: return "PING-PONG";
+        case FX_COMP: return "GLUE";
+        default: break;
+        }
+    }
+    if (r.kind == R_BRKSET && r.c == BRK_BCHANCE)
+        return "B CHANCE";
+    if (r.kind == R_ENG && (r.a == T_909 || r.a == T_808) && r.b < NDRUM && ui.view == V_MIX && ui.overlay == O_LIST) {
+        static char t[24];                             /* MIX's list: whose track ("909 BD LEVEL") */
+        put_s(put_s(put_s(put_s(t, r.a == T_909 ? "909 " : "808 "), engine_voice_name(r.a, r.b)), " "), d ? d->name : "");
+        return t;
+    }
     if (r.kind == R_BRKSLOT)
         return r.a ? "LOOP B" : "LOOP A";
     return d ? d->name : "";
@@ -443,6 +508,15 @@ static void pref_value_of(pref_t r, int v, char *num, char *unit)
         return;
     if (d->names) {
         put_s(num, d->names[v]);
+        return;
+    }
+    if (r.kind == R_TAPE) {
+        if (v < 16)
+            put_s(num, "DIGI");
+        else {
+            put_i(num, (v - 16) * 100 / 111);
+            put_s(unit, "%");
+        }
         return;
     }
     if (is_pan(r)) {                                     /* L64 .. C .. R63 */
@@ -531,10 +605,23 @@ static void pref_value(pref_t r, char *num, char *unit) { pref_value_of(r, pref_
 /* ===================================================================== pages === */
 #define MAXPAGES 14
 /* page groups: whose values a page holds (the SEL list's headers, the header's colour) */
-enum { GR_NONE, GR_TRACK, GR_TMIX, GR_KIT, GR_PAT, GR_SOUND };
-typedef struct { pref_t r[MAXPAGES][4]; char title[MAXPAGES][12]; uint8_t group[MAXPAGES]; int n; } pages_t;
+enum { GR_NONE, GR_TRACK, GR_TMIX, GR_KIT, GR_PAT, GR_SOUND, GR_MORE };
+#define MAXMORE 14
+typedef struct {
+    pref_t r[MAXPAGES][4];
+    char title[MAXPAGES][12];
+    uint8_t group[MAXPAGES];
+    int n;
+    pref_t more[MAXMORE];              /* the screen's other knobs: only in SEL's list, under MORE */
+    int nmore;
+} pages_t;
 static pages_t pg;
 static uint8_t pg_grp;                 /* the group pages added now belong to */
+static void more(pref_t r)
+{
+    if (r.kind != R_NONE && pg.nmore < MAXMORE)
+        pg.more[pg.nmore++] = r;
+}
 
 static void title(int i, const char *s)
 {
@@ -592,110 +679,117 @@ static pref_t find_ref(int t, int v, const char *n)
     return NONE;
 }
 
-/* a drum track: its sound pages, DRIVE and DIST always knobs 3 and 4 of the last one (its level, pan
- * and sends: MIX's 909 MIX / 808 MIX page) */
+/* a drum track: its sound, four knobs a page (its DRIVE and DIST: SEL's list; its level, pan and sends:
+ * MIX's 909 MIX / 808 MIX page) */
 static void add_track_pages(int t, int v)
 {
     const char *nm = engine_voice_name(t, v);
     pref_t snd[NPARAMS_MAX];
-    int n = 0, i, k;
-    char mt[12];
+    int n = 0, i;
     for (i = 0; i < engine_nparams(t, v) && n < NPARAMS_MAX; i++) {
         const x0x_param_t *d = engine_param(t, v, i);
-        if (!name_is(d, "Level") && !name_is(d, "Pan") && !name_is(d, "Rev") && !name_is(d, "Dly") &&
-            !name_is(d, "Drive") && !name_is(d, "Dist"))
+        if (name_is(d, "Drive") || name_is(d, "Dist"))
+            more(PR(R_ENG, t, v, i));
+        else if (!name_is(d, "Level") && !name_is(d, "Pan") && !name_is(d, "Rev") && !name_is(d, "Dly"))
             snd[n++] = PR(R_ENG, t, v, i);
     }
     pg_grp = GR_TRACK;
-    for (i = 0; n - i > 2; i += 4)
+    for (i = 0; i < n; i += 4)
         add_page(nm, snd[i], i + 1 < n ? snd[i + 1] : NONE, i + 2 < n ? snd[i + 2] : NONE, i + 3 < n ? snd[i + 3] : NONE);
-    k = i < n ? n - i : 0;
-    put_s(put_s(mt, nm), " DRIVE");                    /* a page of only the drive says so */
-    add_page(k ? nm : mt, k > 0 ? snd[i] : NONE, k > 1 ? snd[i + 1] : NONE, find_ref(t, v, "Drive"), find_ref(t, v, "Dist"));
 }
 
 static void build_pages(void)
 {
-    int p = ui.part;
-    pg.n = 0;
+    int p = ui.part, b = bidx();
+    pg.n = pg.nmore = 0;
     pg_grp = GR_NONE;
     switch (ui.view) {
-    case V_HOME:
+    case V_HOME:                                       /* the pattern: how the parts run through it */
     case V_GLO:
-        add_page("PERFORM", PR(R_TEMPO, 0, 0, 0), PR(R_SWING, 0, 0, 0), PR(R_ENG, T_MST, 0, MST_PUMP),
-                 PR(R_ENG, T_MST, 0, MST_CUTOFF));
-        break;                                      /* (levels, pans and the master's filter: MIX) */
-    case V_PART:
+        add_page("PERFORM", PR(R_TEMPO, 0, 0, 0), PR(R_SWING, 0, 0, 0), PR(R_ENG, T_MST, 0, MST_DJF),
+                 PR(R_ENG, T_MST, 0, MST_PUMP));
+        add_page("LENGTH", PR(R_DLEN, 0, 0, 0), PR(R_DLEN, 1, 0, 0), PR(R_BLEN, 0, 0, 0), PR(R_BLEN, 1, 0, 0));
+        more(PR(R_DRATE, 0, 0, 0));
+        more(PR(R_DRATE, 1, 0, 0));
+        more(PR(R_BRATE, 0, 0, 0));
+        more(PR(R_BRATE, 1, 0, 0));
+        more(PR(R_BDIR, 0, 0, 0));
+        more(PR(R_BTRANS, 0, 0, 0));
+        more(PR(R_BDIR, 1, 0, 0));
+        more(PR(R_BTRANS, 1, 0, 0));
+        break;
+    case V_PART:                                       /* the part's sound */
         if (is_drum()) {
-            int t = p == PART_909 ? T_909 : T_808, k = p;
-            add_track_pages(t, ui.sel[k]);
+            int t = p == PART_909 ? T_909 : T_808;
+            add_track_pages(t, ui.sel[p]);
             pg_grp = GR_KIT;
-            add_eng_pages(t, NDRUM, 0, 99, "KIT");
-            pg_grp = GR_PAT;
-            add_page("PATTERN", PR(R_DLEN, k, 0, 0), PR(R_DRATE, k, 0, 0), PR(R_SWING, 0, 0, 0), NONE);
+            if (p == PART_909)                         /* (the kit's gain: the mixer's level does it) */
+                add_page("KIT", PR(R_ENG, T_909, NDRUM, 1), NONE, NONE, NONE);
+            else
+                add_page("KIT", PR(R_ENG, T_808, NDRUM, 1), PR(R_ENG, T_808, NDRUM, 2), NONE, NONE);
         } else if (is_303()) {
-            int b = bidx();
             pg_grp = GR_SOUND;
-            add_eng_pages(T_303, b, 0, 4, "FILTER");
-            add_eng_pages(T_303, b, 4, 8, "VOICE");
-            add_eng_pages(T_303, b, 8, 12, "DRIVE");
-            pg_grp = GR_PAT;
-            add_page("LINE", PR(R_BLEN, b, 0, 0), PR(R_BRATE, b, 0, 0), PR(R_BDIR, b, 0, 0), PR(R_BTRANS, b, 0, 0));
+            add_page("TONE", PR(R_ENG, T_303, b, BASS303_CUTOFF), PR(R_ENG, T_303, b, BASS303_RESO),
+                     PR(R_ENG, T_303, b, BASS303_ENVMOD), PR(R_ENG, T_303, b, BASS303_DECAY));
+            add_page("VOICE", PR(R_ENG, T_303, b, BASS303_ACCENT), PR(R_ENG, T_303, b, BASS303_WAVE),
+                     PR(R_ENG, T_303, b, BASS303_DRIVE), PR(R_ENG, T_303, b, BASS303_SLIDE));
+            more(PR(R_ENG, T_303, b, BASS303_TUNE));
+            more(PR(R_ENG, T_303, b, BASS303_VOLUME));
+            more(PR(R_ENG, T_303, b, BASS303_DRVTYPE));
+            more(PR(R_ENG, T_303, b, BASS303_ACCDEC));
         } else {
             pg_grp = GR_PAT;
             add_page("GROOVE", PR(R_BRKSET, 0, 0, BRK_COMPLEX), PR(R_BRKSET, 0, 0, BRK_ANCHOR),
                      PR(R_BRKSET, 0, 0, BRK_ROLL), PR(R_BRKSET, 0, 0, BRK_FILL));
             add_page("RETRIG", PR(R_BRKSET, 0, 0, BRK_R2), PR(R_BRKSET, 0, 0, BRK_R3), PR(R_BRKSET, 0, 0, BRK_R4),
                      PR(R_BRKSET, 0, 0, BRK_R8));
-            add_page("PHRASE", PR(R_BRKSET, 0, 0, BRK_PHRASE), PR(R_BRKSET, 0, 0, BRK_BCHANCE),
-                     PR(R_BRKSET, 0, 0, BRK_ALEN), PR(R_BRKSET, 0, 0, BRK_BLEN));
-            add_page("LOOPS", PR(R_BRKSLOT, 0, 0, 0), PR(R_BRKSLOT, 1, 0, 0), NONE, NONE);
-            pg_grp = GR_SOUND;
-            add_page("SOUND", PR(R_ENG, T_BRK, 0, 0), PR(R_ENG, T_BRK, 0, 1), NONE, NONE);
+            add_page("LOOPS", PR(R_BRKSLOT, 0, 0, 0), PR(R_BRKSLOT, 1, 0, 0), PR(R_BRKSET, 0, 0, BRK_BCHANCE),
+                     PR(R_ENG, T_BRK, 0, 1));
+            more(PR(R_BRKSET, 0, 0, BRK_PHRASE));
+            more(PR(R_BRKSET, 0, 0, BRK_ALEN));
+            more(PR(R_BRKSET, 0, 0, BRK_BLEN));
+            more(PR(R_ENG, T_BRK, 0, 0));
         }
         break;
-    case V_GEN: {
-        int b = bidx();
+    case V_GEN:
         pg_grp = GR_PAT;
         add_page("GENERATE", PR(R_GEN, b, 0, G_DENS), PR(R_GEN, b, 0, G_ACC), PR(R_GEN, b, 0, G_SLIDE),
                  PR(R_GEN, b, 0, G_OCTS));
         add_page("SCALE", PR(R_GEN, b, 0, G_ROOT), PR(R_GEN, b, 0, G_SCALE), PR(R_GEN, b, 0, G_BASE),
                  PR(R_GEN, b, 0, G_MUT));
-        add_page("LINE", PR(R_BLEN, b, 0, 0), PR(R_BRATE, b, 0, 0), PR(R_BDIR, b, 0, 0), PR(R_BTRANS, b, 0, 0));
         break;
-    }
-    case V_FX:
-        add_page("SENDS", PR(R_ENG, T_MIX, PART_909, 1), PR(R_ENG, T_MIX, PART_909, 2), PR(R_ENG, T_MIX, PART_808, 1),
-                 PR(R_ENG, T_MIX, PART_808, 2));
-        add_page("SENDS", PR(R_ENG, T_MIX, PART_303A, 1), PR(R_ENG, T_MIX, PART_303A, 2),
-                 PR(R_ENG, T_MIX, PART_303B, 1), PR(R_ENG, T_MIX, PART_303B, 2));
-        add_page("SENDS", PR(R_ENG, T_MIX, PART_BRK, 1), PR(R_ENG, T_MIX, PART_BRK, 2), NONE, NONE);
-        add_page("REVERB", PR(R_ENG, T_FX, 0, FX_RV_DECAY), PR(R_ENG, T_FX, 0, FX_RV_TONE),
-                 PR(R_ENG, T_FX, 0, FX_RV_HPF), PR(R_ENG, T_FX, 0, FX_RV_LEVEL));
+    case V_FX:                                         /* (each part's sends: MIX's PARTS) */
+        add_page("REVERB", PR(R_ENG, T_FX, 0, FX_RV_DECAY), PR(R_ENG, T_FX, 0, FX_RV_TONE), NONE, NONE);
         add_page("DELAY", PR(R_ENG, T_FX, 0, FX_DL_TIME), PR(R_ENG, T_FX, 0, FX_DL_FDBK),
-                 PR(R_ENG, T_FX, 0, FX_DL_TONE), PR(R_ENG, T_FX, 0, FX_DL_LEVEL));
-        add_page("TAPE", PR(R_ENG, T_FX, 0, FX_DL_TYPE), PR(R_ENG, T_FX, 0, FX_DL_WEAR),
-                 PR(R_ENG, T_FX, 0, FX_DL_HPF), PR(R_ENG, T_FX, 0, FX_DL_PING));
-        add_page("KIT DRIVE", PR(R_ENG, T_FX, 0, FX_VOLUME), PR(R_ENG, T_FX, 0, FX_DIST),
-                 PR(R_ENG, T_FX, 0, FX_DRIVE), PR(R_ENG, T_FX, 0, FX_COMP));
+                 PR(R_ENG, T_FX, 0, FX_DL_TONE), PR(R_TAPE, 0, 0, 0));
+        more(PR(R_ENG, T_FX, 0, FX_RV_HPF));
+        more(PR(R_ENG, T_FX, 0, FX_RV_LEVEL));
+        more(PR(R_ENG, T_FX, 0, FX_DL_HPF));
+        more(PR(R_ENG, T_FX, 0, FX_DL_LEVEL));
+        more(PR(R_ENG, T_FX, 0, FX_DL_PING));
         break;
-    case V_MIX:
-        add_page("LEVELS", PR(R_ENG, T_MIX, PART_909, 0), PR(R_ENG, T_MIX, PART_808, 0), PR(R_ENG, T_MIX, PART_303A, 0),
-                 PR(R_ENG, T_MIX, PART_303B, 0));
-        add_page("PANS", PR(R_ENG, T_MIX, PART_909, MX_PAN), PR(R_ENG, T_MIX, PART_808, MX_PAN),
-                 PR(R_ENG, T_MIX, PART_303A, MX_PAN), PR(R_ENG, T_MIX, PART_303B, MX_PAN));
-        add_page("BREAK", PR(R_ENG, T_MIX, PART_BRK, 0), PR(R_ENG, T_MIX, PART_BRK, MX_PAN), NONE, NONE);
+    case V_MIX:                                        /* a channel picked with a black key, its four knobs */
+        add_page("PARTS", PR(R_ENG, T_MIX, ui.mixsel, MX_LEVEL), PR(R_ENG, T_MIX, ui.mixsel, MX_PAN),
+                 PR(R_ENG, T_MIX, ui.mixsel, MX_REV), PR(R_ENG, T_MIX, ui.mixsel, MX_DLY));
         for (p = 0; p < NKIT; p++) {                    /* each drum machine's tracks: LEVEL, PAN, REV, DLY */
             int t = p ? T_808 : T_909, v = ui.sel[p];
             add_page(p ? "808 MIX" : "909 MIX", find_ref(t, v, "Level"), find_ref(t, v, "Pan"), find_ref(t, v, "Rev"),
                      find_ref(t, v, "Dly"));
         }
-        add_page("COMP", PR(R_ENG, T_MST, 0, MST_THRESH), PR(R_ENG, T_MST, 0, MST_RATIO),
-                 PR(R_ENG, T_MST, 0, MST_ATTACK), PR(R_ENG, T_MST, 0, MST_RELEASE));
-        add_page("COMP", PR(R_ENG, T_MST, 0, MST_MAKEUP), PR(R_ENG, T_MST, 0, MST_MIX), PR(R_ENG, T_MST, 0, MST_PUMP),
-                 PR(R_ENG, T_MST, 0, MST_PUMPSRC));
-        add_page("FILTER", PR(R_ENG, T_MST, 0, MST_MODE), PR(R_ENG, T_MST, 0, MST_CUTOFF),
-                 PR(R_ENG, T_MST, 0, MST_RESO), PR(R_ENG, T_MST, 0, MST_LIMIT));
+        add_page("MASTER", PR(R_ENG, T_FX, 0, FX_DRIVE), PR(R_ENG, T_MST, 0, MST_COMP1), PR(R_ENG, T_MST, 0, MST_PUMP),
+                 PR(R_ENG, T_MST, 0, MST_DJF));
+        more(PR(R_ENG, T_MST, 0, MST_THRESH));
+        more(PR(R_ENG, T_MST, 0, MST_RATIO));
+        more(PR(R_ENG, T_MST, 0, MST_ATTACK));
+        more(PR(R_ENG, T_MST, 0, MST_RELEASE));
+        more(PR(R_ENG, T_MST, 0, MST_MAKEUP));
+        more(PR(R_ENG, T_MST, 0, MST_MIX));
+        more(PR(R_ENG, T_MST, 0, MST_PUMPSRC));
+        more(PR(R_ENG, T_MST, 0, MST_RESO));
+        more(PR(R_ENG, T_MST, 0, MST_LIMIT));
+        more(PR(R_ENG, T_FX, 0, FX_DIST));
+        more(PR(R_ENG, T_FX, 0, FX_COMP));
+        more(PR(R_ENG, T_FX, 0, FX_VOLUME));
         break;
     case V_PERF:
         add_page("PERF", PR(R_STALLS, 0, 0, 0), NONE, NONE, NONE);
@@ -757,6 +851,7 @@ static void hdr_name(int g, char *t)
     case GR_TMIX: put_s(put_s(t, who), ": TRACK MIX"); break;
     case GR_KIT: put_s(put_s(t, PART_N[ui.part]), ": ALL TRACKS"); break;
     case GR_PAT: put_s(put_i(put_s(t, "P"), seq.ppat[ui.part] + 1), ": THE PATTERN"); break;
+    case GR_MORE: put_s(t, "MORE"); break;
     default: put_s(put_s(t, PART_N[ui.part]), ": THE SOUND"); break;
     }
 }
@@ -777,6 +872,10 @@ static void open_list_of_pages(void)
         for (k = 0; k < 4; k++)
             list_add(pg.r[p][k]);
     }
+    if (pg.nmore && ui.list_n < LIST_MAX)              /* the knobs no page has */
+        list_rows[ui.list_n++] = PR(R_HDR, GR_MORE, 0, 0);
+    for (k = 0; k < pg.nmore; k++)
+        list_add(pg.more[k]);
     if (ui.view == V_PERF)
         list_add(PR(R_ACT, ACT_PERF_TEST, 0, 0));
     if (ui.view == V_SONG) {
@@ -800,7 +899,6 @@ static void open_global(void)
     list_add(PR(R_KEYLED, 0, 0, 0));
     list_add(PR(R_KEYSOUND, 0, 0, 0));
     list_add(PR(R_PALETTE, 0, 0, 0));
-    list_add(PR(R_ACCENT, 0, 0, 0));
     list_add(PR(R_SMODE, 0, 0, 0));
     list_add(PR(R_ACT, ACT_SAVE, 0, 0));
     list_add(PR(R_AUTOSAVE, 0, 0, 0));
@@ -1699,6 +1797,13 @@ static void key_event(int k, int down)
         }
         return;
     }
+    if (bl >= 0 && ui.view == V_MIX && cur_page() == 0) {   /* MIX's PARTS: black keys 1-5 pick the part */
+        if (down && bl < NPARTS) {
+            ui.mixsel = (uint8_t)bl;
+            build_pages();
+        }
+        return;
+    }
     if (bl >= 0 && drum_mix_page() >= 0) {            /* MIX, a drum machine's page: black keys pick the track */
         if (down) {
             int km = drum_mix_page();
@@ -1882,10 +1987,7 @@ static void button_tap(int b)
             say("TB-3PO: PICK 303A OR 303B", 0);
             break;
         }
-        if (ui.view != V_GEN)
-            set_view(V_GEN);
-        else
-            ui.page[V_GEN][ui.part] = (uint8_t)((cur_page() + 1) % pg.n);
+        set_view(ui.view == V_GEN ? V_PART : V_GEN);   /* the generator, on and off (SELECT: its pages) */
         break;
     case B_FX:
         if (ui.view == V_FX && ui.overlay == O_NONE)
@@ -2040,8 +2142,10 @@ static void input(void)
                 set_view(V_PART);
             ui.outline_ok = 0;
             build_pages();
-            if (ui.view == V_MIX) {                   /* MIX follows: a drum machine's tracks, else the levels */
+            if (ui.view == V_MIX) {                   /* MIX follows: a drum machine's tracks, else that part on PARTS */
                 int k;
+                ui.mixsel = ui.part;
+                build_pages();
                 for (k = 0; k < pg.n; k++)
                     if (is_drum() ? pg.title[k][0] == PART_N[ui.part][0] && pg.title[k][4] == 'M' : !k)
                         ui.page[V_MIX][ui.part] = (uint8_t)k;
@@ -2864,6 +2968,8 @@ static void draw_mix(int band)
     if (band == 0) {                                   /* channel strips + the master's gain reduction */
         for (p = 0; p < NPARTS; p++) {
             int x = 6 + p * 38, lvl = proj.sound.v[T_MIX][p][0], pk = eng_peak[p] * 64 / 32768;
+            if (cur_page() == 0 && p == ui.mixsel)       /* PARTS: the part the knobs set */
+                box(x - 2, 0, 30, BAND_H, dim(PART_COL[p], 3));
             rbox(x + 10, 4, 6, 64, 3, C_LINE);
             if (pk > 1)
                 rbox(x + 10, 68 - pk, 6, pk, 3, part_muted(p) ? C_DIM : PART_COL[p]);
@@ -3017,13 +3123,15 @@ static void draw_readout(void)
         nm = "TEMPO";
     } else {
         r = pg.r[cur_page()][ui.touched];
-        nm = pref_name(r);
+        nm = caps_of(pref_name(r));
         static char t[24];
         if (track_page()) {                              /* a track's own: "BD  Tune" */
             put_s(put_s(put_s(t, engine_voice_name(ui.part == PART_909 ? T_909 : T_808, ui.sel[ui.part])), "  "), nm);
             nm = t;
         } else if (in_pattern(r)) {                      /* the pattern's: "P3  LENGTH" (it changes with it) */
-            put_s(put_s(put_i(put_s(t, "P"), seq.ppat[r.kind == R_SWING ? PART_909 : part_view() ? ui.part : PART_909] + 1), "  "), nm);
+            int pp = r.kind == R_DLEN || r.kind == R_DRATE ? r.a : r.kind >= R_BLEN && r.kind <= R_BTRANS ? NKIT + r.a
+                     : r.kind == R_SWING ? PART_909 : part_view() ? ui.part : PART_909;
+            put_s(put_s(put_i(put_s(t, "P"), seq.ppat[pp] + 1), "  "), nm);
             nm = t;
         }
     }
@@ -3070,7 +3178,7 @@ static void draw_list(int band)
         d = pref_desc(r);
         if (sel)
             box(0, y + 1, 232, 21, dim(part_col(), 6));
-        cv_text(8, vc(sel ? &FONT_B : &FONT_S, y + 1, 18), sel ? &FONT_B : &FONT_S, pref_name(r), sel ? C_WHITE : C_GRAY);
+        cv_text(8, vc(sel ? &FONT_B : &FONT_S, y + 1, 18), sel ? &FONT_B : &FONT_S, caps_of(pref_name(r)), sel ? C_WHITE : C_GRAY);
         if (r.kind == R_ACT) {                         /* an action: the return arrow */
             uint16_t ac = sel ? C_WHITE : C_DIM;
             cv_rect(212, y + 12, 12, 2, ac);
@@ -3205,6 +3313,9 @@ static uint16_t footer_text(const char **a, const char **b, const char **c)
     } else if (ui.view == V_SONG) {
         *a = "WHITE: THE BAR'S PATTERN";
         *b = "BLACK: MUTE";
+    } else if (ui.view == V_MIX && cur_page() == 0) {
+        *a = "BLACK 1-5: PART";
+        *b = "AGAIN: NEXT PAGE";
     } else if (drum_mix_page() >= 0) {
         *a = "BLACK: TRACK";
         *b = "AGAIN: NEXT PAGE";
@@ -3341,6 +3452,8 @@ static void knob_tag(char *t)
         put_i(put_s(put_s(t, PART_N[ui.part]), " STEP "), ui.held_step + 1);
     else if (dm >= 0)
         put_s(put_s(put_s(t, ti), ": "), engine_voice_name(dm ? T_808 : T_909, ui.sel[dm]));
+    else if (ui.view == V_MIX && cur_page() == 0)
+        put_s(put_s(t, "PARTS: "), PART_N[ui.mixsel]);
     else if (g == GR_PAT)
         put_s(put_s(put_i(put_s(t, "P"), seq.ppat[ui.part] + 1), " "), ti);
     else if (g == GR_KIT || g == GR_SOUND)
@@ -3420,7 +3533,7 @@ static void draw_knobs(void)
             continue;
         if (touched)
             box(i * 60 + 2, 11, 56, 56, dim(col, 4));
-        text_c(cx, vc(&FONT_XS, 13, 10), &FONT_XS, pref_name(r), touched ? C_WHITE : C_GRAY);
+        text_c(cx, vc(&FONT_XS, 13, 10), &FONT_XS, caps_of(pref_name(r)), touched ? C_WHITE : C_GRAY);
         val = pref_get(r);
         if (has_motion(r)) {                           /* recorded motion: a mark, and what it plays now */
             int mv = motion_now(r);
@@ -3428,14 +3541,13 @@ static void draw_knobs(void)
             if (mv >= 0)
                 val = mv;
         }
-        if (d->names) {                                /* a switch: its positions as pips */
+        if (d->names && d->max < 12) {                 /* a switch: its positions as pips (more: a ring) */
             int n = d->max + 1, k, pw = n > 6 ? 3 : 6, gap = 2, w0 = n * (pw + gap) - gap;
-            if (n <= 12)
-                for (k = 0; k < n; k++)
-                    box(cx - w0 / 2 + k * (pw + gap), 33, pw, 9, k == val ? col : C_LINE);
+            for (k = 0; k < n; k++)
+                box(cx - w0 / 2 + k * (pw + gap), 33, pw, 9, k == val ? col : C_LINE);
         } else {
             arc(cx, 38, 12, d->max ? (float)val / (float)d->max : 0.0f, C_LINE, col,
-                r.kind == R_BTRANS || is_pan(r));                                              /* from the middle */
+                r.kind == R_BTRANS || is_pan(r) || (r.kind == R_ENG && r.a == T_MST && r.c == MST_DJF));   /* from the middle */
         }
         pref_value_of(r, val, num, unit);
         cell_value(cx, vc(&FONT_B, 53, 13), num, unit, touched ? C_WHITE : C_HI);

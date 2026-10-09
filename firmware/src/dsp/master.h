@@ -9,6 +9,7 @@ enum {
     MST_THRESH, MST_RATIO, MST_ATTACK, MST_RELEASE,     /* page COMP */
     MST_MAKEUP, MST_MIX, MST_PUMP, MST_PUMPSRC,         /* page COMP 2 */
     MST_MODE, MST_CUTOFF, MST_RESO, MST_LIMIT,          /* page FILTER (+ the limiter switch) */
+    MST_COMP1, MST_DJF,                                 /* X0X: one-knob COMP and FILTER (set the pots above) */
     MST_NPARAMS
 };
 enum { PUMP_909, PUMP_808, PUMP_BOTH };
@@ -41,6 +42,12 @@ typedef struct {
     float la[MST_LA], la_r[MST_LA];
     int la_pos, hold;
 } master_t;
+
+/* the one-knob macros' pots: COMP 0 = off .. 127 (THRESH, RATIO, MAKEUP); FILTER 64 = off, under it a
+ * low-pass sweeping down, over it a high-pass sweeping up (MODE, CUTOFF). The UI writes the same pots
+ * into its mirror, so the details it lists are what plays */
+void master_comp1_pots(int v, uint8_t *thresh, uint8_t *ratio, uint8_t *makeup);
+void master_djf_pots(int v, uint8_t *mode, uint8_t *cutoff);
 
 void master_init(master_t *m);
 int master_nparams(void);

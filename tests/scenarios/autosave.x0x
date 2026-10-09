@@ -30,10 +30,10 @@ expect store_writes 7
 wait 8000
 expect store_writes 8
 expect hit0.0.12 1
-# GLO > AUTOSAVE OFF (the ninth row): saved once more (the setting itself), then edits wait for SAVE
+# GLO > AUTOSAVE OFF (the eighth row): saved once more (the setting itself), then edits wait for SAVE
 wait 21000
 tap GLO
-turn SELECT 8
+turn SELECT 7
 turn ALGO -1
 tap HOME
 wait 5000
