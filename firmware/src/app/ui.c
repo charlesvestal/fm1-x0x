@@ -2209,7 +2209,7 @@ static const capm_t *caps(const felucca_font_t *f)
     if (i == 6)
         i = 5;
     {
-        uint32_t gi = 'H' - f->first, w = f->bw[gi], bpr = (w + 1u) / 2u, x, y;
+        uint32_t gi = ((uint32_t)'H' <= f->last ? 'H' : '0') - f->first, w = f->bw[gi], bpr = (w + 1u) / 2u, x, y;
         const uint8_t *gd = f->data + f->off[gi];
         int top = -1, bot = 0;
         for (y = 0; y < f->h; y++)
@@ -2535,7 +2535,7 @@ static void draw_drum(int band)
             continue;
         if (sel)
             box(0, y - 1, 24, DROW, col);
-        cv_text(5, vc(&FONT_XS, y - 1, DROW), &FONT_XS, nm, sel ? C_BLACK : muted ? C_LINE : v < NDRUM ? C_GRAY : C_WHITE);
+        cv_text(5, vc(&FONT_XS, y - 1, DROW - 1), &FONT_XS, nm, sel ? C_BLACK : muted ? C_LINE : v < NDRUM ? C_GRAY : C_WHITE);
         for (c = 0; c < 16; c++) {
             int s = step_of(c), x = col_x(c), hit = s < NSTEPS && sm_get(bits, s);
             if (s >= len) {
@@ -2556,7 +2556,9 @@ static void draw_drum(int band)
     }
 }
 
-static int note_y(int n, int lo, int hi) { return 64 - (n - lo) * 58 / (hi - lo); }
+#define ROLL_TOP 4                                 /* the 303's line: from here (both bands) ... */
+#define ROLL_BOT 92                                /* ... to here; then AC, SL and the step's line */
+static int note_y(int n, int lo, int hi) { return ROLL_BOT - (n - lo) * (ROLL_BOT - ROLL_TOP) / (hi - lo); }
 
 /* the note step s sounds: a TIE holds the note of the NOTE it follows (its own is not played) */
 static int held_note_of(const bpart_t *bp, int s)
@@ -2569,10 +2571,12 @@ static int held_note_of(const bpart_t *bp, int s)
 
 static void draw_303(int band, int gen)
 {
-    int b = bidx(), c;
+    int b = bidx(), c, o = band * BAND_H, n;       /* o: drawn in the screen's rows, minus the band's */
     const bpart_t *bp = &cur_pat()->bass[b];
     int ph = seq.playing ? eng_step[TRK_BASS0 + b] : -1, lo = 127, hi = 0;
     uint16_t col = part_col();
+    char t[40], *q = t;
+    (void)gen;
     for (c = 0; c < bp->len && c < NSTEPS; c++)
         if (bstep_gate(&bp->step[c]) != G_REST) {
             if (bp->step[c].note < lo)
@@ -2586,73 +2590,60 @@ static void draw_303(int band, int gen)
     hi += 2;
     if (hi - lo < 14)
         hi = lo + 14;
-    if (band == 0) {                                   /* the line: pitch by height, the root's octaves ruled */
-        int n;
-        for (n = lo; n <= hi; n++)
-            if ((n - bp->gen.root) % 12 == 0) {
-                int y = note_y(n, lo, hi);
-                char t[6];
-                cv_rect(GX, y + 2, 213, 1, C_LINE);
-                put_note(t, n);
-                cv_text(1, y - 4, &FONT_XS, t, C_DIM);
-            }
-        for (c = 0; c < 16; c++) {
-            int s = step_of(c), x = col_x(c), g;
-            const bstep_t *st = &bp->step[s < NSTEPS ? s : 0];
-            if (s >= bp->len) {
-                cv_rect(x + 5, 64, 2, 2, C_LINE);
-                continue;
-            }
-            g = bstep_gate(st);
-            if (s == ph)
-                cv_rect(x, 0, 12, 70, dim(col, 2));
-            if (g != G_REST) {
-                int hn = held_note_of(bp, s), y = note_y(hn, lo, hi);
-                uint16_t fc = s == ui.held_step ? C_WHITE : (st->flags & BS_ACCENT) ? col : dim(col, 9);
-                box(x, y, 12, 5, fc);
-                if (g == G_TIE && c > 0)                 /* a tie: one brick with the note it holds */
-                    cv_rect(col_x(c - 1) + 6, y, x - col_x(c - 1), 5, fc);
-                if ((st->flags & BS_SLIDE) && c < 15) {
-                    int nx = s + 1 < bp->len ? s + 1 : 0, ny = note_y(bp->step[nx].note, lo, hi);
-                    cv_line(x + 11, y + 2, x + 14, ny + 2, C_WHITE);
-                }
+    for (n = lo; n <= hi; n++)                     /* the line: pitch by height, the root's octaves ruled */
+        if ((n - bp->gen.root) % 12 == 0) {
+            int y = note_y(n, lo, hi) - o;
+            put_note(t, n);
+            cv_rect(GX, y + 2, 213, 1, C_LINE);
+            cv_text(1, y - 4, &FONT_XS, t, C_DIM);
+        }
+    for (c = 0; c < 16; c++) {
+        int s = step_of(c), x = col_x(c), g;
+        const bstep_t *st = &bp->step[s < NSTEPS ? s : 0];
+        if (s >= bp->len) {
+            cv_rect(x + 5, ROLL_BOT + 4 - o, 2, 2, C_LINE);
+            continue;
+        }
+        g = bstep_gate(st);
+        if (s == ph)
+            cv_rect(x, ROLL_TOP - 4 - o, 12, ROLL_BOT - ROLL_TOP + 10, dim(col, 2));
+        if (g != G_REST) {
+            int hn = held_note_of(bp, s), y = note_y(hn, lo, hi) - o;
+            uint16_t fc = s == ui.held_step ? C_WHITE : (st->flags & BS_ACCENT) ? col : dim(col, 9);
+            box(x, y, 12, 5, fc);
+            if (g == G_TIE && c > 0)                 /* a tie: one brick with the note it holds */
+                cv_rect(col_x(c - 1) + 6, y, x - col_x(c - 1), 5, fc);
+            if ((st->flags & BS_SLIDE) && c < 15) {
+                int nx = s + 1 < bp->len ? s + 1 : 0, ny = note_y(bp->step[nx].note, lo, hi) - o;
+                cv_line(x + 11, y + 2, x + 14, ny + 2, C_WHITE);
             }
         }
-    } else {
-        char t[40], *q = t;
-        for (c = 0; c < 16; c++) {
-            int s = step_of(c), x = col_x(c), g;
-            const bstep_t *st = &bp->step[s < NSTEPS ? s : 0];
-            if (s >= bp->len)
-                continue;
-            g = bstep_gate(st);
-            rbox(x + 1, 2, 10, 4, 2, g && (st->flags & BS_ACCENT) ? C_WHITE : C_LINE);
-            rbox(x + 1, 12, 10, 4, 2, g && (st->flags & BS_SLIDE) ? col : C_LINE);
-        }
-        cv_text(3, vc(&FONT_XS, 0, 8), &FONT_XS, "AC", C_GRAY);
-        cv_text(3, vc(&FONT_XS, 10, 8), &FONT_XS, "SL", C_GRAY);
-        if (ui.held_step >= 0 || (ui.kbd[b] && ui.rec)) {
-            int s = ui.held_step >= 0 ? ui.held_step : ui.wpos[b];
-            const bstep_t *st = &bp->step[s];
-            q = put_s(q, ui.held_step >= 0 ? "STEP " : "WRITE ");
-            q = put_i(q, s + 1);
-            q = put_s(q, "  ");
-            q = put_note(q, held_note_of(bp, s) + bp->transpose - 24);
-            if (bstep_gate(st) == G_TIE)
-                q = put_s(q, " TIE");
-            if (st->flags & BS_ACCENT)
-                q = put_s(q, " ACC");
-            if (st->flags & BS_SLIDE)
-                put_s(q, " SLIDE");
-            cv_text(4, 26, &FONT_B, t, C_WHITE);
-        } else {
-            char t2[16];
-            q = put_s(q, ROOT_N[bp->gen.root % 12]);
-            q = put_s(q, " ");
-            put_s(q, TB3PO_SCALE_NAMES[bp->gen.scale % TB3PO_NSCALES]);
-            put_hex(put_s(t2, "SEED "), bp->gen.seed & 0xFFFFu, 4);
-            segs(4, 26, &FONT_S, C_GRAY, 18, t, t2, 0, 0);
-        }
+        rbox(x + 1, 101 - o, 10, 4, 2, g && (st->flags & BS_ACCENT) ? C_WHITE : C_LINE);   /* its accent, its slide */
+        rbox(x + 1, 113 - o, 10, 4, 2, g && (st->flags & BS_SLIDE) ? col : C_LINE);
+    }
+    cv_text(3, vc(&FONT_XS, 99, 8) - o, &FONT_XS, "AC", C_GRAY);
+    cv_text(3, vc(&FONT_XS, 111, 8) - o, &FONT_XS, "SL", C_GRAY);
+    if (ui.held_step >= 0 || (ui.kbd[b] && ui.rec)) {   /* the step held (or being written) */
+        int s = ui.held_step >= 0 ? ui.held_step : ui.wpos[b];
+        const bstep_t *st = &bp->step[s];
+        q = put_s(q, ui.held_step >= 0 ? "STEP " : "WRITE ");
+        q = put_i(q, s + 1);
+        q = put_s(q, "  ");
+        q = put_note(q, held_note_of(bp, s) + bp->transpose - 24);
+        if (bstep_gate(st) == G_TIE)
+            q = put_s(q, " TIE");
+        if (st->flags & BS_ACCENT)
+            q = put_s(q, " ACC");
+        if (st->flags & BS_SLIDE)
+            put_s(q, " SLIDE");
+        cv_text(4, vc(&FONT_B, 122, 16) - o, &FONT_B, t, C_WHITE);
+    } else {                                           /* else the line's scale and seed */
+        char t2[16];
+        q = put_s(q, ROOT_N[bp->gen.root % 12]);
+        q = put_s(q, " ");
+        put_s(q, TB3PO_SCALE_NAMES[bp->gen.scale % TB3PO_NSCALES]);
+        put_hex(put_s(t2, "SEED "), bp->gen.seed & 0xFFFFu, 4);
+        segs(4, vc(&FONT_S, 122, 16) - o, &FONT_S, C_GRAY, 18, t, t2, 0, 0);
     }
 }
 
@@ -2845,25 +2836,21 @@ static void draw_fx(int band)
 /* MIX, a drum machine's page: its eleven tracks' levels (and pans), the selected one lit */
 static void draw_drum_mix(int band, int k)
 {
-    int t = k ? T_808 : T_909, v;
+    int t = k ? T_808 : T_909, v, o = band * BAND_H;
     uint16_t col = PART_COL[k];
     for (v = 0; v < NDRUM; v++) {
         int x = 4 + v * 21, sel = v == ui.sel[k];
         pref_t lv = find_ref(t, v, "Level"), pn = find_ref(t, v, "Pan");
         int l = lv.kind ? proj.sound.v[t][v][lv.c] : 0, pa = pn.kind ? proj.sound.v[t][v][pn.c] : 64;
-        int muted = (seq.mute | seq.vmute) & (1u << (k * NDRUM + v));
-        if (band == 0) {
-            if (sel)
-                box(x, 0, 19, 72, dim(col, 3));
-            rbox(x + 7, 4, 5, 62, 2, C_LINE);
-            rbox(x + 7, 66 - l * 62 / 127, 5, l * 62 / 127, 2, muted ? C_DIM : sel ? col : dim(col, 9));
-        } else {
-            if (sel)
-                box(x, 0, 19, 30, dim(col, 3));
-            text_c(x + 10, vc(&FONT_XS, 1, 12), &FONT_XS, engine_voice_name(t, v), sel ? C_WHITE : muted ? C_LINE : C_GRAY);
-            rbox(x + 3, 20, 13, 3, 1, C_LINE);                  /* the pan, a mark from the middle */
-            rbox(x + 3 + (pa * 10) / 127, 18, 3, 7, 1, sel ? C_WHITE : C_GRAY);
-        }
+        int muted = (seq.mute | seq.vmute) & (1u << (k * NDRUM + v)), fh = 96, f = l * fh / 127;
+        if (sel)
+            box(x, 0 - o, 19, 134, dim(col, 3));
+        rbox(x + 7, 4 - o, 5, fh, 2, C_LINE);
+        if (f)
+            rbox(x + 7, 4 + fh - f - o, 5, f, 2, muted ? C_DIM : sel ? col : dim(col, 9));
+        text_c(x + 10, vc(&FONT_XS, 104, 12) - o, &FONT_XS, engine_voice_name(t, v), sel ? C_WHITE : muted ? C_LINE : C_GRAY);
+        rbox(x + 3, 123 - o, 13, 3, 1, C_LINE);          /* the pan, a mark from the middle */
+        rbox(x + 3 + (pa * 10) / 127, 121 - o, 3, 7, 1, sel ? C_WHITE : C_GRAY);
     }
 }
 
