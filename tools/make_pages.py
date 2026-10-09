@@ -6,6 +6,8 @@
   emu/                        X0X in the browser (web/emu: build/emu, from web/emu/build.sh)
   install/index.html          the web installer (web/x0x_installer.html, with fm1pkg.js, fm1ota.js
                               and the package's metadata inlined; Chrome or Edge, Web MIDI)
+  breaks/index.html           your own break loops onto the FM-1 (web/x0x_breaks.html with
+                              x0x_breaks.js inlined; Chrome or Edge, Web MIDI)
   manual/index.html, img/     the manual (tools/manual_html.py, from docs/MANUAL.md)
   firmware/x0x-VERSION.fwsc   the package the installer writes; also the download
 
@@ -76,6 +78,7 @@ does, and the installer can put M-VAVE's own firmware back. Installing is at you
   <a href="emu/"><strong>Try it in the browser</strong><span>The same code the FM-1 runs, with sound. Mouse, touch or keyboard; no FM-1 needed.</span></a>
   <a href="install/"><strong>Install</strong><span>From Chrome or Edge, with the FM-1 connected by USB. Nothing to install on the computer.</span></a>
   <a href="manual/"><strong>Manual</strong><span>Getting started in ten steps, then everything else.</span></a>
+  <a href="breaks/"><strong>Your own breaks</strong><span>Drop in loops and send them to the BREAK part, from Chrome or Edge.</span></a>
   <a href="firmware/__PKG__"><strong>Download __PKG__</strong><span>For the command-line installer: <code>python3 tools/fm1_install.py __PKG__</code></span></a>
   <a href="__REPO__"><strong>Source</strong><span>GitHub, GPL-3.0. Built on Felucca by Hügelton Instruments.</span></a>
 </nav>
@@ -98,7 +101,7 @@ def main(pkg, version, out):
     name = f"x0x-{re.sub(r'[^A-Za-z0-9.-]', '-', version)}.fwsc"
     if out.exists():
         shutil.rmtree(out)
-    for d in ("install", "manual", "firmware"):
+    for d in ("install", "manual", "firmware", "breaks"):
         (out / d).mkdir(parents=True)
     shutil.copy(pkg, out / "firmware" / name)
     # the installer
@@ -110,6 +113,12 @@ def main(pkg, version, out):
         if page.count(mark) != 1:
             raise SystemExit(f"x0x_installer.html must contain {mark} once")
     (out / "install" / "index.html").write_text(page.replace("/*LIB*/", lib).replace("/*META*/", meta), encoding="utf-8")
+    # the break loop uploader
+    page = (SRC / "web" / "x0x_breaks.html").read_text(encoding="utf-8")
+    if page.count("/*LIB*/") != 1:
+        raise SystemExit("x0x_breaks.html must contain /*LIB*/ once")
+    lib = strip_module((SRC / "web" / "x0x_breaks.js").read_text(encoding="utf-8"))
+    (out / "breaks" / "index.html").write_text(page.replace("/*LIB*/", lib), encoding="utf-8")
     # the manual (a complete page; its images beside it)
     subprocess.run([sys.executable, str(SRC / "tools" / "manual_html.py"), str(SRC / "docs" / "MANUAL.md"),
                     str(out / "manual" / "index.html")], check=True, capture_output=True)
