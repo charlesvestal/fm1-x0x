@@ -112,11 +112,16 @@ int plat_cpu2_set(int on)
         fm1_cpu1_hold();
         return 0;
     }
-    fm1_guard_unlock_top();                         /* its entry word is in the protected top of RAM */
-    fm1_guard_pc_open();                            /* it starts in the chip's ROM */
-    rc = fm1_cpu1_start();
-    fm1_guard_enable(FM1_GUARD_PC);
-    fm1_guard_lock_top();
+    {
+        int locked = fm1_guard_top_locked();            /* at boot the top is not locked yet: leave it so */
+        if (locked)
+            fm1_guard_unlock_top();                     /* its entry word is in the protected top of RAM */
+        fm1_guard_pc_open();                            /* it starts in the chip's ROM */
+        rc = fm1_cpu1_start();
+        fm1_guard_enable(FM1_GUARD_PC);
+        if (locked)
+            fm1_guard_lock_top();
+    }
     return rc;
 }
 int plat_cpu2_on(void) { return fm1_c1_on; }

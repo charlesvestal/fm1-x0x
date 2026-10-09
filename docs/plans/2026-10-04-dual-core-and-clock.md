@@ -1,5 +1,27 @@
 # The second core, and the clock
 
+## Done (2026-10-09): what it took on the device
+
+The split below is in (hal/fm1_cpu1.{h,S}, engine.c render_sub): core 1 renders the 909 and the
+808 into the mix while core 0 renders the 303s and the break; the output is bit for bit one core's.
+What the device needed, beyond the SDK sequence (several from Melodee's dual-core audio,
+github.com/keremimo/melodee, GPL-3.0):
+
+- **Start at power-on**, before the audio and the timers. Started later from the main loop, core 1
+  never reached its entry (C1_CON bit 3 did not stay set; no trace).
+- **The PC limits apply to core 1**, and it boots through the chip's ROM: open them while it starts
+  (fm1_guard_pc_open), arm them again after (Melodee: DBG bit 10, c1_pc_limit_err_r).
+- **The SDK's entry**: icfg 0, usp / sp / ssp, then reti / rti into the loop. After rti the core
+  runs on **usp**: give that the real stack. With 256 bytes there the render (284 bytes idle, 828
+  dense) ran past it into X0X's variables: the master volume and the PERF test broke.
+- **The waiting loop in RAM** (.c1_text, inside the PC window): idle, core 1 never fetches from
+  the flash, so a flash write needs no parking. tools/build.py must put .c1_text in the image
+  (it was missing at first: core 1 ran into erased flash, 0xFFFFFFFF).
+- Hold before a reset: C1_CON bit 1 set, then bit 3 cleared.
+
+Measured (PERF TEST, one FM-1): factory loop 43 -> 32 %, all five 83 -> 53 %, worst case 115 -> 82 %
+(peak 100 %). Core 1's stack: 828 of 2816 bytes at the deepest.
+
 Research for using the AC79's second core, from JieLi's AC79 SDK
 ([gitee: Jieli-Tech/fw-AC79_AIoT_SDK](https://gitee.com/Jieli-Tech/fw-AC79_AIoT_SDK), Apache-2.0): its
 headers, its sources, and its precompiled libraries disassembled with the JieLi toolchain. Nothing

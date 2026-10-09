@@ -287,6 +287,10 @@ static void fm1_main(void)
     seq.send_clock = proj.set.clk_out;
     seq.send_notes = proj.set.notes_out;
     engine_brk_loops();
+    if (!proj.set.cpu2_off)                         /* the second core: at power-on, before the audio and the
+                                                     * timers, as Melodee starts it (started later, it does not
+                                                     * reach its entry); if it does not answer, one core */
+        plat_cpu2_set(1);
     audio_init();
     usb_start();
 #if X0X_TRS
@@ -299,8 +303,6 @@ static void fm1_main(void)
     fm1_timer5_start(isr_timer5, 4);
     fm1_guard_lock_top();
     fm1_irq_enable_all();
-    if (proj.set.cpu2 && plat_cpu2_set(1))          /* the second core, if it was on (and starts) */
-        proj.set.cpu2 = 0;
     fm1_delay_ms(30);
     if ((fm1_in.buttons & 3u) == 3u)
         panel_setup();                              /* OCT- + OCT+ held at power-on */

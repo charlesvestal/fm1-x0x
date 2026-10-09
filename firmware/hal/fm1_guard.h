@@ -113,6 +113,9 @@ static void fm1_guard_lock_top(void)
     fm1__dbg_lock();
 }
 
+/* the reserved top of RAM is write-protected now (fm1_guard_lock_top) */
+static int fm1_guard_top_locked(void) { return (FM1_C0_WR_LIMIT_EN & 4u) != 0; }
+
 /* reopen the reserved top of RAM (mailbox write before a UBOOT reset) */
 static void fm1_guard_unlock_top(void)
 {

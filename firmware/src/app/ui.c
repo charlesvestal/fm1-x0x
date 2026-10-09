@@ -312,7 +312,7 @@ static int pref_get(pref_t r)
     case R_SMODE: return seq.song_on;
     case R_SLEN: return song()->len;
     case R_STALLS: return perf.stalls_on;
-    case R_CPU2: return plat_cpu2_on();
+    case R_CPU2: return !proj.set.cpu2_off;
     default: return 0;
     }
 }
@@ -376,12 +376,11 @@ static void pref_set(pref_t r, int v)
         song()->bar[ui.song_sel].pat[r.a] = (uint8_t)v;
         break;
     case R_SMODE: seq.song_on = (uint8_t)v; break;
-    case R_CPU2:
-        if (plat_cpu2_set(v)) {
-            v = 0;
-            say("2ND CORE DID NOT START", 0);
-        }
-        proj.set.cpu2 = (uint8_t)v;
+    case R_CPU2:                                      /* off at once; on from the next power-on */
+        proj.set.cpu2_off = (uint8_t)!v;
+        if (!v)
+            plat_cpu2_set(0);
+        say(!v ? "ONE CORE" : plat_cpu2_on() ? "2ND CORE ON" : "2ND CORE: SAVE, RESTART", 0);
         perf.have = 0;
         break;
     case R_STALLS:

@@ -23,13 +23,18 @@
 #define FM1_C1_SYNC() __asm__ volatile("csync" ::: "memory")
 
 extern void fm1_c1_entry(void);
+extern uint32_t _c1_ustack[];
+#define FM1_C1_STACK_WORDS (2816u / 4u)
+#define FM1_C1_MARK 0x43314D4Bu                  /* "C1MK": how deep core 1's stack has gone */
 static volatile uint32_t fm1_c1_alive, fm1_c1_job, fm1_c1_done, fm1_c1_arg;
+volatile uint32_t fm1_c1_trace;                 /* breadcrumbs (fm1_cpu1.S, fm1_c1_main) */
 static void (*volatile fm1_c1_fn)(uint32_t);
 static uint8_t fm1_c1_on;                       /* started and answering: core 0 may hand it work */
 
 void fm1_c1_main(void);
 void __attribute__((section(".c1_text"), noreturn, used)) fm1_c1_main(void)
 {
+    fm1_c1_trace = 0xC1000002;
     fm1_c1_alive = 1;
     FM1_C1_SYNC();
     for (;;) {
@@ -60,7 +65,10 @@ static int fm1_cpu1_start(void)
     if (fm1_c1_on)
         return 0;
     fm1_cpu1_hold();
+    for (i = 0; i < FM1_C1_STACK_WORDS; i++)
+        _c1_ustack[i] = FM1_C1_MARK;
     fm1_c1_alive = 0;
+    fm1_c1_trace = 0;
     fm1_c1_done = fm1_c1_job;
     for (i = 0; i < 32u; i++)                   /* its interrupt bank: all off (core 0's is at 0x1EEF100) */
         *(volatile uint32_t *)(0x1EEF300u + 4u * i) = 0;
