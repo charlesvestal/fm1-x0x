@@ -8,7 +8,7 @@
 # every sound and pot, and writes build/drum808_demo.wav. Exits non-zero on failure.
 set -e
 cd "$(dirname "$0")/../.."
-: "${EIGHTW8_DIR:=/private/tmp/claude-501/-Volumes-ExtFS-charlesvestal-github-schwung-parent-schwung/e33a5e22-f1db-4de6-868c-2e6586090880/scratchpad/8w8}"
+: "${EIGHTW8_DIR:=../schwung-8W8}"         # fm1-parent/schwung-8W8 -> github.com/athousanddetails/schwung-8W8
 REF="$EIGHTW8_DIR/src/dsp"
 [ -f "$REF/sc808_engine.cpp" ] || { echo "8W8 sources not found in $EIGHTW8_DIR (set EIGHTW8_DIR)"; exit 2; }
 CC="${CC:-cc}"

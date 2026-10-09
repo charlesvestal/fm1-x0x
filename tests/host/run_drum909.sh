@@ -7,7 +7,7 @@
 # the port.
 set -e
 cd "$(dirname "$0")/../.."
-: "${NINEW9_DIR:=/private/tmp/claude-501/-Volumes-ExtFS-charlesvestal-github-schwung-parent-schwung/e33a5e22-f1db-4de6-868c-2e6586090880/scratchpad/9w9}"
+: "${NINEW9_DIR:=../schwung-9W9}"          # fm1-parent/schwung-9W9 -> github.com/athousanddetails/schwung-9W9
 [ -f "$NINEW9_DIR/src/dsp/er99_engine.c" ] || { echo "9W9 sources not found in $NINEW9_DIR (set NINEW9_DIR)"; exit 2; }
 CC="${CC:-cc}"
 OUT=build/drum909_test

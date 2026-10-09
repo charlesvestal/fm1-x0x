@@ -51,10 +51,11 @@ static int fails;
 static const int ref_trig[DR_NUM] = { 0, 1, 2, 3, 4, 5, 6, 8, 7, 10, 9 };
 static const char *const vname[DR_NUM + 1] = { "BD", "SD", "LT", "MT", "HT", "RS", "CP", "CH", "OH", "CR", "RD", "KIT" };
 
-/* 9W9 keys for each port parameter, in the port's order */
+/* 9W9 keys for each port parameter, in the port's order; 0: X0X's own (the BD's sends, the SD's
+ * DECAY), which 9W9 does not have (the PANs are skipped by name) */
 static const char *const dkeys[DR_NUM + 1][DR_MAX_PARAMS] = {
-    { "bd_c_tune", "bd_c_attack", "bd_c_decay", "bd_c_level", "bd_c_sweep_depth", "bd_c_pitch_mod", "bd_c_drive", "bd_c_dist_type" },
-    { "sd_c_tune", "sd_c_noise_decay", "sd_c_snappy", "sd_c_level", "sd_c_drive", "sd_c_dist_type", "sd_c_rev", "sd_c_dly" },
+    { "bd_c_tune", "bd_c_attack", "bd_c_decay", "bd_c_level", "bd_c_sweep_depth", "bd_c_pitch_mod", "bd_c_drive", "bd_c_dist_type", 0, 0 },
+    { "sd_c_tune", "sd_c_noise_decay", "sd_c_snappy", 0, "sd_c_level", "sd_c_drive", "sd_c_dist_type", "sd_c_rev", "sd_c_dly" },
     { "lt_c_tune", "lt_c_decay", "lt_c_level", "lt_c_attack", "lt_c_drive", "lt_c_dist_type", "lt_c_rev", "lt_c_dly" },
     { "mt_c_tune", "mt_c_decay", "mt_c_level", "mt_c_attack", "mt_c_drive", "mt_c_dist_type", "mt_c_rev", "mt_c_dly" },
     { "ht_c_tune", "ht_c_decay", "ht_c_level", "ht_c_attack", "ht_c_drive", "ht_c_dist_type", "ht_c_rev", "ht_c_dly" },
@@ -219,8 +220,8 @@ static void voice_cases(void)
         for (int i = 0; i < drum909_nparams(v); ++i) {
             const x0x_param_t *p = drum909_param(v, i);
             const int sends = !strcmp(p->name, "Rev") || !strcmp(p->name, "Dly");
-            if (!strcmp(p->name, "Pan"))
-                continue;                       /* X0X's (stereo): 9W9 has none; stereo_test covers it */
+            if (!strcmp(p->name, "Pan") || !dkeys[v][i])
+                continue;                       /* X0X's (stereo, the BD's sends, the SD's DECAY): 9W9 has none */
             if (p->max == 127) {
                 static const int pots[3] = { 0, 64, 127 };
                 for (int k = 0; k < 3; ++k) {
@@ -338,7 +339,7 @@ static void check_tables(void)
         for (int v = 0; v <= DR_KIT; ++v)
             for (int i = 0; i < drum909_nparams(v); ++i) {
                 float pv;
-                if (!strcmp(drum909_param(v, i)->name, "Pan"))
+                if (!strcmp(drum909_param(v, i)->name, "Pan") || !dkeys[v][i])
                     continue;                   /* X0X's: no 9W9 key */
                 ref_get(ref, dkeys[v][i], &pv);
                 nk++;
