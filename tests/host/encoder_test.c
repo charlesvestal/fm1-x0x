@@ -106,6 +106,49 @@ int main(void)
         got += turn(5, 4, 0, 1);
     }
     CHECK(got == 6, "a pause halfway through a click, then 5 more: %d (6)", got);
+    /* a pause halfway through a click on the complement of the detent (state 3, a full cycle per
+     * click): it must not become a second detent, or every click after it counts two */
+    reset();
+    {
+        int p;
+        got = turn(3, 4, 0, 1);
+        for (p = 0; p < 4; p++)
+            frame(1);
+        for (p = 0; p < 70; p++)
+            frame(3);
+        for (p = 0; p < 4; p++)
+            frame(2);
+        for (p = 0; p < 60; p++)
+            frame(0);
+        got += fm1_in.enc_steps[0];
+        fm1_in.enc_steps[0] = 0;
+        got += turn(5, 4, 0, 1);
+    }
+    CHECK(got == 9, "a pause on the complement halfway through a click, then 5 more: %d (9)", got);
+    /* a half-cycle encoder (it rests on 0 and on 3: two clicks a cycle), turned slowly: after the
+     * first few clicks, one step a click */
+    reset();
+    {
+        int c, p, st = 0;
+        static const uint32_t SEQ4[4] = {1, 3, 2, 0};
+        for (c = 0; c < 6; c++) {                       /* warm-up: it learns its second rest */
+            for (p = 0; p < 4; p++) frame(SEQ4[st]);
+            st = (st + 1) & 3;
+            for (p = 0; p < 4; p++) frame(SEQ4[st]);
+            st = (st + 1) & 3;
+            for (p = 0; p < 60; p++) frame(SEQ4[(st + 3) & 3]);
+        }
+        fm1_in.enc_steps[0] = 0;
+        for (c = 0; c < 10; c++) {
+            for (p = 0; p < 4; p++) frame(SEQ4[st]);
+            st = (st + 1) & 3;
+            for (p = 0; p < 4; p++) frame(SEQ4[st]);
+            st = (st + 1) & 3;
+            for (p = 0; p < 60; p++) frame(SEQ4[(st + 3) & 3]);
+        }
+        got = fm1_in.enc_steps[0];
+    }
+    CHECK(got == 10, "a half-cycle encoder, 10 slow clicks after warming up: %d (10)", got);
     printf(fails ? "encoder: %d FAILED\n" : "encoder: ok\n", fails);
     return fails != 0;
 }

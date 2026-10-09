@@ -73,6 +73,8 @@ static volatile struct {
     uint8_t cnt[FM1_NKEY];
     uint8_t enc_prev[FM1_NENC], enc_last[FM1_NENC];
     uint8_t enc_rest[FM1_NENC];  /* learned rest (detent) states, bit per state */
+    uint8_t enc_home[FM1_NENC];  /* the state at power-on: a detent */
+    uint8_t enc_sth[FM1_NENC], enc_stc[FM1_NENC];   /* rests on it, and on its complement */
     uint8_t enc_still[FM1_NENC]; /* frames since the last state change */
     int8_t enc_sub[FM1_NENC];    /* net transitions since the last rest state */
     int8_t enc_dir[FM1_NENC];    /* the last valid transition: +1 / -1 (0: none yet) */
@@ -230,15 +232,26 @@ static void fm1__frame(void)
         if (fm1_in.enc_prev[e] == 0xFF) {          /* first frame: the knob rests here */
             fm1_in.enc_prev[e] = (uint8_t)cur;
             fm1_in.enc_rest[e] = (uint8_t)(1u << cur);
+            fm1_in.enc_home[e] = (uint8_t)cur;
         }
         if (fm1_in.enc_still[e] < 255u && ++fm1_in.enc_still[e] == FM1_REST_FRAMES) {
-            /* learn detent states: the state at power-on, and its complement (00/11 or 01/10) if
-             * the knob rests there too (a half-cycle detent). X0X: nothing else is learned. A
-             * knob left halfway through a click used to restart the set there, and the clicks
-             * after it then landed between detents and some were lost. */
-            uint32_t r = fm1_in.enc_rest[e], bit = 1u << cur, comp = 1u << (cur ^ 3u);
-            if (!(r & bit) && r == comp)
-                fm1_in.enc_rest[e] = (uint8_t)(r | bit);
+            /* learn detent states. X0X: the state at power-on is one; its complement (00/11 or
+             * 01/10) is the other only if the knob keeps resting there (a half-cycle detent rests
+             * on both, about as often), not once: a full-cycle knob left halfway through a click
+             * sits on the complement too, and taking it as a detent made every click after it
+             * count two. Nothing else is learned (a knob left elsewhere mid-click used to restart
+             * the set there, and the clicks after it were lost). */
+            uint32_t h = fm1_in.enc_home[e];
+            if (cur == h && fm1_in.enc_sth[e] < 255u)
+                fm1_in.enc_sth[e]++;
+            else if (cur == (h ^ 3u) && fm1_in.enc_stc[e] < 255u)
+                fm1_in.enc_stc[e]++;
+            if (fm1_in.enc_sth[e] >= 200u || fm1_in.enc_stc[e] >= 200u) {   /* the recent past counts */
+                fm1_in.enc_sth[e] >>= 1;
+                fm1_in.enc_stc[e] >>= 1;
+            }
+            fm1_in.enc_rest[e] = (uint8_t)(1u << h | (fm1_in.enc_stc[e] >= 3u &&
+                                                       fm1_in.enc_stc[e] * 3u >= fm1_in.enc_sth[e] ? 1u << (h ^ 3u) : 0u));
         }
         if (cur == fm1_in.enc_prev[e])
             continue;
