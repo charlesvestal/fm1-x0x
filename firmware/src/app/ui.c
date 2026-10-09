@@ -1047,6 +1047,7 @@ static int help_lines(int b, const char *l[HELP_LINES])
         break;
     case B_LFO:
         L("THE MIXER AND THE MASTER"); L("AGAIN: THE NEXT PAGE");
+        if (ui.view == V_MIX) L("HOME + BLACK KEY: MUTE");
         if (is_303()) { L("HOLD + KEY: A SLIDE"); if (kbd) L("HOLD + OCT: A TIE"); }
         break;
     case B_EDIT: L("THE PART'S SOUND"); L("AGAIN: THE NEXT PAGE"); break;
@@ -1749,6 +1750,22 @@ static int part_muted(int p) { return (seq.mute & MUTE_MASK[p]) == MUTE_MASK[p];
 
 static int perf_testing(void) { return perf.test >= 0 && perf.phase != 4; }
 
+static void mute_part(int p)                         /* a whole part on / off (HOME, MIX's PARTS) */
+{
+    seq.mute = part_muted(p) ? seq.mute & ~MUTE_MASK[p] : seq.mute | MUTE_MASK[p];
+    if (seq.song_rec && seq.playing && seq.song_pos < song()->len) {   /* song recording: this bar too */
+        song_bar_t *b = &song()->bar[seq.song_pos];
+        b->mute = (uint8_t)(part_muted(p) ? b->mute | 1u << p : b->mute & ~(1u << p));
+    }
+    say(part_muted(p) ? "MUTED " : "UNMUTED ", PART_N[p]);
+}
+static int track_muted(int km, int v) { return (int)(seq.vmute >> (km * NDRUM + v) & 1u); }
+static void mute_track(int km, int v)                /* one drum track on / off */
+{
+    seq.vmute ^= 1u << (km * NDRUM + v);
+    say(track_muted(km, v) ? "MUTED " : "UNMUTED ", engine_voice_name(km ? T_808 : T_909, v));
+}
+
 static void key_event(int k, int down)
 {
     int w = KEY_WHITE[k], bl = KEY_BLACK[k], wp = w >= 0 ? ui.pbank * 16 + w : -1;   /* wp: a white key's pattern */
@@ -1805,6 +1822,14 @@ static void key_event(int k, int down)
         }
         return;
     }
+    if (bl >= 0 && (ui.btn & (1u << B_HOME)) && (drum_mix_page() >= 0 || (ui.view == V_MIX && cur_page() == 0))) {
+        ui.btn_used |= 1u << B_HOME;                  /* MIX + HOME + black key: mute that channel */
+        if (down && drum_mix_page() >= 0)
+            mute_track(drum_mix_page(), bl);
+        else if (down && bl < NPARTS)
+            mute_part(bl);
+        return;
+    }
     if (bl >= 0 && ui.view == V_MIX && cur_page() == 0) {   /* MIX's PARTS: black keys 1-5 pick the part */
         if (down && bl < NPARTS) {
             ui.mixsel = (uint8_t)bl;
@@ -1823,24 +1848,14 @@ static void key_event(int k, int down)
         return;
     }
     if (ui.view == V_HOME && bl >= 0) {
-        if (down && bl < NPARTS) {
-            seq.mute = part_muted(bl) ? seq.mute & ~MUTE_MASK[bl] : seq.mute | MUTE_MASK[bl];
-            if (seq.song_rec && seq.playing && seq.song_pos < song()->len) {   /* song recording: this bar too */
-                song_bar_t *b = &song()->bar[seq.song_pos];
-                b->mute = (uint8_t)(part_muted(bl) ? b->mute | 1u << bl : b->mute & ~(1u << bl));
-            }
-            say(part_muted(bl) ? "MUTED " : "UNMUTED ", PART_N[bl]);
-        }
+        if (down && bl < NPARTS)
+            mute_part(bl);
         return;
     }
     if (is_drum() && bl >= 0 && (ui.btn & (1u << B_HOME))) {   /* HOME + black key: mute that track */
-        if (down) {
-            uint32_t m = 1u << (ui.part * NDRUM + bl);
-            const char *nm = engine_voice_name(ui.part == PART_909 ? T_909 : T_808, bl);
-            ui.btn_used |= 1u << B_HOME;
-            seq.vmute ^= m;
-            say((seq.vmute & m) ? "MUTED " : "UNMUTED ", nm);
-        }
+        ui.btn_used |= 1u << B_HOME;
+        if (down)
+            mute_track(ui.part, bl);
         return;
     }
     if (is_drum()) {
@@ -3321,10 +3336,10 @@ static uint16_t footer_text(const char **a, const char **b, const char **c)
         *b = "BLACK: MUTE";
     } else if (ui.view == V_MIX && cur_page() == 0) {
         *a = "BLACK 1-5: PART";
-        *b = "AGAIN: NEXT PAGE";
+        *b = "HOME+BLK: MUTE";
     } else if (drum_mix_page() >= 0) {
         *a = "BLACK: TRACK";
-        *b = "AGAIN: NEXT PAGE";
+        *b = "HOME+BLK: MUTE";
     } else if (ui.view == V_FX || ui.view == V_MIX) {
         *a = "AGAIN: NEXT PAGE";
         *b = "SEL: ALL AS A LIST";
@@ -3612,11 +3627,13 @@ static void leds(void)
             }
         } else if (ui.view == V_MIX && (cur_page() == 0 || drum_mix_page() >= 0)) {
             int dm = drum_mix_page(), n = dm >= 0 ? NDRUM : NPARTS, on = dm >= 0 ? ui.sel[dm] : ui.mixsel;
-            for (i = 0; i < (uint32_t)n && i < 11u; i++)    /* the channels: the one the knobs set bright */
-                if ((int)i == on)
+            for (i = 0; i < (uint32_t)n && i < 11u; i++) {  /* the knobs' channel bright (blinking: muted), */
+                int mu = dm >= 0 ? track_muted(dm, (int)i) : part_muted((int)i);   /* the others dim, muted dark */
+                if ((int)i == on ? !mu || blink : 0)
                     k |= 1u << BLACK_KEY[i];
-                else
+                else if ((int)i != on && !mu)
                     d |= 1u << BLACK_KEY[i];
+            }
         } else if (ui.view == V_MIX || ui.view == V_FX) {
             /* the master and the effects: the keys have nothing to choose */
         } else if (is_drum()) {
@@ -3630,11 +3647,13 @@ static void leds(void)
                 if (on)
                     k |= 1u << WHITE_KEY[i];
             }
-            for (i = 0; i < NDRUM && i < 11u; i++)      /* the tracks: this one bright, the others with hits dim */
-                if ((int)i == ui.sel[ui.part])
+            for (i = 0; i < NDRUM && i < 11u; i++) {    /* the track bright (blinking: muted), the others */
+                int mu = track_muted(ui.part, (int)i);  /* with hits dim, muted dark */
+                if ((int)i == ui.sel[ui.part] ? !mu || blink : 0)
                     k |= 1u << BLACK_KEY[i];
-                else if (sm_any(d0->hit[i]) && !(seq.mute >> (ui.part * NDRUM + i) & 1u))
+                else if ((int)i != ui.sel[ui.part] && sm_any(d0->hit[i]) && !mu)
                     d |= 1u << BLACK_KEY[i];
+            }
         } else if (is_303() && !ui.rec) {             /* notes bright, ties dim */
             const bpart_t *bp = &cur_pat()->bass[bidx()];
             int ph = eng_step[TRK_BASS0 + bidx()];

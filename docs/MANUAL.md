@@ -520,6 +520,10 @@ reduction in red. It has four pages:
   the black keys pick a track, and the knobs set its LEVEL, PAN, REV and DLY.
 - **MASTER**: four knobs over the whole mix.
 
+On PARTS, 909 MIX and 808 MIX, hold HOME and press a black key to mute or unmute that channel (a
+part on PARTS, a track on the drum pages). The key lights show it: the channel the knobs set is
+bright (blinking while muted), the others dim, muted ones dark.
+
 On MIX, turning ALGORITHM goes to the part's own page: MIX: 909 or MIX: 808 for the drum
 machines, PARTS (with that part picked) for the 303s and the break.
 

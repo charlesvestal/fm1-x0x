@@ -26,3 +26,21 @@ press HOME
 tapkey b1
 release HOME
 expect vmute 2048
+# the mixer: HOME + a black key mutes the channel (PARTS: the part; 909 MIX: the track), and stays on MIX
+tap LFO
+press HOME
+tapkey b0
+release HOME
+expect mute 2047
+expect view 4
+press HOME
+tapkey b0
+release HOME
+expect mute 0
+tap LFO
+press HOME
+tapkey b3
+release HOME
+expect vmute 2056
+expect view 4
+leds
