@@ -39,6 +39,8 @@ a { color: var(--accent); }
 .keyface { transition: fill .06s; }
 .lit .keyface.white { fill: #f3b25c; }
 .lit .keyface.black { fill: #e0902c; }
+.dim .keyface.white { fill: #f6dcb6; }
+.dim .keyface.black { fill: #7a5326; }
 .start { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(10, 11, 13, .55); border-radius: 4.4% / 6.9%; }
 .start button { font: 600 1.25rem "Barlow Semi Condensed", "Barlow", sans-serif; letter-spacing: .04em; padding: .7em 1.6em;
                 border-radius: 999px; border: 0; background: #f0a043; color: #1b1205; cursor: pointer; }
@@ -363,9 +365,12 @@ function drawScreen(fb) {
   }
   ctx.putImageData(img, 0, 0);
 }
-function drawLights(b, k) {
+function drawLights(b, k, d = 0) {
   for (const x of Object.values(buttons)) x.g.classList.toggle("lit", !!(b & (1 << x.bit)));
-  keys.forEach((x, i) => x.g.classList.toggle("lit", !!(k & (1 << i))));
+  keys.forEach((x, i) => {
+    x.g.classList.toggle("lit", !!(k & (1 << i)));
+    x.g.classList.toggle("dim", !(k & (1 << i)) && !!(d & (1 << i)));
+  });
 }
 
 // ---------------------------------------------------------------- storage
@@ -497,7 +502,7 @@ async function switchOn() {
         if (m.type === "ready") res();
         else if (m.type === "frame") {
           if (m.fb) drawScreen(m.fb);
-          drawLights(m.buttons, m.keys);
+          drawLights(m.buttons, m.keys, m.dim);
           window.x0xLast = m;
           if (m.load !== undefined) cpu.textContent = `X0X uses ${m.load}% of this computer's time`;
           if (m.store) saveStore(m.store);

@@ -17,9 +17,8 @@ expect hit0.0.62 1
 tap OCT-
 tapkey w0
 expect hit0.0.32 1
-# the 909's LENGTH to 64 (HOME's LENGTH page, knob 1), and it plays to step 64
-tap HOME
-turn SELECT 1
+# the 909's LENGTH to 64 (SEQ, knob 1), and it plays to step 64
+tap SEQ
 spin K1 48
 tap EDIT
 tap PLAY

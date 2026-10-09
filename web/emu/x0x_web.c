@@ -57,6 +57,7 @@ __attribute__((used, visibility("default"))) void web_enc(int role, int32_t n)
 __attribute__((used, visibility("default"))) void web_master(uint32_t v) { master = v > 4096u ? 4096u : v; }
 __attribute__((used, visibility("default"))) uint32_t web_lit_buttons(void) { return lit_btn; }
 __attribute__((used, visibility("default"))) uint32_t web_lit_keys(void) { return lit_keys; }
+__attribute__((used, visibility("default"))) uint32_t web_dim_keys(void) { return dim_keys & ~lit_keys; }
 __attribute__((used, visibility("default"))) uint16_t *web_fb(void) { return fb; }
 __attribute__((used, visibility("default"))) uint32_t web_blits(void) { return blits; }
 __attribute__((used, visibility("default"))) uint32_t web_now(void) { return now_ms; }

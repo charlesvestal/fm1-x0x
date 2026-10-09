@@ -47,6 +47,8 @@ void plat_glow(int on) { glow_on = (uint8_t)(on != 0); }
  * column 8, row PA5 (found on the device). Green, unless recording. */
 static uint8_t play_red;
 void plat_play_red(int red) { play_red = (uint8_t)(red != 0); }
+static uint32_t keys_dim;
+void plat_keys_dim(uint32_t keys) { keys_dim = keys; }
 void plat_leds(uint32_t buttons, uint32_t keys)
 {
     uint8_t nl[FM1_NCOL] = {0}, dl[FM1_NCOL] = {0};
@@ -61,14 +63,14 @@ void plat_leds(uint32_t buttons, uint32_t keys)
             continue;
         if (on)
             nl[q >> 3] |= (uint8_t)(1u << (q & 7u));
-        else if (i < NB && glow_on)
+        else if (i < NB ? glow_on : (keys_dim >> (i - NB)) & 1u)
             dl[q >> 3] |= (uint8_t)(1u << (q & 7u));
     }
     for (c = 0; c < FM1_NCOL; c++) {
         fm1_led[c] = nl[c];
         fm1_led_dim[c] = dl[c];
     }
-    fm1_led_dim_div = glow_on ? GLOW_DIV : 0u;
+    fm1_led_dim_div = glow_on || keys_dim ? GLOW_DIV : 0u;
 }
 
 /* MIDI: Felucca's rings carry 4-byte USB-MIDI event packets, byte 0 = cable / CIN */

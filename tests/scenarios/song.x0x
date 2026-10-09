@@ -24,8 +24,8 @@ shot s02_home_parts.png
 # a HOME white key: all five parts
 tapkey w0
 expect ppat2 1
-# SONG (SEQ on HOME): white keys write bars 1, 2, 1
-tap SEQ
+# SONG (HOME again): white keys write bars 1, 2, 1
+tap HOME
 expect view 6
 tapkey w0
 tapkey w1

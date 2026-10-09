@@ -70,7 +70,7 @@ static void lcd_blit(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint1
 
 static uint32_t now_ms, held_btn, held_keys, master = 2048;
 static int32_t enc_acc[NE];
-static uint32_t lit_btn, lit_keys;
+static uint32_t lit_btn, lit_keys, dim_keys;
 
 uint32_t plat_ms(void) { return now_ms; }
 uint32_t plat_buttons(void) { return held_btn; }
@@ -89,7 +89,8 @@ void plat_leds(uint32_t b, uint32_t k)
 }
 static int glow_on = 1;                 /* the device's button glow (plat_glow); the lights printed are the bright ones */
 void plat_glow(int on) { glow_on = on; }
-void plat_play_red(int red) { (void)red; }      /* the device's PLAY colour: green, red while recording */
+void plat_play_red(int red) { (void)red; }
+void plat_keys_dim(uint32_t k) { dim_keys = k; }      /* dim keys: "o" in the leds print */      /* the device's PLAY colour: green, red while recording */
 
 #define MQ 256
 static uint32_t min_q[MQ], mi_w, mi_r;
@@ -905,10 +906,10 @@ int main(int argc, char **argv)
                     printf(" %s", BTN_N[i]);
             printf(" | white");
             for (i = 0; i < 16; i++)
-                printf("%c", (lit_keys >> WHITE_K[i] & 1u) ? '#' : '.');
+                printf("%c", (lit_keys >> WHITE_K[i] & 1u) ? '#' : (dim_keys >> WHITE_K[i] & 1u) ? 'o' : '.');
             printf(" black");
             for (i = 0; i < 11; i++)
-                printf("%c", (lit_keys >> BLACK_K[i] & 1u) ? '#' : '.');
+                printf("%c", (lit_keys >> BLACK_K[i] & 1u) ? '#' : (dim_keys >> BLACK_K[i] & 1u) ? 'o' : '.');
             printf("\n");
         } else if (!strcmp(cmd, "expect"))
             fails += expect(a, b);

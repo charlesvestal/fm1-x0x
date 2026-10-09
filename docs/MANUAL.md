@@ -102,9 +102,9 @@ how to arrange them into a song.
 ![What the keys do](img/fm1-keys.svg)
 
 These controls do the same thing on every screen. Each button that opens a screen always opens the
-same one (HOME the pattern, EDIT the part, ARP TB-3PO, SEQ the song, LFO the mixer, FX the effects,
-GLO the settings); pressing it again steps through that screen's pages. ALGORITHM only picks the
-part.
+same one: HOME the pattern (again: the song), SEQ the part's steps, EDIT the part's sound, ARP
+TB-3PO, LFO the mixer, FX the effects, GLO the settings. Pressing it again steps through that
+screen's pages. ALGORITHM only picks the part.
 
 | Control | What it does |
 |---|---|
@@ -113,16 +113,29 @@ part.
 | SELECT | Moves to the next or previous page. In a list, it moves up and down. Hold HOME and turn SELECT to set the tempo. |
 | KNOB 1–4 | Change the four values shown at the bottom of the screen. Turn slowly for single steps, quickly to sweep: a fast half turn covers the whole range. |
 | SEL | Shows everything on the current screen as a list. In a list, it runs the highlighted action. When X0X asks a question, SEL means yes. |
-| HOME | The pattern: all five parts. Press it again for the next page. In a list, it goes back; when X0X asks a question, HOME means no. |
-| EDIT | The selected part: its steps and its sound. Press it again for the next page. |
+| HOME | The pattern: all five parts. Press it again for the song, and again to come back. In a list, it goes back; when X0X asks a question, HOME means no. |
+| SEQ | The selected part's steps, with its LENGTH, RATE and (on a 303) DIRECTION and TRANSPOSE. Press it again for the next page. |
+| EDIT | The selected part's sound, with its steps still on the keys. Press it again for the next page. |
 | ARP | TB-3PO, the 303 line generator (on a 303 only). Press it again for the next page. |
 | FX | Opens the effects. |
 | LFO | Opens the mixer and the master. |
 | GLO | Opens the settings. |
-| SEQ | The song. Press it again for the next page. |
 | PLAY | Starts and stops. Hold HOME and press PLAY to redo. |
 | REC | Turns recording on and off: what you play is written (drum hits, 303 notes, knob moves; in SONG mode, the song). On a 303, the keys become a keyboard while it's on. Hold HOME and press REC to undo. |
 | SAVE | Saves everything. |
+
+**The key lights** have two levels: bright for what is on or chosen, dim for what is there to
+choose.
+
+| Screen | Bright | Dim |
+|---|---|---|
+| HOME | the pattern playing (a cued one blinks); the parts playing | patterns with notes; muted parts |
+| SONG | the bar's pattern; the bar's parts | patterns with notes; the bar's muted parts |
+| 909 / 808 | the track's hits; the track | the other tracks with hits |
+| 303 | notes | ties |
+| 303 with REC on | the keys you hold | the Cs, to find your place |
+| BREAK | the steps it plays | the slice pads 1–8 |
+| MIX (PARTS, 909 MIX, 808 MIX) | the channel the knobs set | the other channels |
 | ENV, LFO | Hold one of these while pressing keys to add an accent (ENV) or a slide (LFO). (LFO on its own opens the mixer.) |
 | OCT-, OCT+ | Page through the steps, 16 at a time (1–16, 17–32, 33–48, 49–64). On HOME and SONG they show patterns 1–16 or 17–32. On the 303 keyboard they change the octave. In TB-3PO they mutate the line or write a new one. |
 | White keys | Steps. On HOME, they choose patterns. |
@@ -232,8 +245,8 @@ Press EDIT to step through the pages: the selected track's sound (one page, two 
 kick), then KIT, for the whole machine: ACCENT, how much louder accented steps are, and on the
 808 CHOKE. Each track's DRIVE and DIST are in SEL's list, under MORE.
 
-A drum machine's length and rate are on HOME (its LENGTH page, and SEL's list); the swing is on
-HOME's PERFORM page. Each track's level, pan and reverb and delay sends are on the mixer: press
+A drum machine's LENGTH, RATE and the SWING are on SEQ (the swing is also on HOME's PERFORM
+page). Each track's level, pan and reverb and delay sends are on the mixer: press
 LFO and go to the 909 MIX or 808 MIX page, which shows all eleven tracks' levels at once. The
 black keys pick a track there, and the knobs are its LEVEL, PAN, REV and DLY (the 909's kick has
 no sends). On the 808 the alternate sounds share their track's pan, so the conga sits where the
@@ -268,8 +281,8 @@ Press EDIT to step through these pages:
 - VOICE: ACCENT, WAVE (saw or square), DRIVE and SLIDE time.
 
 TUNE, VOLUME, DRIVE TYPE (off, soft or RAT) and ACCENT DECAY are in SEL's list. The line's
-LENGTH (1–64 steps) is on HOME's LENGTH page; its RATE, DIRECTION (forward, reverse, ping-pong or
-random) and TRANSPOSE are in HOME's list. Each 303's level, pan and sends are on the mixer (LFO).
+LENGTH (1–64 steps), RATE, DIRECTION (forward, reverse, ping-pong or random) and TRANSPOSE are
+on SEQ. Each 303's level, pan and sends are on the mixer (LFO).
 
 ---
 
@@ -313,8 +326,9 @@ the slice's number. Press the same black key again (holding the step) to give th
 the generator. This way you can fix the kick and snare where you want them and let the generator
 play with the rest. A step's slice is saved with the pattern.
 
-Its three pages are GROOVE (COMPLEXITY, ANCHOR, ROLL, FILL), RETRIG (2X, 3X, 4X, 8X) and LOOPS
-(LOOP A, LOOP B, B CHANCE, PITCH); PHRASE, A LENGTH, B LENGTH and LEVEL are in SEL's list. These
+SEQ has its two sequence pages, GROOVE (COMPLEXITY, ANCHOR, ROLL, FILL) and RETRIG (2X, 3X, 4X,
+8X), with PHRASE, A LENGTH and B LENGTH in SEL's list. EDIT has LOOPS (LOOP A, LOOP B, B CHANCE,
+PITCH), with LEVEL in SEL's list. These
 settings control how the generator rearranges the loop:
 
 - COMPLEXITY: how often it jumps to a different slice instead of playing the next one.
@@ -405,9 +419,8 @@ Parts can have different lengths, so they drift against each other. The 909's le
 the length of a bar, and the 909's pattern sets the swing. Swing delays every second 16th
 note: 50% is straight, and 75% is the most swing.
 
-HOME's knobs are the pattern's: PERFORM has TEMPO, SWING, FILTER and PUMP (the master's, for
-playing live), and LENGTH each part's length (909, 808, 303A, 303B; the break is always 16
-steps). Each part's RATE and the 303s' DIRECTION and TRANSPOSE are in HOME's SEL list.
+HOME's knobs are for playing live: TEMPO, SWING, and the master's FILTER and PUMP. Each part's
+length and rate are on its SEQ screen (the break is always 16 steps).
 
 ---
 
@@ -457,7 +470,7 @@ top line says MOTION FULL.
 ![SONG](img/screen-song.png)
 
 A song is a list of up to 192 bars. Each bar says which pattern each part plays and which
-parts are muted. To open the song, press SEQ.
+parts are muted. To open the song, press HOME twice (HOME again comes back to the pattern).
 
 - **Write bars:** press a white key. The selected bar gets that pattern for all five parts,
   and the next bar is selected. Pressing keys at the end of the song adds new bars.

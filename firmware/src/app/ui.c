@@ -21,8 +21,8 @@ static const int8_t KEY_WHITE[NKEYS] = {0, -1, 1, -1, 2, -1, 3, 4, -1, 5, -1, 6,
 static const int8_t KEY_BLACK[NKEYS] = {-1, 0, -1, 1, -1, 2, -1, -1, 3, -1, 4, -1, -1, 5, -1, 6, -1, 7, -1, -1, 8, -1, 9, -1, -1, 10, -1};
 static uint8_t WHITE_KEY[16], BLACK_KEY[11];
 
-enum { V_HOME, V_PART, V_GEN, V_FX, V_MIX, V_GLO, V_SONG, V_PERF, NVIEWS };
-static const char *const VIEW_N[NVIEWS] = {"HOME", "", "TB-3PO", "FX", "MIX", "GLOBAL", "SONG", "PERF"};
+enum { V_HOME, V_PART, V_GEN, V_FX, V_MIX, V_GLO, V_SONG, V_PERF, V_SEQ, NVIEWS };
+static const char *const VIEW_N[NVIEWS] = {"HOME", "", "TB-3PO", "FX", "MIX", "GLOBAL", "SONG", "PERF", "SEQ"};
 static const uint16_t PART_COL[NPARTS] = {RGB(255, 150, 40), RGB(255, 72, 64), RGB(130, 240, 90), RGB(70, 205, 255),
                                           RGB(214, 120, 255)};
 static const char *const PART_N[NPARTS] = {"909", "808", "303A", "303B", "BREAK"};
@@ -114,7 +114,8 @@ static struct {
 
 static pattern_t *pat_of(int part) { return &proj.pat[seq.ppat[part]]; }
 static pattern_t *cur_pat(void) { return pat_of(ui.part); }    /* the pattern the part on screen plays */
-static int part_view(void) { return ui.view == V_PART || ui.view == V_GEN; }
+static int part_view(void) { return ui.view == V_PART || ui.view == V_SEQ || ui.view == V_GEN; }
+static int steps_view(void) { return ui.view == V_PART || ui.view == V_SEQ; }   /* the keys are the part's steps */
 static song_t *song(void) { return &proj.arr.song; }
 static int is_303(void) { return ui.part == PART_303A || ui.part == PART_303B; }
 static int is_drum(void) { return ui.part == PART_909 || ui.part == PART_808; }
@@ -450,8 +451,9 @@ static const char *pref_name(pref_t r)
                                            {"A RATE", "B RATE"}, {"A DIR", "B DIR"}, {"A TRANSP", "B TRANSP"}};
     static const char *const CHN[MX_NPARAMS] = {"LEVEL", "REV", "DLY", "PAN"};
     const x0x_param_t *d = pref_desc(r);
-    if (r.kind >= R_DLEN && r.kind <= R_BTRANS)       /* HOME: whose */
-        return PATN[r.kind - R_DLEN][r.a & 1];
+    static const char *const SEQN[6] = {"LENGTH", "RATE", "LENGTH", "RATE", "DIRECTION", "TRANSP"};
+    if (r.kind >= R_DLEN && r.kind <= R_BTRANS)       /* SEQ: the part's own; a list elsewhere: whose */
+        return ui.view == V_SEQ ? SEQN[r.kind - R_DLEN] : PATN[r.kind - R_DLEN][r.a & 1];
     if (r.kind == R_ENG && r.a == T_MIX && ui.view == V_MIX && r.c < MX_NPARAMS)
         return CHN[r.c];                               /* MIX's PARTS: the picked part's */
     if (r.kind == R_ENG && (r.a == T_909 || r.a == T_808) && r.b == NDRUM)
@@ -700,7 +702,7 @@ static void add_track_pages(int t, int v)
 /* where a screen's page is kept: per part on the part's screens (and TB-3PO), else one per screen */
 static uint8_t *page_of(int view)
 {
-    return &ui.page[view][view == V_PART || view == V_GEN ? ui.part : 0];
+    return &ui.page[view][view == V_PART || view == V_SEQ || view == V_GEN ? ui.part : 0];
 }
 
 static void build_pages(void)
@@ -713,15 +715,22 @@ static void build_pages(void)
     case V_GLO:
         add_page("PERFORM", PR(R_TEMPO, 0, 0, 0), PR(R_SWING, 0, 0, 0), PR(R_ENG, T_MST, 0, MST_DJF),
                  PR(R_ENG, T_MST, 0, MST_PUMP));
-        add_page("LENGTH", PR(R_DLEN, 0, 0, 0), PR(R_DLEN, 1, 0, 0), PR(R_BLEN, 0, 0, 0), PR(R_BLEN, 1, 0, 0));
-        more(PR(R_DRATE, 0, 0, 0));
-        more(PR(R_DRATE, 1, 0, 0));
-        more(PR(R_BRATE, 0, 0, 0));
-        more(PR(R_BRATE, 1, 0, 0));
-        more(PR(R_BDIR, 0, 0, 0));
-        more(PR(R_BTRANS, 0, 0, 0));
-        more(PR(R_BDIR, 1, 0, 0));
-        more(PR(R_BTRANS, 1, 0, 0));
+        break;
+    case V_SEQ:                                        /* the part's steps: how its pattern runs */
+        pg_grp = GR_PAT;
+        if (is_drum())
+            add_page("SEQUENCE", PR(R_DLEN, p, 0, 0), PR(R_DRATE, p, 0, 0), PR(R_SWING, 0, 0, 0), NONE);
+        else if (is_303())
+            add_page("SEQUENCE", PR(R_BLEN, b, 0, 0), PR(R_BRATE, b, 0, 0), PR(R_BDIR, b, 0, 0), PR(R_BTRANS, b, 0, 0));
+        else {
+            add_page("GROOVE", PR(R_BRKSET, 0, 0, BRK_COMPLEX), PR(R_BRKSET, 0, 0, BRK_ANCHOR),
+                     PR(R_BRKSET, 0, 0, BRK_ROLL), PR(R_BRKSET, 0, 0, BRK_FILL));
+            add_page("RETRIG", PR(R_BRKSET, 0, 0, BRK_R2), PR(R_BRKSET, 0, 0, BRK_R3), PR(R_BRKSET, 0, 0, BRK_R4),
+                     PR(R_BRKSET, 0, 0, BRK_R8));
+            more(PR(R_BRKSET, 0, 0, BRK_PHRASE));
+            more(PR(R_BRKSET, 0, 0, BRK_ALEN));
+            more(PR(R_BRKSET, 0, 0, BRK_BLEN));
+        }
         break;
     case V_PART:                                       /* the part's sound */
         if (is_drum()) {
@@ -743,16 +752,9 @@ static void build_pages(void)
             more(PR(R_ENG, T_303, b, BASS303_DRVTYPE));
             more(PR(R_ENG, T_303, b, BASS303_ACCDEC));
         } else {
-            pg_grp = GR_PAT;
-            add_page("GROOVE", PR(R_BRKSET, 0, 0, BRK_COMPLEX), PR(R_BRKSET, 0, 0, BRK_ANCHOR),
-                     PR(R_BRKSET, 0, 0, BRK_ROLL), PR(R_BRKSET, 0, 0, BRK_FILL));
-            add_page("RETRIG", PR(R_BRKSET, 0, 0, BRK_R2), PR(R_BRKSET, 0, 0, BRK_R3), PR(R_BRKSET, 0, 0, BRK_R4),
-                     PR(R_BRKSET, 0, 0, BRK_R8));
+            pg_grp = GR_PAT;                           /* (its groove and retrigs: SEQ) */
             add_page("LOOPS", PR(R_BRKSLOT, 0, 0, 0), PR(R_BRKSLOT, 1, 0, 0), PR(R_BRKSET, 0, 0, BRK_BCHANCE),
                      PR(R_ENG, T_BRK, 0, 1));
-            more(PR(R_BRKSET, 0, 0, BRK_PHRASE));
-            more(PR(R_BRKSET, 0, 0, BRK_ALEN));
-            more(PR(R_BRKSET, 0, 0, BRK_BLEN));
             more(PR(R_ENG, T_BRK, 0, 0));
         }
         break;
@@ -889,7 +891,10 @@ static void open_list_of_pages(void)
         list_add(PR(R_ACT, ACT_SONG_DEL, 0, 0));
         list_add(PR(R_ACT, ACT_SONG_CLR, 0, 0));
     }
-    put_s(list_title, ui.view == V_PART ? PART_N[ui.part] : VIEW_N[ui.view]);
+    if (ui.view == V_SEQ)
+        put_s(put_s(list_title, PART_N[ui.part]), " SEQ");
+    else
+        put_s(list_title, ui.view == V_PART ? PART_N[ui.part] : VIEW_N[ui.view]);
     ui.list_sel = ui.list_top = 0;
     while (list_skip(ui.list_sel))
         ui.list_sel++;
@@ -1044,10 +1049,10 @@ static int help_lines(int b, const char *l[HELP_LINES])
         L("THE MIXER AND THE MASTER"); L("AGAIN: THE NEXT PAGE");
         if (is_303()) { L("HOLD + KEY: A SLIDE"); if (kbd) L("HOLD + OCT: A TIE"); }
         break;
-    case B_EDIT: L("THE PART: ITS STEPS, ITS SOUND"); L("AGAIN: THE NEXT PAGE"); break;
+    case B_EDIT: L("THE PART'S SOUND"); L("AGAIN: THE NEXT PAGE"); break;
     case B_GLO: L("SETTINGS, SAVE, CLEAR,"); L("FACTORY RESET, PERFORMANCE"); L("AGAIN: CLOSE"); break;
     case B_HOME:
-        L("THE PATTERN: ALL FIVE PARTS"); L("AGAIN: THE NEXT PAGE   + SELECT: TEMPO"); L("+ WHITE KEY: PATTERN");
+        L("THE PATTERN: ALL FIVE PARTS"); L("AGAIN: THE SONG   + SELECT: TEMPO"); L("+ WHITE KEY: PATTERN");
         if (is_drum() && part_view()) L("+ BLACK KEY: MUTE THE TRACK");
         L("+ REC: UNDO   + PLAY: REDO"); L("LIST: BACK   QUESTION: NO");
         break;
@@ -1068,7 +1073,7 @@ static int help_lines(int b, const char *l[HELP_LINES])
         L("AGAIN: THE NEXT PAGE");
         break;
     case B_SEQ:
-        L("THE SONG: PATTERNS, BAR BY BAR"); L("AGAIN: THE NEXT PAGE");
+        L("THE PART'S STEPS: LENGTH, RATE"); L("AGAIN: THE NEXT PAGE");
         break;
     case B_PLAY: L("START / STOP"); L("HOME + PLAY: REDO"); break;
     case B_REC:
@@ -1967,13 +1972,11 @@ static void button_tap(int b)
             ui.wpos[bidx()] = 0;
         say(ui.rec ? "RECORD ON: KEYS + KNOBS" : "RECORD OFF", 0);
         break;
-    case B_HOME:                                      /* the pattern; again: its next page (a list: back) */
+    case B_HOME:                                      /* the pattern; again: the song (a list: back) */
         if (ui.overlay != O_NONE || ui.view == V_GLO)
             close_overlay();
-        else if (ui.view == V_HOME)
-            *page_of(V_HOME) = (uint8_t)((cur_page() + 1) % pg.n);
         else
-            set_view(V_HOME);
+            set_view(ui.view == V_HOME ? V_SONG : V_HOME);
         break;
     case B_SEL:
         if (ui.overlay == O_LIST)
@@ -2017,11 +2020,11 @@ static void button_tap(int b)
             open_global();
         }
         break;
-    case B_SEQ:                                       /* the song; again: its next page */
-        if (ui.view == V_SONG && ui.overlay == O_NONE)
-            *page_of(V_SONG) = (uint8_t)((cur_page() + 1) % pg.n);
+    case B_SEQ:                                       /* the part's steps; again: the next page */
+        if (ui.view == V_SEQ && ui.overlay == O_NONE)
+            *page_of(V_SEQ) = (uint8_t)((cur_page() + 1) % pg.n);
         else
-            set_view(V_SONG);
+            set_view(V_SEQ);
         break;
     case B_SAVE: save_project(); break;
     case B_OCTUP:
@@ -2048,7 +2051,7 @@ static void button_tap(int b)
                 say("MUTATED", 0);
             }
             mark_dirty();
-        } else if (is_303() && ui.rec && ui.view == V_PART) {   /* pitch entry: the keyboard's octave */
+        } else if (is_303() && ui.rec && steps_view()) {   /* pitch entry: the keyboard's octave */
             if (ui.btn & (1u << B_LFO)) {                 /* LFO + OCT: a tie; ENV + OCT: a rest */
                 ui.btn_used |= 1u << B_LFO;
                 bass_write(bidx(), 0, G_TIE);
@@ -2167,7 +2170,7 @@ static void input(void)
     for (i = 0; i < 4; i++) {
         if ((e = enc(EN_K1 + (int)i)) == 0)
             continue;
-        if (ui.view == V_PART && is_303() && ui.held_step >= 0) {     /* a held step's knobs edit it */
+        if (steps_view() && is_303() && ui.held_step >= 0) {     /* a held step's knobs edit it */
             bpart_t *bp = &cur_pat()->bass[bidx()];
             bstep_t *st = &bp->step[ui.held_step];
             ui.step_edited = 1;
@@ -2571,13 +2574,15 @@ static void draw_header(void)
         return;
     }
     ui.msg_until = 0;
-    if (ui.view == V_PART || ui.view == V_GEN) {      /* the part chip, then where we are */
+    if (part_view()) {                                /* the part chip, then where we are */
         int32_t w = tw(&FONT_B, PART_N[ui.part]) + 12;
         box(0, 1, w, 17, part_col());
         cv_text(6, vc(&FONT_B, 1, 17), &FONT_B, PART_N[ui.part], C_BLACK);
         x = w + 6;
         if (ui.view == V_GEN)
             x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, "TB-3PO", C_HI) + 6;
+        else if (ui.view == V_SEQ)
+            x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, is_303() && ui.rec ? "SEQ KEYS" : "SEQ", is_303() && ui.rec ? C_AMB : C_HI) + 6;
         else if (is_303() && ui.rec)
             x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, "KEYS", C_AMB) + 6;
     } else {
@@ -2603,7 +2608,7 @@ static void draw_header(void)
             cv_text(x + 2, vc(&FONT_S, 1, 17), &FONT_S, b, (ui.frame & 16u) ? C_WHITE : C_GRAY);
         } else if (seq.chain_a != seq.chain_b && !seq.song_on) {
             cv_text(x + 3, vc(&FONT_XS, 1, 17), &FONT_XS, "CHN", C_AMB);
-        } else if (ui.view == V_PART && steps_len() > 16) {   /* the 16 steps the keys show */
+        } else if (steps_view() && steps_len() > 16) {   /* the 16 steps the keys show */
             put_i(put_s(put_i(b, ui.spage * 16 + 1), "-"), ui.spage * 16 + 16);
             cv_text(x + 4, vc(&FONT_XS, 1, 17), &FONT_XS, b, C_GRAY);
         }
@@ -3248,7 +3253,7 @@ static void draw_help(int band)
 /* every card, on every kind of screen, fits the screen: 1 = yes (prints the first that does not) */
 static int help_fits(void)
 {
-    static const uint8_t views[] = {V_PART, V_HOME, V_SONG, V_GEN, V_FX, V_MIX};
+    static const uint8_t views[] = {V_PART, V_SEQ, V_HOME, V_SONG, V_GEN, V_FX, V_MIX};
     const char *l[HELP_LINES];
     ui_t keep = ui;
     uint8_t keep_any = any_button;
@@ -3332,9 +3337,9 @@ static uint16_t footer_text(const char **a, const char **b, const char **c)
         *b = "WHITE: STEP";
         *c = "HOME+BLK: MUTE";
     } else if (is_303() && ui.rec) {
-        *a = ui.rec ? "KEYS WRITE STEPS" : "KEYS PLAY";
-        *b = ui.rec ? "ENV: REST" : "SEQ: STEPS";
-        *c = ui.rec ? "LFO+OCT: TIE" : 0;
+        *a = "KEYS WRITE NOTES";
+        *b = "ENV+OCT: REST";
+        *c = "LFO+OCT: TIE";
     } else if (is_303()) {
         *a = "PRESS: ON";
         *b = "TAP: OFF";
@@ -3449,7 +3454,7 @@ static void knob_tag(char *t)
 {
     int g = pg.group[cur_page()], dm = drum_mix_page();
     const char *ti = pg.title[cur_page()];
-    if (ui.view == V_PART && is_303() && ui.held_step >= 0)
+    if (steps_view() && is_303() && ui.held_step >= 0)
         put_i(put_s(put_s(t, PART_N[ui.part]), " STEP "), ui.held_step + 1);
     else if (dm >= 0)
         put_s(put_s(put_s(t, ti), ": "), engine_voice_name(dm ? T_808 : T_909, ui.sel[dm]));
@@ -3500,7 +3505,7 @@ static void draw_knobs(void)
         }
     }
     draw_footer();
-    if (ui.view == V_PART && is_303() && ui.held_step >= 0) {     /* the held step's own knobs */
+    if (steps_view() && is_303() && ui.held_step >= 0) {     /* the held step's own knobs */
         static const char *const SN[4] = {"NOTE", "GATE", "ACCENT", "SLIDE"};
         static const char *const G[3] = {"REST", "NOTE", "TIE"};
         const bpart_t *bp = &cur_pat()->bass[bidx()];
@@ -3559,14 +3564,16 @@ static void draw_knobs(void)
 /* ===================================================================== LEDs === */
 static void leds(void)
 {
-    uint32_t b = 0, k = 0, i;
+    uint32_t b = 0, k = 0, d = 0, i;
     int blink = (ui.frame & 8u) != 0;
     if (seq.playing && eng_step[TRK_DRUM] % 4 == 0)
         b |= 1u << B_PLAY;
     if (ui.rec)
         b |= 1u << B_REC;
-    if (ui.view == V_HOME)
+    if (ui.view == V_HOME || ui.view == V_SONG || (seq.song_on && blink))
         b |= 1u << B_HOME;
+    if (ui.view == V_SEQ)
+        b |= 1u << B_SEQ;
     if (ui.view == V_PART)
         b |= 1u << B_EDIT;
     if (ui.view == V_GEN)
@@ -3577,58 +3584,73 @@ static void leds(void)
         b |= 1u << B_LFO;
     if (ui.view == V_GLO)
         b |= 1u << B_GLO;
-    if (ui.view == V_SONG || (seq.song_on && blink))
-        b |= 1u << B_SEQ;
     if (ui.overlay != O_NONE)
         b |= 1u << B_SEL;
-    if (is_303() && ui.rec)
-        b |= 1u << B_SEQ;
     if (ui.view == V_HOME || ui.view == V_SONG ? ui.pbank : ui.spage)
         b |= 1u << B_OCTUP;
     if (ui.dirty && blink && ui.view == V_GLO)
         b |= 1u << B_SAVE;
-    if (proj.set.keyled) {
-        if (ui.view == V_HOME) {
-            int pp = seq.ppat[PART_909] - ui.pbank * 16, cu = seq_cue_of(&seq, PART_909) - ui.pbank * 16;
-            if (pp >= 0 && pp < 16)
-                k |= 1u << WHITE_KEY[pp];
-            if (seq_cue_of(&seq, PART_909) >= 0 && blink && cu >= 0 && cu < 16)
-                k |= 1u << WHITE_KEY[cu];
-            for (i = 0; i < NPARTS; i++)
-                if (!part_muted((int)i))
-                    k |= 1u << BLACK_KEY[i];
-        } else if (ui.view == V_SONG) {               /* the selected bar: its 909 pattern, its unmuted parts */
+    if (proj.set.keyled) {                           /* bright: on / chosen; dim: there, not chosen */
+        if (ui.view == V_HOME || ui.view == V_SONG) {
             const song_t *sg = song();
-            if (ui.song_sel < sg->len) {
-                int sp = sg->bar[ui.song_sel].pat[PART_909] - ui.pbank * 16;
-                if (sp >= 0 && sp < 16)
-                    k |= 1u << WHITE_KEY[sp];
-                for (i = 0; i < NPARTS; i++)
-                    if (!(sg->bar[ui.song_sel].mute >> i & 1u))
-                        k |= 1u << BLACK_KEY[i];
+            int bar = ui.view == V_SONG && ui.song_sel < sg->len;
+            int pp = (bar ? sg->bar[ui.song_sel].pat[PART_909] : seq.ppat[PART_909]) - ui.pbank * 16;
+            int cu = seq_cue_of(&seq, PART_909) - ui.pbank * 16;
+            for (i = 0; i < 16; i++)                  /* patterns with notes */
+                if (pattern_used(&proj.pat[ui.pbank * 16 + i]))
+                    d |= 1u << WHITE_KEY[i];
+            if (pp >= 0 && pp < 16 && (ui.view == V_HOME || bar))
+                k |= 1u << WHITE_KEY[pp];
+            if (ui.view == V_HOME && seq_cue_of(&seq, PART_909) >= 0 && blink && cu >= 0 && cu < 16)
+                k |= 1u << WHITE_KEY[cu];
+            for (i = 0; i < NPARTS; i++) {            /* the parts: playing bright, muted dim */
+                int muted = ui.view == V_HOME ? part_muted((int)i) : bar ? (int)(sg->bar[ui.song_sel].mute >> i & 1u) : 1;
+                if (muted)
+                    d |= 1u << BLACK_KEY[i];
+                else
+                    k |= 1u << BLACK_KEY[i];
             }
+        } else if (ui.view == V_MIX && (cur_page() == 0 || drum_mix_page() >= 0)) {
+            int dm = drum_mix_page(), n = dm >= 0 ? NDRUM : NPARTS, on = dm >= 0 ? ui.sel[dm] : ui.mixsel;
+            for (i = 0; i < (uint32_t)n && i < 11u; i++)    /* the channels: the one the knobs set bright */
+                if ((int)i == on)
+                    k |= 1u << BLACK_KEY[i];
+                else
+                    d |= 1u << BLACK_KEY[i];
+        } else if (ui.view == V_MIX || ui.view == V_FX) {
+            /* the master and the effects: the keys have nothing to choose */
         } else if (is_drum()) {
-            const dpart_t *d = &cur_pat()->drum[ui.part];
-            const uint32_t *bits = (ui.btn & (1u << B_ENV)) ? d->accent : d->hit[ui.sel[ui.part]];
+            const dpart_t *d0 = &cur_pat()->drum[ui.part];
+            const uint32_t *bits = (ui.btn & (1u << B_ENV)) ? d0->accent : d0->hit[ui.sel[ui.part]];
             int ph = eng_step[TRK_DRUM + ui.part];
             for (i = 0; i < 16; i++) {
-                int s = step_of((int)i), on = s < d->len && sm_get(bits, s);
+                int s = step_of((int)i), on = s < d0->len && sm_get(bits, s);
                 if (seq.playing && s == ph)
                     on = !on;
                 if (on)
                     k |= 1u << WHITE_KEY[i];
             }
-            k |= 1u << BLACK_KEY[ui.sel[ui.part]];
-        } else if (is_303() && !ui.rec) {
+            for (i = 0; i < NDRUM && i < 11u; i++)      /* the tracks: this one bright, the others with hits dim */
+                if ((int)i == ui.sel[ui.part])
+                    k |= 1u << BLACK_KEY[i];
+                else if (sm_any(d0->hit[i]) && !(seq.mute >> (ui.part * NDRUM + i) & 1u))
+                    d |= 1u << BLACK_KEY[i];
+        } else if (is_303() && !ui.rec) {             /* notes bright, ties dim */
             const bpart_t *bp = &cur_pat()->bass[bidx()];
             int ph = eng_step[TRK_BASS0 + bidx()];
             for (i = 0; i < 16; i++) {
-                int s = step_of((int)i), on = bstep_gate(&bp->step[s]) != G_REST && s < bp->len;
+                int s = step_of((int)i), g = s < bp->len ? bstep_gate(&bp->step[s]) : G_REST, on = g == G_NOTE;
                 if (seq.playing && s == ph)
                     on = !on;
                 if (on)
                     k |= 1u << WHITE_KEY[i];
+                else if (g == G_TIE)
+                    d |= 1u << WHITE_KEY[i];
             }
+        } else if (is_303()) {                        /* the keyboard: its Cs dim, to find your place */
+            for (i = 0; i < NKEYS; i++)
+                if (i % 12u == 7u)                    /* F3 = 0: C4 = 7, C5 = 19 */
+                    d |= 1u << i;
         } else if (ui.part == PART_BRK) {
             int ph = eng_step[TRK_BRK];
             for (i = 0; i < 16; i++) {
@@ -3638,9 +3660,12 @@ static void leds(void)
                 if (on)
                     k |= 1u << WHITE_KEY[i];
             }
+            for (i = 0; i < 8; i++)                   /* the slice pads */
+                d |= 1u << BLACK_KEY[i];
         }
     }
     k |= ui.keys;
+    plat_keys_dim(d & ~k);
     plat_glow(proj.set.keyled == 1);
     plat_play_red(ui.rec);                           /* PLAY green; red while recording */
     plat_leds(b, k);
