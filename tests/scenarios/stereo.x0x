@@ -10,13 +10,13 @@ wait 1200
 shot s02_panned.png
 expect sound5.0.3 24
 expect sound5.2.3 94
-# a drum voice's PAN: the 909's kick, its last pot (EDIT pages through the voice's settings)
+# a drum voice's PAN: the 909's kick, knob 2 of its MIX page (EDIT pages through the voice's settings)
 tap LFO
 expect part 0
 tap EDIT
 tap EDIT
 tap EDIT
-turn K1 -24
+turn K2 -24
 wait 1200
 shot s03_bd_pan.png
 expect sound0.0.8 40

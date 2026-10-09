@@ -153,9 +153,8 @@ the tempo or the settings, and the history is cleared when you switch off.
 The **top line** shows, from left to right:
 
 - the part, in its colour: 909 orange, 808 red, 303A green, 303B blue, BREAK violet;
-- on the 909 and 808, whose sound the page sets: the selected track's name (BD) for the track's
-  own pages, or ALL in amber (ALL SENDS, ALL PART, ALL KIT) for the pages that set the whole drum
-  machine;
+- the page: in white when it sets the selected track or the part's own sound (BD, BD MIX,
+  FILTER), in amber when it sets the whole drum machine or the pattern (KIT, PATTERN, LINE);
 - small dots, one for each page, with the current page lit;
 - the pattern playing, such as P3. If you've chosen a different pattern to play next, it
   appears after it: P3 >5 means pattern 5 is coming up. On a part longer than 16 steps, the 16
@@ -167,14 +166,19 @@ The **top line** shows, from left to right:
 When you press a button that does something, the top line says what happened for about a
 second, for example SAVED or COPIED TO P5.
 
+Above the knobs, a **footer** line says what the keys do on this screen (for example BLACK: TRACK,
+WHITE: STEP). Until you first press a button it says HOLD ANY BUTTON: WHAT IT DOES: any button held
+for a second shows a card about it.
+
 The **bottom** of the screen shows the four knobs. Settings with only a few choices show a
 row of small squares instead of a ring. When you turn a knob, its value is also shown in
-large type for a second, with the track's name when it's a track's own setting (BD Tune).
+large type for a second, with whose it is: the track's (BD Tune), or the pattern's (P3 LENGTH).
+A pattern's settings (its length, rate and swing, the 303's LINE and TB-3PO settings, the break's
+generator and loops) change when the pattern changes and are copied with it; everything else is
+the sound, which stays the same whatever pattern plays.
 
-A knob with a small **P** beside it belongs to the pattern: LENGTH, RATE, SWING, the 303's LINE
-and TB-3PO settings, and the break's generator and loops. It changes when the pattern changes and
-is copied with it. Every other knob is part of the sound, which stays the same whatever pattern
-plays.
+**SEL** shows the whole screen as a list, in sections: on the 909, for example, BD: THIS TRACK,
+BD: TRACK MIX, 909: ALL TRACKS and P1: THE PATTERN.
 
 ![The 909](img/screen-909.png)
 ![Turning a knob](img/screen-readout.png)
@@ -217,16 +221,21 @@ you mute or unmute the whole part on HOME.
 The closed hat cuts off the open hat. On the 808 you can change this with CHOKE on the KIT
 page.
 
-Press EDIT to step through the selected track's sound settings (the top line shows the track's
-name). The last one is the track's PAN, which places it left or right. (On the 808, the alternate sounds share their track's pan,
-so the conga sits where the tom does.) After the track's own pages come these:
+Press EDIT to step through the pages, in this order:
 
-- SENDS: how much of the whole part goes to the reverb and the delay, its level, and its pan
-  (the top line says ALL SENDS: these are for all eleven tracks together, on top of each
-  track's own Rev and Dly).
-- PART: LENGTH (1–64 steps), RATE (1/16, 1/16 triplet, 1/32 or 1/8 triplet), SWING and
-  ACCENT.
-- KIT: settings for the whole kit.
+- The selected track's sound (the top line shows its name). Its last page always ends with
+  DRIVE on KNOB 3 and DIST on KNOB 4.
+- The track's MIX page (BD MIX): LEVEL, PAN, REV and DLY, on the same knobs for every track
+  (the 909's kick has no sends, so its KNOB 3 and 4 are empty). PAN places the track left or
+  right; on the 808 the alternate sounds share their track's pan, so the conga sits where the
+  tom does.
+- KIT, in amber: settings for the whole drum machine. While it's on screen the selected
+  track is only outlined, since these knobs aren't the track's.
+- PATTERN, in amber: LENGTH (1–64 steps), RATE (1/16, 1/16 triplet, 1/32 or 1/8 triplet) and
+  SWING.
+
+The whole drum machine's level and pan are on the mixer (LFO), and its reverb and delay sends
+are on FX.
 
 ---
 
@@ -255,9 +264,10 @@ Press EDIT to step through these pages:
 - FILTER: CUTOFF, RESO, ENVMOD and DECAY.
 - VOICE: ACCENT, WAVE (saw or square), TUNE and VOLUME.
 - DRIVE: DRIVE, DRIVE TYPE (off, soft or RAT), SLIDE time and ACCENT DECAY.
-- SENDS: reverb, delay, level and pan.
-- LINE: LENGTH (1–64 steps), RATE, DIRECTION (forward, reverse, ping-pong or random) and
-  TRANSPOSE.
+- LINE, in amber (the pattern's): LENGTH (1–64 steps), RATE, DIRECTION (forward, reverse,
+  ping-pong or random) and TRANSPOSE.
+
+Each 303's level and pan are on the mixer (LFO); its reverb and delay sends are on FX.
 
 ---
 
@@ -314,8 +324,9 @@ These settings control how the generator rearranges the loop:
   chance applies to every bar: at 50%, about half the bars play loop B.
 - A LENGTH and B LENGTH: how often a new slice is chosen, from every 1/4 bar to every 8 bars.
 
-These settings are saved with the pattern. The LOOPS page chooses loop A and loop B, and has
-a PITCH setting. X0X comes with two loops of its own, 909 GR and 909 FL, played by its 909.
+These settings are saved with the pattern. The LOOPS page chooses loop A and loop B (also the
+pattern's), and the SOUND page has the break's LEVEL and PITCH. Its level and pan in the mix are
+on the mixer's BREAK page (LFO), its reverb and delay sends on FX. X0X comes with two loops of its own, 909 GR and 909 FL, played by its 909.
 Loops you upload appear after them. Loops are stretched to fit the tempo.
 
 ### Your own breaks
@@ -377,6 +388,7 @@ were.
 
 To manage patterns:
 
+- **Finding a pattern:** on HOME, every fourth box is numbered (1, 5, 9, 13; 17 … 29 in amber).
 - **Copy:** hold SAVE and press a white key to copy to that pattern. On a part's screen this
   copies only that part. On HOME it copies all five parts as they're playing now. Holding SAVE
   for a moment shows a card that says exactly what will be copied (for example COPY 303A P1),
@@ -483,7 +495,7 @@ sends, on that track's own page. The reverb is stereo: whatever you send it come
 
 Press LFO to open MIX. It shows a level and a meter for each part, and the compressor's gain
 reduction in red. The PANS page places the 909, 808 and both 303s left or right (C is the
-middle); the break's pan is on its own SENDS page. As you turn a pan, the part stays at full
+middle), and the BREAK page has the break's level and pan. As you turn a pan, the part stays at full
 level on that side and fades out of the other.
 
 The factory mix is set up for big beat: the break is up front with the 909 kick under it, the

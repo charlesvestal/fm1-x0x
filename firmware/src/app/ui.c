@@ -75,6 +75,9 @@ typedef struct {
     uint8_t song_sel;                  /* the SONG screen's bar */
 } ui_t;
 static ui_t ui;
+static uint8_t any_button;             /* a button has been pressed since power-on (the footer's first line) */
+#define FOOT_GAP 7                     /* between the footer's parts */
+static uint16_t footer_text(const char **a, const char **b, const char **c);
 
 /* something the project keeps changed: SAVE (or the autosave) has work to do */
 static void mark_dirty(void) { ui.dirty = 1; }
@@ -167,7 +170,7 @@ static void say(const char *a, const char *b)
 /* =============================================================== param refs === */
 enum { R_NONE, R_ENG, R_SWING, R_DLEN, R_DRATE, R_BLEN, R_BRATE, R_BDIR, R_BTRANS, R_GEN, R_BRKSET,
        R_BRKSLOT, R_TEMPO, R_ACCENT, R_CLKOUT, R_NOTEOUT, R_PALETTE, R_KEYLED, R_KEYSOUND, R_AUTOSAVE, R_ACT, R_SBAR, R_SPAT, R_SMODE,
-       R_SLEN, R_STALLS };
+       R_SLEN, R_STALLS, R_HDR };          /* R_HDR: a list's section header (a = its group), never selected */
 typedef struct { uint8_t kind, a, b, c; } pref_t;
 #define PR(k, a, b, c) ((pref_t){(k), (a), (b), (c)})
 #define NONE PR(R_NONE, 0, 0, 0)
@@ -527,8 +530,11 @@ static void pref_value(pref_t r, char *num, char *unit) { pref_value_of(r, pref_
 
 /* ===================================================================== pages === */
 #define MAXPAGES 14
-typedef struct { pref_t r[MAXPAGES][4]; char title[MAXPAGES][12]; int n; } pages_t;
+/* page groups: whose values a page holds (the SEL list's headers, the header's colour) */
+enum { GR_NONE, GR_TRACK, GR_TMIX, GR_KIT, GR_PAT, GR_SOUND };
+typedef struct { pref_t r[MAXPAGES][4]; char title[MAXPAGES][12]; uint8_t group[MAXPAGES]; int n; } pages_t;
 static pages_t pg;
+static uint8_t pg_grp;                 /* the group pages added now belong to */
 
 static void title(int i, const char *s)
 {
@@ -549,6 +555,7 @@ static void add_page(const char *t, pref_t a, pref_t b, pref_t c, pref_t d)
     pg.r[pg.n][2] = c;
     pg.r[pg.n][3] = d;
     title(pg.n, t);
+    pg.group[pg.n] = pg_grp;
     pg.n++;
 }
 
@@ -562,14 +569,59 @@ static void add_eng_pages(int t, int v, int from, int to, const char *name)
         for (k = 0; k < 4; k++)
             pg.r[pg.n][k] = (i + k < to) ? PR(R_ENG, t, v, i + k) : NONE;
         title(pg.n, name);
+        pg.group[pg.n] = pg_grp;
         pg.n++;
     }
+}
+
+static int name_is(const x0x_param_t *d, const char *n)
+{
+    const char *a = d ? d->name : "";
+    while (*a && *a == *n) {
+        a++;
+        n++;
+    }
+    return !*a && !*n;
+}
+static pref_t find_ref(int t, int v, const char *n)
+{
+    int i;
+    for (i = 0; i < engine_nparams(t, v); i++)
+        if (name_is(engine_param(t, v, i), n))
+            return PR(R_ENG, t, v, i);
+    return NONE;
+}
+
+/* a drum track: its sound pages (DRIVE and DIST always knobs 3 and 4 of the last one), then its MIX
+ * page: LEVEL, PAN, REV, DLY, the same knobs on every track (a track without sends leaves 3, 4 empty) */
+static void add_track_pages(int t, int v)
+{
+    const char *nm = engine_voice_name(t, v);
+    pref_t snd[NPARAMS_MAX];
+    int n = 0, i, k;
+    char mt[12];
+    for (i = 0; i < engine_nparams(t, v) && n < NPARAMS_MAX; i++) {
+        const x0x_param_t *d = engine_param(t, v, i);
+        if (!name_is(d, "Level") && !name_is(d, "Pan") && !name_is(d, "Rev") && !name_is(d, "Dly") &&
+            !name_is(d, "Drive") && !name_is(d, "Dist"))
+            snd[n++] = PR(R_ENG, t, v, i);
+    }
+    pg_grp = GR_TRACK;
+    for (i = 0; n - i > 2; i += 4)
+        add_page(nm, snd[i], i + 1 < n ? snd[i + 1] : NONE, i + 2 < n ? snd[i + 2] : NONE, i + 3 < n ? snd[i + 3] : NONE);
+    k = i < n ? n - i : 0;
+    put_s(put_s(mt, nm), " DRIVE");                    /* a page of only the drive says so */
+    add_page(k ? nm : mt, k > 0 ? snd[i] : NONE, k > 1 ? snd[i + 1] : NONE, find_ref(t, v, "Drive"), find_ref(t, v, "Dist"));
+    put_s(put_s(mt, nm), " MIX");
+    pg_grp = GR_TMIX;
+    add_page(mt, find_ref(t, v, "Level"), find_ref(t, v, "Pan"), find_ref(t, v, "Rev"), find_ref(t, v, "Dly"));
 }
 
 static void build_pages(void)
 {
     int p = ui.part;
     pg.n = 0;
+    pg_grp = GR_NONE;
     switch (ui.view) {
     case V_HOME:
     case V_GLO:
@@ -577,38 +629,40 @@ static void build_pages(void)
                  PR(R_ENG, T_MST, 0, MST_CUTOFF));
         add_page("LEVELS", PR(R_ENG, T_MIX, PART_909, 0), PR(R_ENG, T_MIX, PART_808, 0), PR(R_ENG, T_MIX, PART_303A, 0),
                  PR(R_ENG, T_MIX, PART_303B, 0));
-        add_page("MORE", PR(R_ENG, T_MIX, PART_BRK, 0), PR(R_ACCENT, 0, 0, 0), PR(R_ENG, T_MST, 0, MST_MODE),
-                 PR(R_ENG, T_MST, 0, MST_RESO));
+        add_page("MORE", PR(R_ENG, T_MIX, PART_BRK, 0), NONE, PR(R_ENG, T_MST, 0, MST_MODE), PR(R_ENG, T_MST, 0, MST_RESO));
         break;
     case V_PART:
         if (is_drum()) {
             int t = p == PART_909 ? T_909 : T_808, k = p;
-            add_eng_pages(t, ui.sel[k], 0, 99, engine_voice_name(t, ui.sel[k]));
-            add_page("SENDS", PR(R_ENG, T_MIX, p, 1), PR(R_ENG, T_MIX, p, 2), PR(R_ENG, T_MIX, p, 0), PR(R_ENG, T_MIX, p, MX_PAN));
-            add_page("PART", PR(R_DLEN, k, 0, 0), PR(R_DRATE, k, 0, 0), PR(R_SWING, 0, 0, 0), PR(R_ACCENT, 0, 0, 0));
+            add_track_pages(t, ui.sel[k]);
+            pg_grp = GR_KIT;
             add_eng_pages(t, NDRUM, 0, 99, "KIT");
+            pg_grp = GR_PAT;
+            add_page("PATTERN", PR(R_DLEN, k, 0, 0), PR(R_DRATE, k, 0, 0), PR(R_SWING, 0, 0, 0), NONE);
         } else if (is_303()) {
             int b = bidx();
+            pg_grp = GR_SOUND;
             add_eng_pages(T_303, b, 0, 4, "FILTER");
             add_eng_pages(T_303, b, 4, 8, "VOICE");
             add_eng_pages(T_303, b, 8, 12, "DRIVE");
-            add_page("SENDS", PR(R_ENG, T_MIX, p, 1), PR(R_ENG, T_MIX, p, 2), PR(R_ENG, T_MIX, p, 0), PR(R_ENG, T_MIX, p, MX_PAN));
+            pg_grp = GR_PAT;
             add_page("LINE", PR(R_BLEN, b, 0, 0), PR(R_BRATE, b, 0, 0), PR(R_BDIR, b, 0, 0), PR(R_BTRANS, b, 0, 0));
         } else {
+            pg_grp = GR_PAT;
             add_page("GROOVE", PR(R_BRKSET, 0, 0, BRK_COMPLEX), PR(R_BRKSET, 0, 0, BRK_ANCHOR),
                      PR(R_BRKSET, 0, 0, BRK_ROLL), PR(R_BRKSET, 0, 0, BRK_FILL));
             add_page("RETRIG", PR(R_BRKSET, 0, 0, BRK_R2), PR(R_BRKSET, 0, 0, BRK_R3), PR(R_BRKSET, 0, 0, BRK_R4),
                      PR(R_BRKSET, 0, 0, BRK_R8));
             add_page("PHRASE", PR(R_BRKSET, 0, 0, BRK_PHRASE), PR(R_BRKSET, 0, 0, BRK_BCHANCE),
                      PR(R_BRKSET, 0, 0, BRK_ALEN), PR(R_BRKSET, 0, 0, BRK_BLEN));
-            add_page("LOOPS", PR(R_BRKSLOT, 0, 0, 0), PR(R_BRKSLOT, 1, 0, 0), PR(R_ENG, T_BRK, 0, 0),
-                     PR(R_ENG, T_BRK, 0, 1));
-            add_page("SENDS", PR(R_ENG, T_MIX, PART_BRK, 1), PR(R_ENG, T_MIX, PART_BRK, 2),
-                     PR(R_ENG, T_MIX, PART_BRK, 0), PR(R_ENG, T_MIX, PART_BRK, MX_PAN));
+            add_page("LOOPS", PR(R_BRKSLOT, 0, 0, 0), PR(R_BRKSLOT, 1, 0, 0), NONE, NONE);
+            pg_grp = GR_SOUND;
+            add_page("SOUND", PR(R_ENG, T_BRK, 0, 0), PR(R_ENG, T_BRK, 0, 1), NONE, NONE);
         }
         break;
     case V_GEN: {
         int b = bidx();
+        pg_grp = GR_PAT;
         add_page("GENERATE", PR(R_GEN, b, 0, G_DENS), PR(R_GEN, b, 0, G_ACC), PR(R_GEN, b, 0, G_SLIDE),
                  PR(R_GEN, b, 0, G_OCTS));
         add_page("SCALE", PR(R_GEN, b, 0, G_ROOT), PR(R_GEN, b, 0, G_SCALE), PR(R_GEN, b, 0, G_BASE),
@@ -636,14 +690,13 @@ static void build_pages(void)
                  PR(R_ENG, T_MIX, PART_303B, 0));
         add_page("PANS", PR(R_ENG, T_MIX, PART_909, MX_PAN), PR(R_ENG, T_MIX, PART_808, MX_PAN),
                  PR(R_ENG, T_MIX, PART_303A, MX_PAN), PR(R_ENG, T_MIX, PART_303B, MX_PAN));
+        add_page("BREAK", PR(R_ENG, T_MIX, PART_BRK, 0), PR(R_ENG, T_MIX, PART_BRK, MX_PAN), NONE, NONE);
         add_page("COMP", PR(R_ENG, T_MST, 0, MST_THRESH), PR(R_ENG, T_MST, 0, MST_RATIO),
                  PR(R_ENG, T_MST, 0, MST_ATTACK), PR(R_ENG, T_MST, 0, MST_RELEASE));
         add_page("COMP", PR(R_ENG, T_MST, 0, MST_MAKEUP), PR(R_ENG, T_MST, 0, MST_MIX), PR(R_ENG, T_MST, 0, MST_PUMP),
                  PR(R_ENG, T_MST, 0, MST_PUMPSRC));
         add_page("FILTER", PR(R_ENG, T_MST, 0, MST_MODE), PR(R_ENG, T_MST, 0, MST_CUTOFF),
                  PR(R_ENG, T_MST, 0, MST_RESO), PR(R_ENG, T_MST, 0, MST_LIMIT));
-        add_page("MORE", PR(R_ENG, T_MIX, PART_BRK, 0), PR(R_SWING, 0, 0, 0), PR(R_TEMPO, 0, 0, 0),
-                 PR(R_ACCENT, 0, 0, 0));
         break;
     case V_PERF:
         add_page("PERF", PR(R_STALLS, 0, 0, 0), NONE, NONE, NONE);
@@ -667,8 +720,8 @@ static int cur_page(void) { return ui.page[ui.view][ui.part]; }
 /* a drum machine's page of the selected track's own sound (not the whole kit's: SENDS, PART, KIT) */
 static int track_page(void)
 {
-    pref_t r = pg.r[cur_page()][0];
-    return ui.view == V_PART && is_drum() && r.kind == R_ENG && (r.a == T_909 || r.a == T_808) && r.b == ui.sel[ui.part];
+    int g = pg.group[cur_page()];
+    return ui.view == V_PART && is_drum() && (g == GR_TRACK || g == GR_TMIX);
 }
 
 /* ===================================================================== lists === */
@@ -689,13 +742,35 @@ static void list_add(pref_t r)
     list_rows[ui.list_n++] = r;
 }
 
+/* a list section's name: whose values follow */
+static void hdr_name(int g, char *t)
+{
+    const char *who = is_drum() ? engine_voice_name(ui.part == PART_909 ? T_909 : T_808, ui.sel[ui.part]) : PART_N[ui.part];
+    switch (g) {
+    case GR_TRACK: put_s(put_s(t, who), ": THIS TRACK"); break;
+    case GR_TMIX: put_s(put_s(t, who), ": TRACK MIX"); break;
+    case GR_KIT: put_s(put_s(t, PART_N[ui.part]), ": ALL TRACKS"); break;
+    case GR_PAT: put_s(put_i(put_s(t, "P"), seq.ppat[ui.part] + 1), ": THE PATTERN"); break;
+    default: put_s(put_s(t, PART_N[ui.part]), ": THE SOUND"); break;
+    }
+}
+
+static int list_skip(int i) { return i < ui.list_n && list_rows[i].kind == R_HDR; }
+
 static void open_list_of_pages(void)
 {
-    int p, k;
+    int p, k, last = -1, groups = 0;
     ui.list_n = 0;
     for (p = 0; p < pg.n; p++)
+        if (pg.group[p] != (p ? pg.group[p - 1] : GR_NONE))
+            groups++;
+    for (p = 0; p < pg.n; p++) {
+        if (groups > 1 && pg.group[p] != last && ui.list_n < LIST_MAX)
+            list_rows[ui.list_n++] = PR(R_HDR, pg.group[p], 0, 0);
+        last = pg.group[p];
         for (k = 0; k < 4; k++)
             list_add(pg.r[p][k]);
+    }
     if (ui.view == V_PERF)
         list_add(PR(R_ACT, ACT_PERF_TEST, 0, 0));
     if (ui.view == V_SONG) {
@@ -706,6 +781,8 @@ static void open_list_of_pages(void)
     }
     put_s(list_title, ui.view == V_PART ? PART_N[ui.part] : VIEW_N[ui.view]);
     ui.list_sel = ui.list_top = 0;
+    while (list_skip(ui.list_sel))
+        ui.list_sel++;
     ui.overlay = ui.list_n ? O_LIST : O_NONE;
 }
 
@@ -1677,7 +1754,11 @@ static void key_event(int k, int down)
 static void list_move(int d)
 {
     int s = ui.list_sel + d;
+    while (s > 0 && s < ui.list_n - 1 && list_skip(s))   /* over a section header */
+        s += d;
     s = s < 0 ? 0 : s >= ui.list_n ? ui.list_n - 1 : s;
+    if (list_skip(s))
+        s = ui.list_sel;
     ui.list_sel = (uint8_t)s;
     if (ui.list_sel < ui.list_top)
         ui.list_top = ui.list_sel;
@@ -1760,7 +1841,7 @@ static void button_tap(int b)
         ui.rec = !ui.rec;
         if (ui.rec && is_303())
             ui.wpos[bidx()] = 0;
-        say(ui.rec ? "RECORD ON" : "RECORD OFF", 0);
+        say(ui.rec ? "RECORD ON: KEYS + KNOBS" : "RECORD OFF", 0);
         break;
     case B_HOME:
         if (ui.overlay != O_NONE || ui.view == V_GLO)
@@ -1888,6 +1969,7 @@ static void input(void)
         if (!(ch & m))
             continue;
         if (btn & m) {
+            any_button = 1;
             ui.btn_used &= ~m;
             ui.down_t[i] = plat_ms();
             if (i == B_REC || i == B_PLAY)             /* transport acts on the press: timing */
@@ -2369,11 +2451,9 @@ static void draw_header(void)
         x = w + 6;
         if (ui.view == V_GEN)
             x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, "TB-3PO", C_HI) + 6;
-        else if (is_drum() && track_page())         /* one track's own sound */
-            x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, engine_voice_name(ui.part == PART_909 ? T_909 : T_808, ui.sel[ui.part]), C_WHITE) + 6;
-        else if (is_drum()) {                        /* the whole machine: ALL, in amber, and the page */
-            x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, "ALL", C_AMB) + 4;
-            x = cv_text(x, vc(&FONT_XS, 1, 17), &FONT_XS, pg.title[cur_page()], C_AMB) + 6;
+        else if (!(is_303() && ui.kbd[bidx()])) {   /* the page: white = this track / sound, amber = all of it */
+            int g = pg.group[cur_page()];
+            x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, pg.title[cur_page()], g == GR_KIT || g == GR_PAT ? C_AMB : C_WHITE) + 6;
         }
         else if (is_303() && ui.kbd[bidx()])
             x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, "KEYS", C_AMB) + 6;
@@ -2423,36 +2503,42 @@ static int step_of(int col) { return ui.spage * 16 + col; }
 #define GX 27
 static int32_t col_x(int c) { return GX + c * 13 + (c >> 2); }   /* a pixel between beats */
 
+#define DROW 11                                    /* drum rows: 12 of them over both bands, then the footer */
 static void draw_drum(int band)
 {
-    int k = ui.part, v, c, len = cur_pat()->drum[k].len;
+    int k = ui.part, v, c, len = cur_pat()->drum[k].len, own = track_page();
     const dpart_t *d = &cur_pat()->drum[k];
     int ph = seq.playing ? eng_step[TRK_DRUM + k] : -1;
     uint16_t col = part_col(), on_dim = dim(col, 8);
-    for (v = band * 6; v < (band ? NDRUM + 1 : 6); v++) {
-        int y = (v - band * 6) * 12 + 1, sel = v < NDRUM && v == ui.sel[k];
+    for (v = 0; v <= NDRUM; v++) {
+        int y = v * DROW + 1 - band * BAND_H, sel = v < NDRUM && v == ui.sel[k];
         const char *nm = v < NDRUM ? engine_voice_name(k == PART_909 ? T_909 : T_808, v) : "AC";
         const uint32_t *bits = v < NDRUM ? d->hit[v] : d->accent;
         int muted = v < NDRUM && ((seq.mute | seq.vmute) & (1u << (k * NDRUM + v)));
-        if (sel)
-            box(0, y - 1, 24, 12, col);
-        cv_text(5, vc(&FONT_XS, y - 1, 12), &FONT_XS, nm, sel ? C_BLACK : muted ? C_LINE : v < NDRUM ? C_GRAY : C_WHITE);
+        if (y < -DROW || y >= BAND_H)
+            continue;
+        if (sel && own)                                /* the knobs are this track's */
+            box(0, y - 1, 24, DROW, col);
+        else if (sel)                                  /* selected, but the knobs are the whole machine's */
+            frame(0, y - 1, 24, DROW, col);
+        cv_text(5, vc(&FONT_XS, y - 1, DROW), &FONT_XS, nm,
+                sel && own ? C_BLACK : sel ? col : muted ? C_LINE : v < NDRUM ? C_GRAY : C_WHITE);
         for (c = 0; c < 16; c++) {
             int s = step_of(c), x = col_x(c), hit = s < NSTEPS && sm_get(bits, s);
             if (s >= len) {
-                cv_rect(x + 5, y + 4, 2, 2, C_LINE);
+                cv_rect(x + 5, y + 3, 2, 2, C_LINE);
                 continue;
             }
             if (v == NDRUM) {                          /* the accent row: white marks */
                 if (hit)
-                    box(x + 2, y + 2, 8, 6, C_WHITE);
+                    box(x + 2, y + 1, 8, 6, C_WHITE);
                 else
-                    rbox(x + 2, y + 4, 8, 2, 1, C_LINE);
+                    rbox(x + 2, y + 3, 8, 2, 1, C_LINE);
                 continue;
             }
-            box(x, y, 12, 10, hit ? (muted ? C_DIM : sel ? col : on_dim) : (s == ph ? C_DIM : C_LINE));
+            box(x, y, 12, DROW - 2, hit ? (muted ? C_DIM : sel ? col : on_dim) : (s == ph ? C_DIM : C_LINE));
             if (hit && s == ph)
-                box(x + 2, y + 2, 8, 6, C_WHITE);
+                box(x + 2, y + 2, 8, DROW - 6, C_WHITE);
         }
     }
 }
@@ -2554,12 +2640,6 @@ static void draw_303(int band, int gen)
             put_hex(put_s(t2, "SEED "), bp->gen.seed & 0xFFFFu, 4);
             segs(4, 26, &FONT_S, C_GRAY, 18, t, t2, 0, 0);
         }
-        if (gen)                                     /* settings changed: they apply on the next press */
-            segs(4, 50, &FONT_XS, ui.gen_stale[b] ? C_WHITE : C_AMB, 16, ui.gen_stale[b] ? "OCT+  NEW LINE *" : "OCT+  NEW LINE",
-                 "OCT-  MUTATE", 0, 0);
-        else if (ui.held_step < 0)
-            segs(4, 50, &FONT_XS, C_DIM, 12, ui.kbd[b] ? "KEYS PLAY" : "PRESS: ON", ui.kbd[b] ? "REC: STEP WRITE" : "HOLD + KNOBS: EDIT",
-                 ui.kbd[b] ? 0 : "TAP: OFF", 0);
     }
 }
 
@@ -2615,8 +2695,6 @@ static void draw_break(int band)
                 put_i(put_s(q, "   RETRIG X"), div);
             cv_text(4, 36, &FONT_S, t, bank ? C_AMB : C_GRAY);
         }
-        cv_text(4, 47, &FONT_XS, "HOLD A STEP + 1-8: ITS OWN SLICE", C_DIM);
-        segs(4, 58, &FONT_XS, C_DIM, 10, "1-8 SLICES", "9 REV", "10 HALF", "11 STUT");
     }
 }
 
@@ -2650,10 +2728,13 @@ static void draw_home(int band)
             if (c == cue && c != seq.ppat[PART_909] && (ui.frame & 16u))
                 frame(x - 1, 2, 14, 20, C_WHITE);
             if (in_chain)
-                cv_rect(x, 23, 12, 2, C_AMB);
+                cv_rect(x, 30, 12, 2, C_AMB);
+            if ((c & 3) == 0) {                         /* every fourth: its number (and so the bank) */
+                char t[4];
+                put_i(t, c + 1);
+                cv_text(x + 1, 21, &FONT_XS, t, ui.pbank ? C_AMB : C_GRAY);
+            }
         }
-        if (ui.pbank)                                   /* the second bank: say so */
-            text_r(236, 22, &FONT_XS, "P17-32", C_AMB);
         for (p = 0; p < 2; p++) {
             const dpart_t *d = &pat_of(p)->drum[p];
             uint32_t bits = 0;
@@ -2677,8 +2758,6 @@ static void draw_home(int band)
                 lane((p - 2) * 16 + 1, p, pat_of(p)->brk.steps, eng_step[TRK_BRK], 16, 0);
             }
         }
-        segs(4, 50, &FONT_XS, C_DIM, 14, "WHITE: PATTERN", "TWO HELD: CHAIN", 0, 0);
-        segs(4, 60, &FONT_XS, C_DIM, 14, "BLACK 1-5: MUTE", "SEQ: SONG", ui.pbank ? "OCT-: P1-16" : "OCT+: P17-32", 0);
     }
 }
 
@@ -2696,7 +2775,7 @@ static void draw_song(int band)
                 text_c(58 + p * 36, vc(&FONT_XS, y, 12), &FONT_XS, PART_S[p], PART_COL[p]);
             continue;
         }
-        if (k > sg->len || k >= NSONG)
+        if (k > sg->len || k >= NSONG || (band && r == 5))   /* (the footer's line) */
             break;
         if (k == ui.song_sel)
             box(0, y, 236, 12, C_LINE);
@@ -2747,7 +2826,6 @@ static void draw_fx(int band)
             segs(4, 24, &FONT_S, C_GRAY, 18, t, t2, 0, 0);
             (void)q;
         }
-        segs(4, 52, &FONT_XS, C_DIM, 14, "FX AGAIN: NEXT PAGE", "SEL: EVERYTHING", 0, 0);
     }
 }
 
@@ -2784,10 +2862,10 @@ static void draw_mix(int band)
         put_s(q, u);
         cv_text(124, 20, &FONT_B, t, proj.sound.v[T_MST][0][MST_PUMP] ? C_HI : C_GRAY);
         put_s(put_i(a, (int)plat_cpu_pct()), "%");
-        cv_text(4, 50, &FONT_XS, "AUDIO LOAD", C_DIM);
-        cv_text(70, 50, &FONT_XS, a, plat_cpu_pct() > 85u ? RGB(255, 60, 60) : C_GRAY);
+        cv_text(4, 42, &FONT_XS, "AUDIO LOAD", C_DIM);
+        cv_text(70, 42, &FONT_XS, a, plat_cpu_pct() > 85u ? RGB(255, 60, 60) : C_GRAY);
         if (engine_guard_active())                    /* the overload guard is saving the CPU */
-            cv_text(100, 50, &FONT_XS, "GUARD", C_AMB);
+            cv_text(100, 42, &FONT_XS, "GUARD", C_AMB);
     }
 }
 
@@ -2911,9 +2989,12 @@ static void draw_readout(void)
     } else {
         r = pg.r[cur_page()][ui.touched];
         nm = pref_name(r);
+        static char t[24];
         if (track_page()) {                              /* a track's own: "BD  Tune" */
-            static char t[24];
             put_s(put_s(put_s(t, engine_voice_name(ui.part == PART_909 ? T_909 : T_808, ui.sel[ui.part])), "  "), nm);
+            nm = t;
+        } else if (in_pattern(r)) {                      /* the pattern's: "P3  LENGTH" (it changes with it) */
+            put_s(put_s(put_i(put_s(t, "P"), seq.ppat[r.kind == R_SWING ? PART_909 : part_view() ? ui.part : PART_909] + 1), "  "), nm);
             nm = t;
         }
     }
@@ -2944,6 +3025,13 @@ static void draw_list(int band)
         if (row >= ui.list_n)
             break;
         r = list_rows[row];
+        if (r.kind == R_HDR) {                         /* a section: whose values follow */
+            char t[28];
+            hdr_name(r.a, t);
+            cv_text(8, vc(&FONT_XS, y + 4, 16), &FONT_XS, t, C_AMB);
+            cv_rect(8, y + 20, 220, 1, C_LINE);
+            continue;
+        }
         d = pref_desc(r);
         if (sel)
             box(0, y + 1, 232, 22, dim(part_col(), 6));
@@ -3019,6 +3107,7 @@ static int help_fits(void)
     static const uint8_t views[] = {V_PART, V_HOME, V_SONG, V_GEN, V_FX, V_MIX};
     const char *l[HELP_LINES];
     ui_t keep = ui;
+    uint8_t keep_any = any_button;
     int b, p, v, kb, n, k, ok = 1;
     for (v = 0; v < (int)sizeof views; v++)
         for (p = 0; p < NPARTS; p++)
@@ -3027,6 +3116,20 @@ static int help_fits(void)
                     ui.view = views[v];
                     ui.part = (uint8_t)p;
                     ui.kbd[0] = ui.kbd[1] = (uint8_t)kb;
+                    {
+                        const char *fa, *fb, *fc;
+                        int32_t w;
+                        ui.gen_stale[0] = (uint8_t)(b & 1);
+                        ui.rec = (uint8_t)(b & 2);
+                        any_button = (uint8_t)(b != 0);
+                        footer_text(&fa, &fb, &fc);
+                        w = 4 + tw(&FONT_XS, fa) + (fb ? FOOT_GAP + tw(&FONT_XS, fb) : 0) + (fc ? FOOT_GAP + tw(&FONT_XS, fc) : 0);
+                        if (w > 236) {
+                            if (ok)
+                                printf("footer too wide: \"%s / %s / %s\" (%d px)\n", fa, fb ? fb : "", fc ? fc : "", (int)w);
+                            ok = 0;
+                        }
+                    }
                     n = help_lines(b, l);
                     if (n < 1 || n > HELP_LINES)
                         ok = 0;
@@ -3038,9 +3141,58 @@ static int help_fits(void)
                         }
                 }
     ui = keep;
+    any_button = keep_any;
     return ok;
 }
 #endif
+
+/* the footer: one line at the bottom of the main area, what the keys do on this screen (until the
+ * first button, how to find out what any of them does) */
+static uint16_t footer_text(const char **a, const char **b, const char **c)
+{
+    *a = *b = *c = 0;
+    if (!any_button) {
+        *a = "HOLD ANY BUTTON: WHAT IT DOES";
+        return C_GRAY;
+    }
+    if (ui.view == V_HOME) {
+        *a = "WHITE: PATTERN";
+        *b = "TWO: CHAIN";
+        *c = "BLACK: MUTE";
+    } else if (ui.view == V_SONG) {
+        *a = "WHITE: THE BAR'S PATTERN";
+        *b = "BLACK: MUTE";
+    } else if (ui.view == V_FX || ui.view == V_MIX) {
+        *a = "AGAIN: NEXT PAGE";
+        *b = "SEL: ALL AS A LIST";
+    } else if (ui.view == V_GEN) {
+        *a = ui.gen_stale[bidx()] ? "OCT+: NEW LINE *" : "OCT+: NEW LINE";
+        *b = "OCT-: MUTATE";
+        return ui.gen_stale[bidx()] ? C_WHITE : C_AMB;
+    } else if (is_drum()) {
+        *a = "BLACK: TRACK";
+        *b = "WHITE: STEP";
+        *c = "HOME+BLK: MUTE";
+    } else if (is_303() && ui.kbd[bidx()]) {
+        *a = ui.rec ? "KEYS WRITE STEPS" : "KEYS PLAY";
+        *b = ui.rec ? "ENV: REST" : "SEQ: STEPS";
+        *c = ui.rec ? "LFO+OCT: TIE" : 0;
+    } else if (is_303()) {
+        *a = "PRESS: ON";
+        *b = "TAP: OFF";
+        *c = "HOLD + KNOBS: EDIT";
+    } else {
+        *a = "STEP + 1-8: PIN A SLICE";                /* (1-8 play the slices numbered above) */
+        *b = "9 REV 10 HALF 11 STUT";
+    }
+    return C_DIM;
+}
+static void draw_footer(void)
+{
+    const char *a, *b, *c;
+    uint16_t col = footer_text(&a, &b, &c);
+    segs(4, vc(&FONT_XS, 61, 11), &FONT_XS, col, FOOT_GAP, a, b, c, 0);
+}
 
 static void draw_main(void)
 {
@@ -3072,6 +3224,8 @@ static void draw_main(void)
             draw_303(band, ui.view == V_GEN);
         else
             draw_break(band);
+        if (band == 1 && !ui.help && ui.overlay == O_NONE && !readout && ui.view != V_PERF)
+            draw_footer();
         if (band == 1 && readout)
             draw_readout();
     }
@@ -3163,10 +3317,6 @@ static void draw_knobs(void)
         if (touched)
             box(i * 60 + 2, 2, 56, KNOB_H - 4, dim(col, 4));
         text_c(cx, vc(&FONT_XS, 6, 12), &FONT_XS, pref_name(r), touched ? C_WHITE : C_GRAY);
-        if (in_pattern(r)) {                           /* saved with the pattern (changes with it): a P tag */
-            rbox(i * 60 + 3, 28, 9, 11, 2, C_LINE);
-            text_c(i * 60 + 8, vc(&FONT_XS, 28, 11), &FONT_XS, "P", C_HI);
-        }
         val = pref_get(r);
         if (has_motion(r)) {                           /* recorded motion: a mark, and what it plays now */
             int mv = motion_now(r);
