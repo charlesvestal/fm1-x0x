@@ -153,7 +153,6 @@ the tempo or the settings, and the history is cleared when you switch off.
 The **top line** shows, from left to right:
 
 - the part, in its colour: 909 orange, 808 red, 303A green, 303B blue, BREAK violet;
-- small dots, one for each page, with the current page lit;
 - the pattern playing, such as P3. If you've chosen a different pattern to play next, it
   appears after it: P3 >5 means pattern 5 is coming up. On a part longer than 16 steps, the 16
   steps the white keys show come after it (33-48);
@@ -164,13 +163,15 @@ The **top line** shows, from left to right:
 When you press a button that does something, the top line says what happened for about a
 second, for example SAVED or COPIED TO P5.
 
-Above the knobs, a **footer** line says what the keys do on this screen (for example BLACK: TRACK,
-WHITE: STEP). Until you first press a button it says HOLD ANY BUTTON: WHAT IT DOES: any button held
-for a second shows a card about it.
+At the very bottom, a **footer** line says what the keys do on this screen (for example BLACK:
+TRACK, WHITE: STEP). Until you first press a button it says HOLD ANY BUTTON: WHAT IT DOES: any
+button held for a second shows a card about it.
 
-The **bottom** of the screen shows the four knobs, under a tag that says whose they are: the
-selected track (BD), the whole machine (909 KIT), the pattern (P3 PATTERN), a 303's sound
-(303A FILTER), a track on the mixer (909 MIX: CP), or a held 303 step (303A STEP 5). Settings with only a few choices show a
+Above the footer are the four knobs, under a tag that says whose they are: the selected track
+(BD), the whole machine (909 KIT), the pattern (P3 PATTERN), a 303's sound (303A FILTER), a track
+on the mixer (909 MIX: CP), or a held 303 step (303A STEP 5). When a section has more than one
+page, the tag counts them (BD (1/2)); the dots at the end of its line are all the screen's pages,
+the current one lit. Settings with only a few choices show a
 row of small squares instead of a ring. When you turn a knob, its value is also shown in
 large type for a second, with whose it is: the track's (BD Tune), or the pattern's (P3 LENGTH).
 A pattern's settings (its length, rate and swing, the 303's LINE and TB-3PO settings, the break's
