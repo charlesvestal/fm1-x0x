@@ -1228,9 +1228,19 @@ static void do_undo(int redo)
     say(redo ? "REDO " : "UNDO ", t);
 }
 
+/* SAVE while playing waits for the stop: writing the flash stops the audio (the code and the samples
+ * are read from it, and a 4 KB erase takes tens of ms) */
+static uint8_t save_wait;
 static void save_project(void)
 {
-    int rc = project_save();
+    int rc;
+    if (seq.playing || seq.req_stop) {
+        save_wait = 1;
+        say("SAVES WHEN STOPPED", 0);
+        return;
+    }
+    save_wait = 0;
+    rc = project_save();
     say(rc == -7 ? "MEMORY FULL: NOT SAVED" : rc ? "SAVE FAILED" : "SAVED", 0);
     if (!rc)
         ui.dirty = 0;
@@ -3223,7 +3233,19 @@ static void draw_mix(int band)
         draw_drum_mix(band, drum_mix_page());
         return;
     }
-    if (band == 0) {                                   /* channel strips + the master's gain reduction */
+    if (band == 0 && cur_page() == pg.n - 1) {         /* MASTER: the level over the last moments, not */
+        static uint8_t hist[98];                       /* the parts (it shows the pump and the comp) */
+        static uint8_t hw;
+        int x, pk = 0;
+        for (p = 0; p < NPARTS; p++)
+            pk = eng_peak[p] > pk ? eng_peak[p] : pk;
+        hist[hw++ % 98u] = (uint8_t)(pk * 62 / 32768);
+        for (x = 0; x < 98; x++) {
+            int h = hist[(hw + (unsigned)x) % 98u];
+            cv_rect(4 + x * 2, 66 - h, 2, h + 1, part_col());
+        }
+    }
+    if (band == 0 && cur_page() != pg.n - 1) {         /* channel strips */
         for (p = 0; p < NPARTS; p++) {
             int x = 6 + p * 38, lvl = proj.sound.v[T_MIX][p][0], pk = eng_peak[p] * 64 / 32768;
             if (cur_page() == 0 && p == ui.mixsel)       /* PARTS: the part the knobs set */
@@ -3233,6 +3255,8 @@ static void draw_mix(int band)
                 rbox(x + 10, 68 - pk, 6, pk, 3, part_muted(p) ? C_DIM : PART_COL[p]);
             rbox(x + 4, 67 - lvl * 64 / 127, 18, 3, 1, C_WHITE);
         }
+    }
+    if (band == 0) {                                   /* the master's gain reduction */
         {
             int gr = (int)(engine_gr_db() * 64.0f / 24.0f);
             gr = gr > 64 ? 64 : gr;
@@ -3243,7 +3267,7 @@ static void draw_mix(int band)
         }
     } else {
         char t[24], a[12], u[8], *q;
-        for (p = 0; p < NPARTS; p++)
+        for (p = 0; p < NPARTS && cur_page() != pg.n - 1; p++)   /* the strips' names (not on MASTER) */
             text_c(6 + p * 38 + 13, 0, &FONT_XS, PART_N[p], part_muted(p) ? C_LINE : PART_COL[p]);
         if ((int)(engine_gr_db() + 0.5f))
             put_s(put_i(put_s(t, "COMP -"), (int)(engine_gr_db() + 0.5f)), "dB");
@@ -3974,6 +3998,10 @@ void ui_init(void)
 static void autosave(void)
 {
     uint32_t now = plat_ms();
+    if (save_wait && !seq.playing && !seq.req_stop) { /* SAVE pressed while playing: now */
+        save_project();
+        return;
+    }
     if (!ui.dirty || (proj.set.autosave_off && !ui.last_autosave) || seq.playing || seq.req_stop || ui.rec || perf_testing() ||
         ui.overlay == O_ASK || now - ui.act_t < AUTOSAVE_QUIET || (ui.saved_t && now - ui.saved_t < AUTOSAVE_GAP))
         return;

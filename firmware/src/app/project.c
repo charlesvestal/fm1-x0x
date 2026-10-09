@@ -403,18 +403,18 @@ static void sound_rev2(void)
     proj.sound.v[T_FX][1][0] = (uint8_t)(proj.sound.v[T_FX][0][FX_DL_TYPE] ? 16 + proj.sound.v[T_FX][0][FX_DL_WEAR] * 111 / 127 : 0);
 }
 
-/* the 909 BD gained REV and DLY before its PAN (8 -> 10): the pan and its motion move, the sends start
+/* a BD gained REV and DLY before its PAN (909: 8 -> 10, 808: 7 -> 9): the pan and its motion move, the sends start
  * at none (as the kick had) */
-static void sound_rev3(void)
+static void sound_bd_sends(int t, int pan)            /* (rev 3: the 909's at 8; rev 4: the 808's at 7) */
 {
-    uint8_t *bd = proj.sound.v[T_909][DR_BD];
+    uint8_t *bd = proj.sound.v[t][0];
     int i;
-    bd[10] = bd[8];
-    bd[8] = bd[9] = 0;
+    bd[pan + 2] = bd[pan];
+    bd[pan] = bd[pan + 1] = 0;
     for (i = 0; i < NLANE; i++) {
         lane_t *l = &proj.arr.lane[i];
-        if (l->used && l->t == T_909 && l->v == DR_BD && l->i == 8)
-            l->i = 10;
+        if (l->used && l->t == t && l->v == 0 && l->i == pan)
+            l->i = (uint8_t)(pan + 2);
     }
 }
 
@@ -441,7 +441,9 @@ int project_load(void)
     if (!sound_ok)
         bad = 1;
     if (sound_ok && proj.set.snd_rev < 3)             /* before the 909 BD's sends: its pan moves up two */
-        sound_rev3();                                 /* (first: the pans' own fixes below see the new place) */
+        sound_bd_sends(T_909, 8);                     /* (first: the pans' own fixes below see the new place) */
+    if (sound_ok && proj.set.snd_rev < 4)             /* the 808 BD's, the same */
+        sound_bd_sends(T_808, 7);
     if (proj.set.stereo < 1)                          /* saved mono: no pans there (zeros = hard left) */
         for (i = 0; i < NPARTS; i++)
             proj.sound.v[T_MIX][i][MX_PAN] = 64;

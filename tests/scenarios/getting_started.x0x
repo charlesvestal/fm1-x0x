@@ -82,5 +82,7 @@ tap REC
 expect lanes 1
 shot gs_motion.png
 # 10. save
+tap PLAY
 tap SAVE
+wait 100
 expect store_writes 6

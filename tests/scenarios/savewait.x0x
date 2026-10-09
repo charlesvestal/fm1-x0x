@@ -1,0 +1,12 @@
+# SAVE while playing waits for the stop (writing the flash stops the audio), then saves
+wait 300
+tapkey w0
+tap PLAY
+wait 500
+expect store_writes 0
+tap SAVE
+wait 500
+expect store_writes 0
+tap PLAY
+wait 300
+expect store_writes >0

@@ -1262,10 +1262,10 @@ static const char *const k_clap_names[2] = {"CLAP", "MARAC"};
 #define P_DLY {"Dly", 127, 0, 0}
 
 static const x0x_param_t k_p_bd[] = {PP("Level", 64), PP("Tone", 42), PP("Decay", 87), PP("Tune", 64),
-                                     PP("Attack", 24), P_DRIVE, P_DIST, PP("Pan", 64)};
+                                     PP("Attack", 24), P_DRIVE, P_DIST, P_REV, P_DLY, PP("Pan", 64)};   /* X0X: sends */
 static const d8_pmap_t k_m_bd[] = {{K_POT, D8P_LEVEL, 0}, {K_POT, D8P_X1, 0}, {K_POT, D8P_DECAY, 0},
                                    {K_POT, D8P_TUNE, 0}, {K_POT, D8P_X2, 0}, {K_POT, D8P_DRIVE, 0},
-                                   {K_POT, D8P_DIST, 0}, {K_PAN, 0, 0}};
+                                   {K_POT, D8P_DIST, 0}, {K_POT, D8P_REV, 0}, {K_POT, D8P_DLY, 0}, {K_PAN, 0, 0}};
 static const x0x_param_t k_p_sd[] = {PP("Level", 64), PP("Tone", 64), PP("Snappy", 89), PP("Tune", 64),
                                      PP("Decay", 108), P_DRIVE, P_DIST, P_REV, P_DLY, PP("Pan", 64)};
 static const d8_pmap_t k_m_sd[] = {{K_POT, D8P_LEVEL, 0}, {K_POT, D8P_X2, 0}, {K_POT, D8P_X1, 0},
@@ -1657,7 +1657,7 @@ static void lane_mix(drum808_t *d, d8_lane_t *l, const float *buf, int m, float 
     int s = l->snd, i, type = d->pot[s][D8P_DIST];
     const d8_shp_t *p = &d->shp[s];
     float trim = k_trim[s], g = d->potv[s][D8P_LEVEL] * l->hit * d->vol;
-    float ra = s == D8S_BD ? 0.0f : d->potv[s][D8P_REV], da = s == D8S_BD ? 0.0f : d->potv[s][D8P_DLY];
+    float ra = d->potv[s][D8P_REV], da = d->potv[s][D8P_DLY];
     int bypass = p->drive < 1.0e-3f;
     if (l->cstep == 0.0f && bypass) {             /* the common case */
         float k = trim * g * l->cg;

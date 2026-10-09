@@ -87,7 +87,7 @@ the screen shows the 909, and every part is empty.
    back.
 9. **Record a filter sweep.** Turn ALGORITHM back to 303A and press EDIT. Press REC, slowly turn KNOB 1 for a
    bar or two, then press REC again. The sweep now plays every time the pattern comes round.
-10. **Save.** Press SAVE, and everything is kept when you switch off. (X0X also saves by itself
+10. **Save.** Press PLAY to stop, then SAVE, and everything is kept when you switch off. (X0X also saves by itself
     a few seconds after you stop playing; see section 15.)
 
 From here, section 9 shows how to make more patterns and switch between them, and section 12
@@ -544,7 +544,8 @@ reduction in red. It has four pages:
   fades out of the other.
 - **909 MIX** and **808 MIX**: each drum machine's own mixer, every track's level at a glance;
   the black keys pick a track, and the knobs set its LEVEL, PAN, REV and DLY.
-- **MASTER**: four knobs over the whole mix.
+- **MASTER**: four knobs over the whole mix. The screen shows the output level over the last
+  couple of seconds, so you can see the pump and the compressor working.
 
 On PARTS, 909 MIX and 808 MIX, hold HOME and press a black key to mute or unmute that channel (a
 part on PARTS, a track on the drum pages). The key lights show it: the channel the knobs set is
@@ -596,7 +597,9 @@ Press GLO for these settings:
 | ABOUT X0X | Shows the version, how full the memory for patterns is (MEM), and the audio load. |
 
 Press **SAVE** to save the sounds, all 32 patterns, the song, the knob motion, the tempo and
-the settings. A small dot at the top right of the screen means you have unsaved changes.
+the settings. A small dot at the top right of the screen means you have unsaved changes. Saving
+pauses the sound for a moment (the FM-1 plays from the same memory it saves to), so a SAVE
+pressed while playing waits: the top line says SAVES WHEN STOPPED, and it saves when you stop.
 
 X0X packs the patterns, the song and the knob motion to fit them in the FM-1's memory; empty
 steps take almost no room, so a typical project uses a small part of it (GLO > ABOUT X0X shows
