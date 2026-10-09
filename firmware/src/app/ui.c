@@ -2099,9 +2099,9 @@ static void input(void)
 /* ================================================================== drawing === */
 #define HDR_H 20
 #define MAIN_Y 20
-#define BAND_H 72
-#define KNOB_Y 164
-#define KNOB_H 76
+#define BAND_H 69                     /* the main area: two bands of 69 (the knob row takes the 6 below) */
+#define KNOB_Y 158
+#define KNOB_H 82
 
 static uint32_t blit_hash[4];
 static uint32_t cv_hash(void)
@@ -2519,7 +2519,7 @@ static int step_of(int col) { return ui.spage * 16 + col; }
 #define GX 27
 static int32_t col_x(int c) { return GX + c * 13 + (c >> 2); }   /* a pixel between beats */
 
-#define DROW 12                                    /* drum rows: 12 of them over both bands */
+#define DROW 11                                    /* drum rows: 12 of them over both bands, a gap under */
 static void draw_drum(int band)
 {
     int k = ui.part, v, c, len = cur_pat()->drum[k].len;
@@ -2780,31 +2780,31 @@ static void draw_song(int band)
     const song_t *sg = song();
     int r, p, top = ui.song_sel > 5 ? ui.song_sel - 5 : 0;
     for (r = 0; r < 6; r++) {
-        int row = band * 6 + r, y = r * 12, k = top + row - 1;
+        int row = band * 6 + r, y = r * 11, k = top + row - 1;
         char t[8];
         if (row == 0) {                                /* the heading */
-            cv_text(4, vc(&FONT_XS, y, 12), &FONT_XS, "BAR", C_GRAY);
+            cv_text(4, vc(&FONT_XS, y, 11), &FONT_XS, "BAR", C_GRAY);
             for (p = 0; p < NPARTS; p++)
-                text_c(58 + p * 36, vc(&FONT_XS, y, 12), &FONT_XS, PART_S[p], PART_COL[p]);
+                text_c(58 + p * 36, vc(&FONT_XS, y, 11), &FONT_XS, PART_S[p], PART_COL[p]);
             continue;
         }
         if (k > sg->len || k >= NSONG)
             break;
         if (k == ui.song_sel)
-            box(0, y, 236, 12, C_LINE);
+            box(0, y, 236, 11, C_LINE);
         put_i(t, k + 1);
-        cv_text(4, vc(&FONT_XS, y, 12), &FONT_XS, t, k == ui.song_sel ? C_WHITE : C_GRAY);
+        cv_text(4, vc(&FONT_XS, y, 11), &FONT_XS, t, k == ui.song_sel ? C_WHITE : C_GRAY);
         if (seq.song_on && seq.playing && k == seq.song_pos)
             play_icon(26, y + 1, seq.song_rec ? RGB(255, 80, 70) : C_WHITE);
         if (k == sg->len) {                            /* one past the end: where the song grows */
-            cv_text(50, vc(&FONT_XS, y, 12), &FONT_XS, k ? "END" : "EMPTY: WHITE KEYS ADD BARS", C_DIM);
+            cv_text(50, vc(&FONT_XS, y, 11), &FONT_XS, k ? "END" : "EMPTY: WHITE KEYS ADD BARS", C_DIM);
             continue;
         }
         for (p = 0; p < NPARTS; p++) {
             int muted = sg->bar[k].mute >> p & 1u;
             t[0] = 'P';
             put_i(t + 1, sg->bar[k].pat[p] + 1);
-            text_c(58 + p * 36, vc(&FONT_XS, y, 12), &FONT_XS, muted ? "-" : t, muted ? C_DIM : PART_COL[p]);
+            text_c(58 + p * 36, vc(&FONT_XS, y, 11), &FONT_XS, muted ? "-" : t, muted ? C_DIM : PART_COL[p]);
         }
     }
 }
@@ -3010,12 +3010,12 @@ static void draw_perf(int band)
         q = put_s(t, "RENDER ");
         q = put_i(q, perf.cps);
         put_s(q, " CYCLES / SAMPLE");
-        cv_text(4, 50, &FONT_XS, t, C_GRAY);
+        cv_text(4, 44, &FONT_XS, t, C_GRAY);
     }
     q = put_s(t, engine_guard_active() ? "GUARD ON  " : "GUARD ");   /* the overload guard: engaged, times */
     put_s(put_i(q, (int)eng_guard_count), "x");
-    text_r(236, 60, &FONT_XS, t, engine_guard_active() ? C_AMB : C_DIM);
-    cv_text(4, 60, &FONT_XS, "SEL: RUN PERF TEST", C_DIM);
+    text_r(236, 55, &FONT_XS, t, engine_guard_active() ? C_AMB : C_DIM);
+    cv_text(4, 55, &FONT_XS, "SEL: RUN PERF TEST", C_DIM);
 }
 
 /* the readout: the knob being turned, large, across the bottom band */
@@ -3066,7 +3066,7 @@ static void draw_list(int band)
 {
     int i;
     for (i = 0; i < 3; i++) {
-        int row = ui.list_top + band * 3 + i, y = i * 24, sel = row == ui.list_sel;
+        int row = ui.list_top + band * 3 + i, y = i * 23, sel = row == ui.list_sel;
         pref_t r;
         char num[16], unit[8];
         const x0x_param_t *d;
@@ -3077,12 +3077,12 @@ static void draw_list(int band)
             char t[28];
             hdr_name(r.a, t);
             cv_text(8, vc(&FONT_XS, y + 4, 16), &FONT_XS, t, C_AMB);
-            cv_rect(8, y + 20, 220, 1, C_LINE);
+            cv_rect(8, y + 19, 220, 1, C_LINE);
             continue;
         }
         d = pref_desc(r);
         if (sel)
-            box(0, y + 1, 232, 22, dim(part_col(), 6));
+            box(0, y + 1, 232, 21, dim(part_col(), 6));
         cv_text(8, vc(sel ? &FONT_B : &FONT_S, y + 1, 18), sel ? &FONT_B : &FONT_S, pref_name(r), sel ? C_WHITE : C_GRAY);
         if (r.kind == R_ACT) {                         /* an action: the return arrow */
             uint16_t ac = sel ? C_WHITE : C_DIM;
@@ -3107,8 +3107,8 @@ static void draw_list(int band)
         }
     }
     if (ui.list_n > 6) {                               /* the scrollbar */
-        int h = 144 * 6 / ui.list_n, y = 144 * ui.list_top / ui.list_n - band * 72;
-        rbox(235, 0, 3, 72, 1, C_LINE);
+        int h = 2 * BAND_H * 6 / ui.list_n, y = 2 * BAND_H * ui.list_top / ui.list_n - band * BAND_H;
+        rbox(235, 0, 3, BAND_H, 1, C_LINE);
         rbox(235, y, 3, h, 1, C_HI);
     }
 }
@@ -3246,7 +3246,7 @@ static uint16_t footer_text(const char **a, const char **b, const char **c)
     }
     return C_DIM;
 }
-#define FOOT_Y 65                     /* in the knob row: its last line, in the tiny face */
+#define FOOT_Y 71                     /* in the knob row: its last line, in the tiny face */
 static void draw_footer(void)
 {
     const char *a, *b, *c;
@@ -3384,15 +3384,15 @@ static void draw_knobs(void)
         return;
     last_sig = sig;
     cv_begin(240, KNOB_H, C_BLACK);
-    {   /* the tag on the row's top rule, the page dots at its end */
+    {   /* the rule; at its right end, where you are: the tag, then the page dots */
         char t[28];
-        int32_t x, xd = 236 - (pg.n > 1 && ui.view != V_GLO ? pg.n * 5 : 0);
+        int dots = pg.n > 1 && ui.view != V_GLO;
+        int32_t xd = 237 - (dots ? pg.n * 5 : 0), xt;
         knob_tag(t);
-        cv_rect(0, 5, 6, 1, C_LINE);
-        x = cv_text(9, vc(&FONT_XS, 0, 11), &FONT_XS, t, C_HI) + 4;
-        if (xd > x)
-            cv_rect(x, 5, xd - x - 2, 1, C_LINE);
-        if (pg.n > 1 && ui.view != V_GLO) {
+        xt = xd - (dots ? 5 : 0) - tw(&FONT_XS, t);
+        cv_rect(0, 5, xt - 5, 1, C_LINE);
+        cv_text(xt, vc(&FONT_XS, 0, 11), &FONT_XS, t, C_HI);
+        if (dots) {
             int k;
             for (k = 0; k < pg.n; k++)
                 cv_rect(xd + k * 5, 4, 3, 3, k == cur_page() ? C_HI : C_LINE);
@@ -3408,15 +3408,15 @@ static void draw_knobs(void)
             char v[12];
             int cx = i * 60 + 30;
             if (i)
-                cv_rect(i * 60, 13, 1, 46, C_LINE);
+                cv_rect(i * 60, 14, 1, 50, C_LINE);
             if (i == 0)
                 put_note(v, held_note_of(bp, ui.held_step) + bp->transpose - 24);
             else if (i == 1)
                 put_s(v, G[bstep_gate(st)]);
             else
                 put_s(v, (st->flags & (i == 2 ? BS_ACCENT : BS_SLIDE)) ? "ON" : "OFF");
-            text_c(cx, vc(&FONT_XS, 12, 10), &FONT_XS, SN[i], C_GRAY);
-            text_c(cx, vc(&FONT_M, 28, 34), &FONT_M, v, C_WHITE);
+            text_c(cx, vc(&FONT_XS, 13, 10), &FONT_XS, SN[i], C_GRAY);
+            text_c(cx, vc(&FONT_M, 30, 34), &FONT_M, v, C_WHITE);
         }
         cv_commit(3, 0, KNOB_Y);
         return;
@@ -3428,16 +3428,16 @@ static void draw_knobs(void)
         int cx = i * 60 + 30, val, touched = ui.touched == i;
         uint16_t col = drum_mix_page() >= 0 ? PART_COL[drum_mix_page()] : part_col();   /* MIX: 909 in the 909's */
         if (i)
-            cv_rect(i * 60, 13, 1, 46, C_LINE);
+            cv_rect(i * 60, 14, 1, 50, C_LINE);
         if (!d)
             continue;
         if (touched)
-            box(i * 60 + 2, 10, 56, 51, dim(col, 4));
-        text_c(cx, vc(&FONT_XS, 12, 10), &FONT_XS, pref_name(r), touched ? C_WHITE : C_GRAY);
+            box(i * 60 + 2, 11, 56, 56, dim(col, 4));
+        text_c(cx, vc(&FONT_XS, 13, 10), &FONT_XS, pref_name(r), touched ? C_WHITE : C_GRAY);
         val = pref_get(r);
         if (has_motion(r)) {                           /* recorded motion: a mark, and what it plays now */
             int mv = motion_now(r);
-            dot(i * 60 + 52, 15, 2, mv >= 0 ? C_WHITE : C_DIM);
+            dot(i * 60 + 52, 17, 2, mv >= 0 ? C_WHITE : C_DIM);
             if (mv >= 0)
                 val = mv;
         }
@@ -3445,13 +3445,13 @@ static void draw_knobs(void)
             int n = d->max + 1, k, pw = n > 6 ? 3 : 6, gap = 2, w0 = n * (pw + gap) - gap;
             if (n <= 12)
                 for (k = 0; k < n; k++)
-                    box(cx - w0 / 2 + k * (pw + gap), 31, pw, 9, k == val ? col : C_LINE);
+                    box(cx - w0 / 2 + k * (pw + gap), 33, pw, 9, k == val ? col : C_LINE);
         } else {
-            arc(cx, 36, 11, d->max ? (float)val / (float)d->max : 0.0f, C_LINE, col,
+            arc(cx, 38, 12, d->max ? (float)val / (float)d->max : 0.0f, C_LINE, col,
                 r.kind == R_BTRANS || is_pan(r));                                              /* from the middle */
         }
         pref_value_of(r, val, num, unit);
-        cell_value(cx, vc(&FONT_B, 50, 13), num, unit, touched ? C_WHITE : C_HI);
+        cell_value(cx, vc(&FONT_B, 53, 13), num, unit, touched ? C_WHITE : C_HI);
     }
     cv_commit(3, 0, KNOB_Y);
 }
