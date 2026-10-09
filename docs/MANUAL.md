@@ -114,7 +114,7 @@ screen's pages. ALGORITHM only picks the part.
 | KNOB 1–4 | Change the four values shown at the bottom of the screen. Turn slowly for single steps, quickly to sweep: a fast half turn covers the whole range. |
 | SEL | Shows everything on the current screen as a list. In a list, it runs the highlighted action. When X0X asks a question, SEL means yes. |
 | HOME | The pattern: all five parts. Press it again for the song, and again to come back. In a list, it goes back; when X0X asks a question, HOME means no. |
-| SEQ | The selected part's steps, with its LENGTH, RATE and (on a 303) DIRECTION and TRANSPOSE. Press it again for the next page. |
+| SEQ | The selected part's steps, with its LENGTH, RATE and (on a 303) DIRECTION and TRANSPOSE (SWING is on HOME: it's every part's). Press it again for the next page. |
 | EDIT | The selected part's sound, with its steps still on the keys. Press it again for the next page. |
 | ARP | TB-3PO, the 303 line generator (on a 303 only). Press it again for the next page. |
 | FX | Opens the effects. |
@@ -245,8 +245,7 @@ Press EDIT to step through the pages: the selected track's sound (one page, two 
 kick), then KIT, for the whole machine: ACCENT, how much louder accented steps are, and on the
 808 CHOKE. Each track's DRIVE and DIST are in SEL's list, under MORE.
 
-A drum machine's LENGTH, RATE and the SWING are on SEQ (the swing is also on HOME's PERFORM
-page). Each track's level, pan and reverb and delay sends are on the mixer: press
+A drum machine's LENGTH and RATE are on SEQ. SWING is on HOME: it swings every part. Each track's level, pan and reverb and delay sends are on the mixer: press
 LFO and go to the 909 MIX or 808 MIX page, which shows all eleven tracks' levels at once. The
 black keys pick a track there, and the knobs are its LEVEL, PAN, REV and DLY (the 909's kick has
 no sends). On the 808 the alternate sounds share their track's pan, so the conga sits where the
