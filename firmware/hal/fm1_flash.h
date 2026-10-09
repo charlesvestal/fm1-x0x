@@ -225,23 +225,8 @@ static void fl_plain_window_init(void)
     __asm__ volatile("csync\n\tsti" ::: "memory");
 }
 
-/* the flash goes off between these: the second core (fm1_cpu1.h, when the app has it) waits in RAM */
-static inline uint32_t irq_save(void)
-{
-    __asm__ volatile("cli" ::: "memory");
-#ifdef FM1_HAVE_CPU1
-    fm1_cpu1_park();
-#endif
-    return 0;
-}
-static inline void irq_restore(uint32_t f)
-{
-    (void)f;
-#ifdef FM1_HAVE_CPU1
-    fm1_cpu1_unpark();
-#endif
-    __asm__ volatile("csync\n\tsti" ::: "memory");
-}
+static inline uint32_t irq_save(void) { __asm__ volatile("cli" ::: "memory"); return 0; }
+static inline void irq_restore(uint32_t f) { (void)f; __asm__ volatile("csync\n\tsti" ::: "memory"); }
 
 static int fl_erase4k(uint32_t off, uint32_t *took_us)
 {

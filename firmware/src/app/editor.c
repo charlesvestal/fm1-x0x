@@ -57,9 +57,7 @@ static uint32_t ed_smp_slot(uint32_t k) { return SMP_USER_BASE + k * SMP_USER_SI
 static void ed_smp_inval(uint32_t k)
 {
     fm1_irq_off();
-    fm1_cpu1_park();                                  /* the second core out of the flash */
     fl_inval(ed_smp_slot(k), SMP_USER_SIZE);
-    fm1_cpu1_unpark();
     fm1_irq_on();
 }
 static int ed_smp_erase(uint32_t k, uint32_t all)

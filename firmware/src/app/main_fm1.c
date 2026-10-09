@@ -4,7 +4,7 @@
 /* X0X on the FM-1: boot (WDT first, boot-loop guard, guards), LCD, input (TIMER5 10 kHz),
  * audio (ALNK0), USB; then the main loop: UI at ~60 frames/s, input polled in between. */
 extern uint32_t _data_start[], _data_end[], _data_load[], _bss_start[], _bss_end[];
-extern uint32_t _pool_start[], _pool_end[], _rt_start[], _rt_end[], _rt_load[];
+extern uint32_t _pool_start[], _pool_end[], _rt_start[], _rt_end[], _rt_load[], _c1_start[], _c1_end[], _c1_load[];
 
 /* --------------------------------------------------------------- audio --- */
 /* X0X: 512-frame halves (11.6 ms; Felucca 256). The render runs inside the DMA's deadline, and a
@@ -405,6 +405,8 @@ void fm1_cstart(void)
         *d = *s;
     for (s = _rt_load, d = _rt_start; d < _rt_end; s++, d++)
         *d = *s;
+    for (s = _c1_load, d = _c1_start; d < _c1_end; s++, d++)
+        *d = *s;                                    /* the second core's loop (fm1_cpu1.h) */
     fm1_mailbox_clear();
     fm1_guard_enable(FM1_GUARD_STACK | FM1_GUARD_WRITE | FM1_GUARD_BUS | FM1_GUARD_PC);
     safe_mode = (uint8_t)(p3 >> 8);
