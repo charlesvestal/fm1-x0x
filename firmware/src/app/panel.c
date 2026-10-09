@@ -60,7 +60,7 @@ static void panel_setup(void)
     for (i = 0; i < NB; i++) {
         uint32_t p = 0, id;
         draw_text_box(0, 80, 240, &FONT_S, "PRESS", C_GRAY, 1);
-        draw_text_box(0, 100, 240, &FONT_L, B_NAME[i], C_WHITE, 1);
+        draw_text_box(0, 100, 240, &FONT_M, B_NAME[i], C_WHITE, 1);
         t0 = fm1_ms;
         while (!(p & ~used)) {
             fm1_wdt_feed();
@@ -79,7 +79,7 @@ static void panel_setup(void)
         uint32_t e;
         int32_t st = 0;
         draw_text_box(0, 80, 240, &FONT_S, "TURN RIGHT", C_GRAY, 1);
-        draw_text_box(0, 100, 240, &FONT_L, E_NAME[i], C_WHITE, 1);
+        draw_text_box(0, 100, 240, &FONT_M, E_NAME[i], C_WHITE, 1);
         for (e = 0; e < 7u; e++)
             fm1_enc_take(e);
         t0 = fm1_ms;

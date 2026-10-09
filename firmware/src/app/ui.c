@@ -592,8 +592,8 @@ static pref_t find_ref(int t, int v, const char *n)
     return NONE;
 }
 
-/* a drum track: its sound pages (DRIVE and DIST always knobs 3 and 4 of the last one), then its MIX
- * page: LEVEL, PAN, REV, DLY, the same knobs on every track (a track without sends leaves 3, 4 empty) */
+/* a drum track: its sound pages, DRIVE and DIST always knobs 3 and 4 of the last one (its level, pan
+ * and sends: MIX's 909 MIX / 808 MIX page) */
 static void add_track_pages(int t, int v)
 {
     const char *nm = engine_voice_name(t, v);
@@ -612,9 +612,6 @@ static void add_track_pages(int t, int v)
     k = i < n ? n - i : 0;
     put_s(put_s(mt, nm), " DRIVE");                    /* a page of only the drive says so */
     add_page(k ? nm : mt, k > 0 ? snd[i] : NONE, k > 1 ? snd[i + 1] : NONE, find_ref(t, v, "Drive"), find_ref(t, v, "Dist"));
-    put_s(put_s(mt, nm), " MIX");
-    pg_grp = GR_TMIX;
-    add_page(mt, find_ref(t, v, "Level"), find_ref(t, v, "Pan"), find_ref(t, v, "Rev"), find_ref(t, v, "Dly"));
 }
 
 static void build_pages(void)
@@ -688,6 +685,11 @@ static void build_pages(void)
         add_page("PANS", PR(R_ENG, T_MIX, PART_909, MX_PAN), PR(R_ENG, T_MIX, PART_808, MX_PAN),
                  PR(R_ENG, T_MIX, PART_303A, MX_PAN), PR(R_ENG, T_MIX, PART_303B, MX_PAN));
         add_page("BREAK", PR(R_ENG, T_MIX, PART_BRK, 0), PR(R_ENG, T_MIX, PART_BRK, MX_PAN), NONE, NONE);
+        for (p = 0; p < NKIT; p++) {                    /* each drum machine's tracks: LEVEL, PAN, REV, DLY */
+            int t = p ? T_808 : T_909, v = ui.sel[p];
+            add_page(p ? "808 MIX" : "909 MIX", find_ref(t, v, "Level"), find_ref(t, v, "Pan"), find_ref(t, v, "Rev"),
+                     find_ref(t, v, "Dly"));
+        }
         add_page("COMP", PR(R_ENG, T_MST, 0, MST_THRESH), PR(R_ENG, T_MST, 0, MST_RATIO),
                  PR(R_ENG, T_MST, 0, MST_ATTACK), PR(R_ENG, T_MST, 0, MST_RELEASE));
         add_page("COMP", PR(R_ENG, T_MST, 0, MST_MAKEUP), PR(R_ENG, T_MST, 0, MST_MIX), PR(R_ENG, T_MST, 0, MST_PUMP),
@@ -713,6 +715,13 @@ static void build_pages(void)
 }
 
 static int cur_page(void) { return ui.page[ui.view][ui.part]; }
+
+/* MIX's page of a drum machine's tracks: which machine (0 / 1), -1 = not one */
+static int drum_mix_page(void)
+{
+    const char *t = pg.title[cur_page()];
+    return ui.view == V_MIX && t[4] == 'M' && t[5] == 'I' && t[6] == 'X' ? (t[0] == '8') : -1;
+}
 
 /* a drum machine's page of the selected track's own sound (not the whole kit's: SENDS, PART, KIT) */
 static int track_page(void)
@@ -1690,6 +1699,16 @@ static void key_event(int k, int down)
         }
         return;
     }
+    if (bl >= 0 && drum_mix_page() >= 0) {            /* MIX, a drum machine's page: black keys pick the track */
+        if (down) {
+            int km = drum_mix_page();
+            ui.sel[km] = (uint8_t)bl;
+            if (proj.set.keysound || !seq.playing)
+                engine_drum(km, bl, 0.75f);
+            build_pages();
+        }
+        return;
+    }
     if (ui.view == V_HOME && bl >= 0) {
         if (down && bl < NPARTS) {
             seq.mute = part_muted(bl) ? seq.mute & ~MUTE_MASK[bl] : seq.mute | MUTE_MASK[bl];
@@ -2448,8 +2467,6 @@ static void draw_header(void)
         x = w + 6;
         if (ui.view == V_GEN)
             x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, "TB-3PO", C_HI) + 6;
-        else if (!(is_303() && ui.kbd[bidx()]))     /* the page's name says whose knobs these are */
-            x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, pg.title[cur_page()], C_HI) + 6;
         else if (is_303() && ui.kbd[bidx()])
             x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, "KEYS", C_AMB) + 6;
     } else {
@@ -2821,9 +2838,38 @@ static void draw_fx(int band)
     }
 }
 
+/* MIX, a drum machine's page: its eleven tracks' levels (and pans), the selected one lit */
+static void draw_drum_mix(int band, int k)
+{
+    int t = k ? T_808 : T_909, v;
+    uint16_t col = PART_COL[k];
+    for (v = 0; v < NDRUM; v++) {
+        int x = 4 + v * 21, sel = v == ui.sel[k];
+        pref_t lv = find_ref(t, v, "Level"), pn = find_ref(t, v, "Pan");
+        int l = lv.kind ? proj.sound.v[t][v][lv.c] : 0, pa = pn.kind ? proj.sound.v[t][v][pn.c] : 64;
+        int muted = (seq.mute | seq.vmute) & (1u << (k * NDRUM + v));
+        if (band == 0) {
+            if (sel)
+                box(x, 0, 19, 72, dim(col, 3));
+            rbox(x + 7, 4, 5, 62, 2, C_LINE);
+            rbox(x + 7, 66 - l * 62 / 127, 5, l * 62 / 127, 2, muted ? C_DIM : sel ? col : dim(col, 9));
+        } else {
+            if (sel)
+                box(x, 0, 19, 30, dim(col, 3));
+            text_c(x + 10, vc(&FONT_XS, 1, 12), &FONT_XS, engine_voice_name(t, v), sel ? C_WHITE : muted ? C_LINE : C_GRAY);
+            rbox(x + 3, 20, 13, 3, 1, C_LINE);                  /* the pan, a mark from the middle */
+            rbox(x + 3 + (pa * 10) / 127, 18, 3, 7, 1, sel ? C_WHITE : C_GRAY);
+        }
+    }
+}
+
 static void draw_mix(int band)
 {
     int p;
+    if (drum_mix_page() >= 0) {
+        draw_drum_mix(band, drum_mix_page());
+        return;
+    }
     if (band == 0) {                                   /* channel strips + the master's gain reduction */
         for (p = 0; p < NPARTS; p++) {
             int x = 6 + p * 38, lvl = proj.sound.v[T_MIX][p][0], pk = eng_peak[p] * 64 / 32768;
@@ -2993,15 +3039,21 @@ static void draw_readout(void)
     pref_value(r, num, unit);
     {   /* one row: the name on the left, the value (+ unit) on the right, both on the box's middle */
         const int32_t bx = 8, by = 14, bw = 224, bh = 50;
-        int32_t ly = vc(&FONT_L, by, bh), uw = unit[0] ? tw(&FONT_S, unit) + 3 : 0;
+        const felucca_font_t *vf = &FONT_L;           /* the big face has numbers only: a name in the next size */
+        int32_t ly, uw = unit[0] ? tw(&FONT_S, unit) + 3 : 0;
+        const char *q;
+        for (q = num; *q; q++)
+            if ((uint8_t)*q > '9')
+                vf = &FONT_M;
+        ly = vc(vf, by, bh);
         box(bx, by, bw, bh, C_BLACK);
         frame(bx, by, bw, bh, part_col());
         cv_text(bx + 12, vc(&FONT_B, by, bh), &FONT_B, nm, C_GRAY);
-        w = tw(&FONT_L, num);
+        w = tw(vf, num);
         x = bx + bw - 12 - uw - w;
-        cv_text(x, ly, &FONT_L, num, C_WHITE);
+        cv_text(x, ly, vf, num, C_WHITE);
         if (unit[0])
-            cv_text(bx + bw - 12 - uw + 3, base_y(&FONT_L, ly, &FONT_S), &FONT_S, unit, C_GRAY);
+            cv_text(bx + bw - 12 - uw + 3, base_y(vf, ly, &FONT_S), &FONT_S, unit, C_GRAY);
     }
 }
 
@@ -3154,6 +3206,9 @@ static uint16_t footer_text(const char **a, const char **b, const char **c)
     } else if (ui.view == V_SONG) {
         *a = "WHITE: THE BAR'S PATTERN";
         *b = "BLACK: MUTE";
+    } else if (drum_mix_page() >= 0) {
+        *a = "BLACK: TRACK";
+        *b = "AGAIN: NEXT PAGE";
     } else if (ui.view == V_FX || ui.view == V_MIX) {
         *a = "AGAIN: NEXT PAGE";
         *b = "SEL: ALL AS A LIST";
@@ -3264,6 +3319,23 @@ static uint32_t knobs_sig(void)
     return h;
 }
 
+/* the knob row's tag: whose knobs these are (BD, 909 KIT, P3 PATTERN, 909 MIX: BD, 303A STEP 5) */
+static void knob_tag(char *t)
+{
+    int g = pg.group[cur_page()], dm = drum_mix_page();
+    const char *ti = pg.title[cur_page()];
+    if (ui.view == V_PART && is_303() && ui.held_step >= 0)
+        put_i(put_s(put_s(t, PART_N[ui.part]), " STEP "), ui.held_step + 1);
+    else if (dm >= 0)
+        put_s(put_s(put_s(t, ti), ": "), engine_voice_name(dm ? T_808 : T_909, ui.sel[dm]));
+    else if (g == GR_PAT)
+        put_s(put_s(put_i(put_s(t, "P"), seq.ppat[ui.part] + 1), " "), ti);
+    else if (g == GR_KIT || g == GR_SOUND)
+        put_s(put_s(put_s(t, PART_N[ui.part]), " "), ti);
+    else
+        put_s(t, ti);
+}
+
 static void draw_knobs(void)
 {
     static uint32_t last_sig;
@@ -3273,7 +3345,14 @@ static void draw_knobs(void)
         return;
     last_sig = sig;
     cv_begin(240, KNOB_H, C_BLACK);
-    cv_rect(0, 0, 240, 1, C_LINE);
+    {   /* the tag on the row's top rule */
+        char t[24];
+        int32_t x;
+        knob_tag(t);
+        cv_rect(0, 5, 6, 1, C_LINE);
+        x = cv_text(9, vc(&FONT_XS, 0, 11), &FONT_XS, t, C_HI) + 4;
+        cv_rect(x, 5, 240 - x, 1, C_LINE);
+    }
     if (ui.view == V_PART && is_303() && ui.held_step >= 0) {     /* the held step's own knobs */
         static const char *const SN[4] = {"NOTE", "GATE", "ACCENT", "SLIDE"};
         static const char *const G[3] = {"REST", "NOTE", "TIE"};
@@ -3283,15 +3362,15 @@ static void draw_knobs(void)
             char v[12];
             int cx = i * 60 + 30;
             if (i)
-                cv_rect(i * 60, 6, 1, KNOB_H - 12, C_LINE);
+                cv_rect(i * 60, 14, 1, KNOB_H - 20, C_LINE);
             if (i == 0)
                 put_note(v, held_note_of(bp, ui.held_step) + bp->transpose - 24);
             else if (i == 1)
                 put_s(v, G[bstep_gate(st)]);
             else
                 put_s(v, (st->flags & (i == 2 ? BS_ACCENT : BS_SLIDE)) ? "ON" : "OFF");
-            text_c(cx, vc(&FONT_XS, 5, 12), &FONT_XS, SN[i], C_GRAY);
-            text_c(cx, vc(&FONT_M, 26, 34), &FONT_M, v, C_WHITE);
+            text_c(cx, vc(&FONT_XS, 11, 12), &FONT_XS, SN[i], C_GRAY);
+            text_c(cx, vc(&FONT_M, 30, 34), &FONT_M, v, C_WHITE);
         }
         cv_commit(3, 0, KNOB_Y);
         return;
@@ -3303,16 +3382,16 @@ static void draw_knobs(void)
         int cx = i * 60 + 30, val, touched = ui.touched == i;
         uint16_t col = part_col();
         if (i)
-            cv_rect(i * 60, 8, 1, KNOB_H - 16, C_LINE);
+            cv_rect(i * 60, 14, 1, KNOB_H - 20, C_LINE);
         if (!d)
             continue;
         if (touched)
-            box(i * 60 + 2, 2, 56, KNOB_H - 4, dim(col, 4));
-        text_c(cx, vc(&FONT_XS, 6, 12), &FONT_XS, pref_name(r), touched ? C_WHITE : C_GRAY);
+            box(i * 60 + 2, 11, 56, KNOB_H - 13, dim(col, 4));
+        text_c(cx, vc(&FONT_XS, 11, 12), &FONT_XS, pref_name(r), touched ? C_WHITE : C_GRAY);
         val = pref_get(r);
         if (has_motion(r)) {                           /* recorded motion: a mark, and what it plays now */
             int mv = motion_now(r);
-            dot(i * 60 + 52, 8, 2, mv >= 0 ? C_WHITE : C_DIM);
+            dot(i * 60 + 52, 16, 2, mv >= 0 ? C_WHITE : C_DIM);
             if (mv >= 0)
                 val = mv;
         }
@@ -3320,13 +3399,13 @@ static void draw_knobs(void)
             int n = d->max + 1, k, pw = n > 6 ? 3 : 6, gap = 2, w0 = n * (pw + gap) - gap;
             if (n <= 12)
                 for (k = 0; k < n; k++)
-                    box(cx - w0 / 2 + k * (pw + gap), 26, pw, 10, k == val ? col : C_LINE);
+                    box(cx - w0 / 2 + k * (pw + gap), 32, pw, 9, k == val ? col : C_LINE);
         } else {
-            arc(cx, 34, 15, d->max ? (float)val / (float)d->max : 0.0f, C_LINE, col,
+            arc(cx, 38, 12, d->max ? (float)val / (float)d->max : 0.0f, C_LINE, col,
                 r.kind == R_BTRANS || is_pan(r));                                              /* from the middle */
         }
         pref_value_of(r, val, num, unit);
-        cell_value(cx, vc(&FONT_B, 55, 14), num, unit, touched ? C_WHITE : C_HI);
+        cell_value(cx, vc(&FONT_B, 57, 14), num, unit, touched ? C_WHITE : C_HI);
     }
     cv_commit(3, 0, KNOB_Y);
 }

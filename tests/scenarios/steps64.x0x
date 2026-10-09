@@ -17,8 +17,7 @@ expect hit0.0.62 1
 tap OCT-
 tapkey w0
 expect hit0.0.32 1
-# LENGTH to 64 (the PART page: BD's three pages, SENDS, PART), and it plays to step 64
-tap EDIT
+# LENGTH to 64 (the PATTERN page: BD's two pages, KIT, PATTERN), and it plays to step 64
 tap EDIT
 tap EDIT
 tap EDIT

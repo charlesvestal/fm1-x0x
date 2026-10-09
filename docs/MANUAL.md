@@ -153,8 +153,6 @@ the tempo or the settings, and the history is cleared when you switch off.
 The **top line** shows, from left to right:
 
 - the part, in its colour: 909 orange, 808 red, 303A green, 303B blue, BREAK violet;
-- the page: in white when it sets the selected track or the part's own sound (BD, BD MIX,
-  FILTER), in amber when it sets the whole drum machine or the pattern (KIT, PATTERN, LINE);
 - small dots, one for each page, with the current page lit;
 - the pattern playing, such as P3. If you've chosen a different pattern to play next, it
   appears after it: P3 >5 means pattern 5 is coming up. On a part longer than 16 steps, the 16
@@ -170,7 +168,9 @@ Above the knobs, a **footer** line says what the keys do on this screen (for exa
 WHITE: STEP). Until you first press a button it says HOLD ANY BUTTON: WHAT IT DOES: any button held
 for a second shows a card about it.
 
-The **bottom** of the screen shows the four knobs. Settings with only a few choices show a
+The **bottom** of the screen shows the four knobs, under a tag that says whose they are: the
+selected track (BD), the whole machine (909 KIT), the pattern (P3 PATTERN), a 303's sound
+(303A FILTER), a track on the mixer (909 MIX: CP), or a held 303 step (303A STEP 5). Settings with only a few choices show a
 row of small squares instead of a ring. When you turn a knob, its value is also shown in
 large type for a second, with whose it is: the track's (BD Tune), or the pattern's (P3 LENGTH).
 A pattern's settings (its length, rate and swing, the 303's LINE and TB-3PO settings, the break's
@@ -178,7 +178,7 @@ generator and loops) change when the pattern changes and are copied with it; eve
 the sound, which stays the same whatever pattern plays.
 
 **SEL** shows the whole screen as a list, in sections: on the 909, for example, BD: THIS TRACK,
-BD: TRACK MIX, 909: ALL TRACKS and P1: THE PATTERN.
+909: ALL TRACKS and P1: THE PATTERN.
 
 ![The 909](img/screen-909.png)
 ![Turning a knob](img/screen-readout.png)
@@ -225,17 +225,14 @@ Press EDIT to step through the pages, in this order:
 
 - The selected track's sound (the top line shows its name). Its last page always ends with
   DRIVE on KNOB 3 and DIST on KNOB 4.
-- The track's MIX page (BD MIX): LEVEL, PAN, REV and DLY, on the same knobs for every track
-  (the 909's kick has no sends, so its KNOB 3 and 4 are empty). PAN places the track left or
-  right; on the 808 the alternate sounds share their track's pan, so the conga sits where the
-  tom does.
-- KIT, in amber: settings for the whole drum machine. While it's on screen the selected
-  track is only outlined, since these knobs aren't the track's.
-- PATTERN, in amber: LENGTH (1–64 steps), RATE (1/16, 1/16 triplet, 1/32 or 1/8 triplet) and
-  SWING.
+- KIT: settings for the whole drum machine.
+- PATTERN: LENGTH (1–64 steps), RATE (1/16, 1/16 triplet, 1/32 or 1/8 triplet) and SWING.
 
-The whole drum machine's level and pan are on the mixer (LFO), and its reverb and delay sends
-are on FX.
+Each track's level, pan and reverb and delay sends are on the mixer: press LFO and go to the
+909 MIX or 808 MIX page, which shows all eleven tracks' levels at once. The black keys pick a
+track there, and the knobs are its LEVEL, PAN, REV and DLY (the 909's kick has no sends). On the
+808 the alternate sounds share their track's pan, so the conga sits where the tom does. The whole
+drum machine's level and pan are on the mixer's LEVELS and PANS pages, and its sends on FX.
 
 ---
 
@@ -495,7 +492,9 @@ sends, on that track's own page. The reverb is stereo: whatever you send it come
 
 Press LFO to open MIX. It shows a level and a meter for each part, and the compressor's gain
 reduction in red. The PANS page places the 909, 808 and both 303s left or right (C is the
-middle), and the BREAK page has the break's level and pan. As you turn a pan, the part stays at full
+middle), and the BREAK page has the break's level and pan. The 909 MIX and 808 MIX pages are each
+drum machine's own mixer: every track's level at a glance; the black keys pick a track, and the
+knobs set its LEVEL, PAN, REV and DLY. As you turn a pan, the part stays at full
 level on that side and fades out of the other.
 
 The factory mix is set up for big beat: the break is up front with the 909 kick under it, the
