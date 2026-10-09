@@ -404,10 +404,9 @@ were.
 To manage patterns:
 
 - **Finding a pattern:** on HOME, every fourth box is numbered (1, 5, 9, 13; 17 … 29 in amber).
-- **Copy:** hold SAVE and press a white key to copy to that pattern. On a part's screen this
-  copies only that part. On HOME it copies all five parts as they're playing now. Holding SAVE
-  for a moment shows a card that says exactly what will be copied (for example COPY 303A P1),
-  and the top line confirms it afterwards (303A P1 COPIED TO P2). The white keys stand for the
+- **Copy and paste:** hold SAVE: the top line says the pattern is copied (P1 COPIED). Press a
+  white key to paste it onto that pattern (P1 PASTED TO P2): all five parts, as they're playing
+  now. If that pattern has notes, X0X asks first. The white keys stand for the
   patterns HOME last showed, 1–16 or 17–32; while holding SAVE, OCT- and OCT+ switch between
   them.
 - **Clear one part:** hold SAVE and press REC. To clear all five parts, use GLO > CLEAR

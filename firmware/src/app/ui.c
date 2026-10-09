@@ -1058,12 +1058,9 @@ static int help_lines(int b, const char *l[HELP_LINES])
         if (is_drum() && part_view()) L("+ BLACK KEY: MUTE THE TRACK");
         L("+ REC: UNDO   + PLAY: REDO"); L("LIST: BACK   QUESTION: NO");
         break;
-    case B_SAVE: {                                   /* says what a copy takes: this part, or all five */
+    case B_SAVE: {                                   /* the pattern a copy takes */
         static char cp[40], cl[32];
-        if (part_view())
-            put_i(put_s(put_s(put_s(cp, "+ WHITE KEY: COPY "), PART_N[ui.part]), " P"), seq.ppat[ui.part] + 1);
-        else
-            put_s(cp, "+ WHITE KEY: COPY ALL FIVE PARTS");
+        put_s(put_i(put_s(cp, "+ WHITE KEY: PASTE P"), seq.ppat[PART_909] + 1), " THERE");
         put_s(put_s(cl, "+ REC: CLEAR "), PART_N[ui.part]);
         L("TAP: SAVE EVERYTHING"); L(cp); L(ui.pbank ? "    TO P17-32 (+ OCT-: P1-16)" : "    TO P1-16 (+ OCT+: P17-32)"); L(cl);
         L("+ KNOB: FORGET ITS MOTION"); L(proj.set.autosave_off ? "AUTOSAVE IS OFF" : "STOPPED: SAVES BY ITSELF");
@@ -1096,6 +1093,25 @@ static int help_lines(int b, const char *l[HELP_LINES])
     }
 #undef L
     return n;
+}
+
+/* SAVE held on its own a moment: the pattern is on the clipboard ("P1 COPIED"); a white key pastes it */
+#define COPY_HOLD 250u
+static void copy_tick(uint32_t btn, uint32_t keys)
+{
+    static uint8_t said;
+    uint32_t m = 1u << B_SAVE;
+    if (!(btn & m)) {
+        said = 0;
+        return;
+    }
+    if (!said && btn == m && !keys && !(ui.btn_used & m) && ui.overlay != O_ASK &&
+        plat_ms() - ui.down_t[B_SAVE] >= COPY_HOLD && (int32_t)(ui.turn_t - ui.down_t[B_SAVE]) <= 0) {
+        char t[16];
+        put_s(put_i(put_s(t, "P"), seq.ppat[PART_909] + 1), " COPIED");
+        say(t, 0);
+        said = 1;
+    }
 }
 
 static void help_tick(uint32_t btn, uint32_t keys)
@@ -1456,17 +1472,15 @@ static void run_action(int act, int arg)
         say("PATTERN CLEARED", 0);
         break;
     }
-    case ACT_COPY: {                                  /* arg: pattern | (part + 1) << 8, part 0 = all five */
-        int dst = arg & 0xFF, part = (arg >> 8) - 1, i, rc = 0;
+    case ACT_COPY: {                                  /* arg: the pattern to paste onto (all five parts, */
+        int dst = arg & 0xFF, i, rc = 0;              /* each as it plays now) */
         for (i = 0; i < NPARTS; i++)
-            if ((part < 0 || i == part) && seq.ppat[i] != dst)
+            if (seq.ppat[i] != dst)
                 rc |= copy_part(dst, seq.ppat[i], i);
         mark_dirty();
-        q = put_s(t, part < 0 ? "ALL FIVE" : PART_N[part]);
-        if (part >= 0)
-            q = put_i(put_s(q, " P"), seq.ppat[part] + 1);
-        put_i(put_s(q, " COPIED TO P"), dst + 1);
-        say(rc ? "MOTION FULL: NOT ALL COPIED" : t, 0);
+        q = put_i(put_s(t, "P"), seq.ppat[PART_909] + 1);
+        put_i(put_s(q, " PASTED TO P"), dst + 1);
+        say(rc ? "MOTION FULL: NOT ALL PASTED" : t, 0);
         break;
     }
     case ACT_SONG_INS:
@@ -1796,17 +1810,16 @@ static void key_event(int k, int down)
     int w = KEY_WHITE[k], bl = KEY_BLACK[k], wp = w >= 0 ? ui.pbank * 16 + w : -1;   /* wp: a white key's pattern */
     if (ui.overlay == O_ASK || ui.view == V_PERF || perf_testing())
         return;
-    if (down && w >= 0 && (ui.btn & (1u << B_SAVE))) {     /* SAVE held + white key: copy here */
-        int part = part_view() ? ui.part : -1, arg = wp | (part + 1) << 8;   /* a part's screen: that part */
+    if (down && w >= 0 && (ui.btn & (1u << B_SAVE))) {     /* SAVE held + white key: paste the pattern here */
         ui.btn_used |= 1u << B_SAVE;
-        if (part >= 0 ? seq.ppat[part] == wp : all_on(wp))
+        if (all_on(wp))
             return;
         if (pattern_used(&proj.pat[wp])) {
             char t[24];
-            put_s(put_i(put_s(t, "COPY OVER P"), wp + 1), "?");
-            ask(ACT_COPY, arg, t, "IT HAS NOTES");
+            put_s(put_i(put_s(t, "PASTE OVER P"), wp + 1), "?");
+            ask(ACT_COPY, wp, t, "IT HAS NOTES");
         } else
-            run_action(ACT_COPY, arg);
+            run_action(ACT_COPY, wp);
         return;
     }
     if (ui.view == V_SONG && !(ui.btn & (1u << B_HOME))) {   /* SONG: white = the bar's pattern, black = its mutes */
@@ -2144,6 +2157,7 @@ static void input(void)
     }
     if (btn || keys || btn != ui.btn || keys != ui.keys)
         ui.act_t = plat_ms();                         /* held or changed: being played */
+    copy_tick(btn, keys);
     help_tick(btn, keys);
     ui.btn = btn;
     ch = keys ^ ui.keys;
@@ -2871,9 +2885,12 @@ static void draw_home(int band)
                            c >= (seq.chain_a < seq.chain_b ? seq.chain_a : seq.chain_b) &&
                            c <= (seq.chain_a < seq.chain_b ? seq.chain_b : seq.chain_a);
             box(x, 3, 12, 18, pattern_used(&proj.pat[c]) ? C_DIM : C_LINE);
-            for (p = 0; p < NPARTS; p++)                 /* the parts playing it: solid if they have notes here */
-                if (seq.ppat[p] == c)
-                    rbox(x + 2, 5 + p * 3, 8, 2, 1, part_used(&proj.pat[c], p) ? PART_COL[p] : dim(PART_COL[p], 5));
+            for (p = 0; p < NPARTS; p++) {               /* a line per part with notes here: bright where it */
+                int used = part_used(&proj.pat[c], p);   /* plays now; a part playing it empty, a faint one */
+                if (used || seq.ppat[p] == c)
+                    rbox(x + 2, 5 + p * 3, 8, 2, 1, seq.ppat[p] == c ? (used ? PART_COL[p] : dim(PART_COL[p], 4))
+                                                                     : dim(PART_COL[p], 7));
+            }
             if (c == cue && c != seq.ppat[PART_909] && (ui.frame & 16u))
                 frame(x - 1, 2, 14, 20, C_WHITE);
             if (in_chain)
