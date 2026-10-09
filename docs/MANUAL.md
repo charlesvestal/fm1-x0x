@@ -494,7 +494,8 @@ Press LFO to open MIX. It shows a level and a meter for each part, and the compr
 reduction in red. The PANS page places the 909, 808 and both 303s left or right (C is the
 middle), and the BREAK page has the break's level and pan. The 909 MIX and 808 MIX pages are each
 drum machine's own mixer: every track's level at a glance; the black keys pick a track, and the
-knobs set its LEVEL, PAN, REV and DLY. As you turn a pan, the part stays at full
+knobs set its LEVEL, PAN, REV and DLY. On MIX, turning ALGORITHM goes to the part's own page: MIX: 909 or
+MIX: 808 for the drum machines, LEVELS for the 303s and the break. As you turn a pan, the part stays at full
 level on that side and fades out of the other.
 
 The factory mix is set up for big beat: the break is up front with the 909 kick under it, the

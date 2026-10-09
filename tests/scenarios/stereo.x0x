@@ -20,3 +20,8 @@ turn K2 -24
 wait 1200
 shot s03_bd_pan.png
 expect sound0.0.8 40
+# on MIX, ALGORITHM picks the matching page: the 808's tracks, then the levels for a 303
+turn ALGO 1
+expect part 1
+turn ALGO 1
+expect part 2

@@ -2040,6 +2040,12 @@ static void input(void)
                 set_view(V_PART);
             ui.outline_ok = 0;
             build_pages();
+            if (ui.view == V_MIX) {                   /* MIX follows: a drum machine's tracks, else the levels */
+                int k;
+                for (k = 0; k < pg.n; k++)
+                    if (is_drum() ? pg.title[k][0] == PART_N[ui.part][0] && pg.title[k][4] == 'M' : !k)
+                        ui.page[V_MIX][ui.part] = (uint8_t)k;
+            }
         }
     }
     if ((e = enc(EN_PRESET)) != 0) {             /* PRESETS: a part's screen, that part; else all five */
