@@ -110,9 +110,9 @@ screen's pages. ALGORITHM only picks the part.
 |---|---|
 | ALGORITHM | Chooses the part you're working on: 909, 808, 303A, 303B or BREAK. |
 | PRESETS | Chooses the next pattern. On a part's screen it changes only that part; on HOME it changes all five. |
-| SELECT | Moves to the next or previous page. In a list, it moves up and down. Hold HOME and turn SELECT to set the tempo. |
+| SELECT | Moves to the next or previous page. In a list, it moves up and down. Hold HOME and turn SELECT to set the tempo; hold a step and turn it to set the step's chance (section 11). |
 | KNOB 1–4 | Change the four values shown at the bottom of the screen. Each click is one step, however quickly you turn a few; keep spinning quickly and they speed up, to sweep the range. |
-| SEL | Shows everything on the current screen as a list. In a list, it runs the highlighted action. When X0X asks a question, SEL means yes. |
+| SEL | Shows everything on the current screen as a list: every knob of its pages, then MORE, the settings that are on no page (the advanced ones). In a list, it runs the highlighted action. When X0X asks a question, SEL means yes. |
 | HOME | The pattern: all five parts. Press it again for the song, and again to come back. In a list, it goes back; when X0X asks a question, HOME means no. |
 | SEQ | The selected part's steps, with its LENGTH, RATE and (on a 303) DIRECTION and TRANSPOSE (SWING is on HOME: it's every part's). Press it again for the next page. |
 | EDIT | The selected part's sound, with its steps still on the keys. Press it again for the next page. |
@@ -122,7 +122,12 @@ screen's pages. ALGORITHM only picks the part.
 | GLO | Opens the settings. |
 | PLAY | Starts and stops. Hold HOME and press PLAY to redo. |
 | REC | Turns recording on and off: what you play is written (drum hits, 303 notes, knob moves; in SONG mode, the song). On a 303, the keys become a keyboard while it's on. Hold HOME and press REC to undo. |
-| SAVE | Saves everything. |
+| SAVE | Saves everything (while playing: when you stop). |
+| ENV, LFO | Hold one of these while pressing keys to add an accent (ENV) or a slide (LFO). (LFO on its own opens the mixer.) |
+| OCT-, OCT+ | Page through the steps, 16 at a time (1–16, 17–32, 33–48, 49–64). On HOME and SONG they show patterns 1–16 or 17–32. On the 303 keyboard they change the octave. In TB-3PO they mutate the line or write a new one. |
+| White keys | Steps. On HOME, they choose patterns. On MASTER and FX the keys do nothing. |
+| Black keys | Drum tracks, or the break's slices. On HOME, they mute parts. Hold HOME and press one on the 909 or 808 to mute just that track. On the mixer (LFO) they pick a channel; with HOME held, they mute it. |
+| MASTER | Volume. |
 
 **The key lights** have two levels: bright for what is on or chosen, dim for what is there to
 choose.
@@ -136,11 +141,6 @@ choose.
 | 303 with REC on | the keys you hold | the Cs, to find your place |
 | BREAK | the steps it plays | the slice pads 1–8 |
 | MIX (PARTS, 909 MIX, 808 MIX) | the channel the knobs set | the other channels |
-| ENV, LFO | Hold one of these while pressing keys to add an accent (ENV) or a slide (LFO). (LFO on its own opens the mixer.) |
-| OCT-, OCT+ | Page through the steps, 16 at a time (1–16, 17–32, 33–48, 49–64). On HOME and SONG they show patterns 1–16 or 17–32. On the 303 keyboard they change the octave. In TB-3PO they mutate the line or write a new one. |
-| White keys | Steps. On HOME, they choose patterns. |
-| Black keys | Drum tracks, or the break's slices. On HOME, they mute parts. Hold HOME and press one on the 909 or 808 to mute just that track. |
-| MASTER | Volume. |
 
 (The SEL button is labelled SCL in Felucca.)
 
