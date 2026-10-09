@@ -474,18 +474,22 @@ static void mix_targets(int p, float g)                     /* g: the part level
     glide_set(&mix_glide[p][GL_VDLY], g);
 }
 
-static void render_sub(float *out_l, float *out_r, uint32_t n)
+/* the mix of one stretch between two events: dry left and right, the reverb and delay sends */
+static float dry_l[256], dry_r[256], rev[256], dly[256], t0[256], t1[256], t2[256], tr[256], kbuf[256];
+
+/* the drum machines into the mix (which they start: they clear it), on their own scratch (t0..tr).
+ * The second core's job when it has one (arg bit 8: not timed, the cycle counter is the first
+ * core's); else the first core's, first. Its own per-voice sends; the part level scales all three
+ * buses. A silent part is not cleared, mixed or metered (it would add zeros): the 909 is still
+ * called, for its shared noise; the 808 does nothing while silent, so it is skipped. Exact either way. */
+static void drums_job(uint32_t arg)
 {
-    static float dry_l[256], dry_r[256], rev[256], dly[256], t0[256], t1[256], t2[256], tr[256];
-    uint32_t i;
+    uint32_t n = arg & 0xFFu ? arg & 0xFFu : 256u, i, timed = !(arg & 0x100u);
     int b;
     for (i = 0; i < n; i++)
         dry_l[i] = dry_r[i] = rev[i] = dly[i] = 0.0f;
-    /* drum machines: their own per-voice sends; the part level scales all three buses. A silent
-     * part is not cleared, mixed or metered (it would add zeros): the 909 is still called, for its
-     * shared noise; the 808 does nothing while silent, so it is skipped. Exact either way. */
     for (b = 0; b < NKIT; b++) {
-        PROF_T(pt);
+        uint32_t pt = timed ? plat_cycles() : 0;
         float g = mix_level[b];
         if (!(b == 0 ? drum909_active(&d909) : drum808_active(&d808))) {
             if (b == 0) {
@@ -493,7 +497,8 @@ static void render_sub(float *out_l, float *out_r, uint32_t n)
                 drum909_pan_settle(&d909);                    /* silent: pans move at once, no glide */
             } else
                 drum808_pan_settle(&d808);
-            PROF_ADD(b, pt);
+            if (timed)
+                PROF_ADD(b, pt);
             continue;
         }
         for (i = 0; i < n; i++)
@@ -512,44 +517,61 @@ static void render_sub(float *out_l, float *out_r, uint32_t n)
         add_glide(rev, t0, &mix_glide[b][GL_REV], n);
         add_glide(dly, t0, &mix_glide[b][GL_DLY], n);
         meter(b, t0, g, n);
-        PROF_ADD(b, pt);
+        if (timed)
+            PROF_ADD(b, pt);
     }
+}
+
+/* one stretch: the drums (on the second core when there is one) while the first renders the 303s
+ * into out_l / out_r (free until the FX write them, last) and the break into kbuf; then those are
+ * mixed in after the drums, in the order one core always used: the same sums either way */
+static void render_sub(float *out_l, float *out_r, uint32_t n)
+{
+    float *bb[NBASS] = {out_l, out_r};
+    int idle[NBASS], b, k_silent = 1;
+    uint32_t arg = n & 0xFFu, pt;
+    int on2 = plat_cpu2_run(drums_job, arg | 0x100u);
     for (b = 0; b < NBASS; b++) {
-        int p = PART_303A + b;
-        PROF_T(pt);
-        int was_idle = b303[b].idle;                      /* idle: the render writes zeros */
-        bass303_render(&b303[b], t0, (int)n);
-        if (was_idle) {
-            PROF_ADD(2 + b, pt);
-            continue;
-        }
-        mix_targets(p, mix_level[p]);
-        add_glide(dry_l, t0, &mix_glide[p][GL_L], n);
-        add_glide(dry_r, t0, &mix_glide[p][GL_R], n);
-        add_glide(rev, t0, &mix_glide[p][GL_REV], n);
-        add_glide(dly, t0, &mix_glide[p][GL_DLY], n);
-        meter(p, t0, mix_level[p], n);
-        PROF_ADD(2 + b, pt);
+        PROF_T(pb);
+        idle[b] = b303[b].idle;                           /* idle: the render writes zeros */
+        bass303_render(&b303[b], bb[b], (int)n);
+        PROF_ADD(2 + b, pb);
     }
     if (!brk_hold) {
-        PROF_T(pt);
+        PROF_T(pk);
+        k_silent = breaks_silent(&brk);                   /* the render writes zeros: nothing to mix */
+        breaks_render(&brk, kbuf, (int)n);
+        PROF_ADD(4, pk);
+    }
+    pt = plat_cycles();
+    if (!on2 || plat_cpu2_wait())
+        drums_job(arg);                                   /* one core (or the second failed): here */
+    else
+        PROF_ADD(0, pt);                                  /* what the first core waited for the drums */
+    for (b = 0; b < NBASS; b++) {
+        int p = PART_303A + b;
+        if (idle[b])
+            continue;
+        mix_targets(p, mix_level[p]);
+        add_glide(dry_l, bb[b], &mix_glide[p][GL_L], n);
+        add_glide(dry_r, bb[b], &mix_glide[p][GL_R], n);
+        add_glide(rev, bb[b], &mix_glide[p][GL_REV], n);
+        add_glide(dly, bb[b], &mix_glide[p][GL_DLY], n);
+        meter(p, bb[b], mix_level[p], n);
+    }
+    if (!brk_hold && !k_silent) {
         float g = mix_level[PART_BRK];
-        int silent = breaks_silent(&brk);              /* the render writes zeros: nothing to mix */
-        breaks_render(&brk, t0, (int)n);
-        if (!silent) {
-            mix_targets(PART_BRK, g);
-            add_glide(dry_l, t0, &mix_glide[PART_BRK][GL_L], n);
-            add_glide(dry_r, t0, &mix_glide[PART_BRK][GL_R], n);
-            add_glide(rev, t0, &mix_glide[PART_BRK][GL_REV], n);
-            add_glide(dly, t0, &mix_glide[PART_BRK][GL_DLY], n);
-            meter(PART_BRK, t0, g, n);
-        }
-        PROF_ADD(4, pt);
+        mix_targets(PART_BRK, g);
+        add_glide(dry_l, kbuf, &mix_glide[PART_BRK][GL_L], n);
+        add_glide(dry_r, kbuf, &mix_glide[PART_BRK][GL_R], n);
+        add_glide(rev, kbuf, &mix_glide[PART_BRK][GL_REV], n);
+        add_glide(dly, kbuf, &mix_glide[PART_BRK][GL_DLY], n);
+        meter(PART_BRK, kbuf, g, n);
     }
     {
-        PROF_T(pt);
+        PROF_T(pf);
         fxbus_process_st(&fx, dry_l, dry_r, rev, dly, out_l, out_r, (int)n);
-        PROF_ADD(5, pt);
+        PROF_ADD(5, pf);
     }
 }
 

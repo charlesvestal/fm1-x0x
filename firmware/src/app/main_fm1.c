@@ -299,6 +299,8 @@ static void fm1_main(void)
     fm1_timer5_start(isr_timer5, 4);
     fm1_guard_lock_top();
     fm1_irq_enable_all();
+    if (proj.set.cpu2 && plat_cpu2_set(1))          /* the second core, if it was on (and starts) */
+        proj.set.cpu2 = 0;
     fm1_delay_ms(30);
     if ((fm1_in.buttons & 3u) == 3u)
         panel_setup();                              /* OCT- + OCT+ held at power-on */

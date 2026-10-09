@@ -132,6 +132,8 @@ static void fm1_enter_uboot(void)
 
 FM1_INLINE void fm1_core_reset(void)
 {
+    *(volatile uint32_t *)0x1EEE004u &= ~0x8u;         /* the second core held first (fm1_cpu1.h): it */
+    *(volatile uint32_t *)0x1EEE004u |= 0x2u;          /* must not run old code while the loader writes */
     FM1_PWR_CON |= 0x10u;
     for (;;)
         ;

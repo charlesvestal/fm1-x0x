@@ -104,6 +104,22 @@ const uint8_t *plat_slot(int k, int z, uint32_t *nsamples, uint32_t *rate, char 
 
 static volatile uint32_t audio_cpu_pct, audio_xruns, audio_peak_pct;
 uint32_t plat_cpu_pct(void) { return audio_cpu_pct; }
+
+int plat_cpu2_set(int on)
+{
+    int rc = 0;
+    if (!on) {
+        fm1_cpu1_hold();
+        return 0;
+    }
+    fm1_guard_unlock_top();                         /* its entry word is in the protected top of RAM */
+    rc = fm1_cpu1_start();
+    fm1_guard_lock_top();
+    return rc;
+}
+int plat_cpu2_on(void) { return fm1_c1_on; }
+int plat_cpu2_run(void (*fn)(uint32_t), uint32_t arg) { return fm1_cpu1_run(fn, arg); }
+int plat_cpu2_wait(void) { return fm1_cpu1_wait(); }
 uint32_t plat_xruns(void) { return audio_xruns; }
 
 static int perf_cyc_ok, perf_stalls_on;

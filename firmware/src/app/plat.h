@@ -55,6 +55,11 @@ const uint8_t *plat_slot(int k, int z, uint32_t *nsamples, uint32_t *rate, char 
 
 /* audio load in % of the render budget, and xruns since boot (device: from the ISR) */
 uint32_t plat_cpu_pct(void);
+/* the second core: the 909 and 808 render there while the first renders the rest (engine.c) */
+int plat_cpu2_set(int on);             /* main loop: 0 = done; -1 = it did not start (one core) */
+int plat_cpu2_on(void);
+int plat_cpu2_run(void (*fn)(uint32_t), uint32_t arg);   /* ISR: 1 = the second core has it */
+int plat_cpu2_wait(void);              /* ISR: 0 = done; -1 = it failed (and is off): do the job here */
 uint32_t plat_xruns(void);
 
 /* performance (the PERF screen; firmware/hal/fm1_perf.h): a counter for timing stages, the CPU's

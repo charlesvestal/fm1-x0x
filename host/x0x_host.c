@@ -191,6 +191,18 @@ const uint8_t *plat_slot(int k, int z, uint32_t *ns, uint32_t *rate, char name[9
 
 static uint32_t cpu_pct, cpu_peak;
 static int load_force = -1;                      /* script "load N": the guard sees N%, -1 measured */
+/* the second core, simulated: a job runs at once, in order (the split path, the same sums) */
+static int cpu2_on;
+int plat_cpu2_set(int on) { cpu2_on = on; return 0; }
+int plat_cpu2_on(void) { return cpu2_on; }
+int plat_cpu2_run(void (*fn)(uint32_t), uint32_t arg)
+{
+    if (!cpu2_on)
+        return 0;
+    fn(arg);
+    return 1;
+}
+int plat_cpu2_wait(void) { return 0; }
 uint32_t plat_cpu_pct(void) { return cpu_pct; }
 uint32_t plat_xruns(void) { return 0; }
 /* performance: no CPU counter here: the "cycles" are nanoseconds (plat_cycles_hz) */
@@ -956,6 +968,8 @@ int main(int argc, char **argv)
             proj.arr.song.len = 0;
             for (i = 0; i < NLANE; i++)
                 proj.arr.lane[i].used = 0;
+        } else if (!strcmp(cmd, "cpu2")) {              /* cpu2 0|1: the simulated second core */
+            plat_cpu2_set(atoi(a));
         } else if (!strcmp(cmd, "reboot")) {
             memset(&proj, 0, sizeof proj);
             boot();
