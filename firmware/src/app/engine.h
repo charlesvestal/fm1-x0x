@@ -62,6 +62,7 @@ const char *engine_voice_name(int target, int voice);
 
 /* main loop -> ISR */
 void engine_set(int target, int voice, int i, int value);   /* queued; the sound_t mirror is the caller's */
+void engine_out_loud(int on);          /* 1: the output at the codec's full scale (6 dB hotter than Felucca's) */
 void engine_apply_sound(const sound_t *s);                  /* queue every value (load, init) */
 void engine_sound_defaults(sound_t *s);                     /* each engine's power-on values */
 void engine_sound_centre_drum_pans(sound_t *s);             /* every drum voice's PAN (its last pot) to centre */

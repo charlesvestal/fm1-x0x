@@ -319,8 +319,7 @@ static void fm1_main(void)
     engine_apply_sound(&proj.sound);
     seq.bpm = (float)proj.set.bpm_x10 / 10.0f;
     seq.accent_q7 = proj.set.accent_q7;
-    seq.send_clock = proj.set.clk_out;
-    seq.send_notes = proj.set.notes_out;
+    project_apply_io();                             /* clock and notes out, the MIDI channels, the output */
     engine_brk_loops();
     plat_cpu2_set(1);                               /* the second core: at power-on, before the audio and the
                                                      * timers, as Melodee starts it (started later, it does not

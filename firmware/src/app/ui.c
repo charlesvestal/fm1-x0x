@@ -176,7 +176,7 @@ static void say(const char *a, const char *b)
 /* =============================================================== param refs === */
 enum { R_NONE, R_ENG, R_SWING, R_DLEN, R_DRATE, R_BLEN, R_BRATE, R_BDIR, R_BTRANS, R_GEN, R_BRKSET,
        R_BRKSLOT, R_TEMPO, R_ACCENT, R_CLKOUT, R_NOTEOUT, R_PALETTE, R_KEYLED, R_KEYSOUND, R_AUTOSAVE, R_ACT, R_SBAR, R_SPAT, R_SMODE,
-       R_SLEN, R_STALLS, R_HDR, R_TAPE };   /* R_TAPE: FX's one-knob TAPE (DIGI .. worn tape) */          /* R_HDR: a list's section header (a = its group), never selected */
+       R_SLEN, R_STALLS, R_HDR, R_TAPE, R_MIDICH, R_OUTLOUD, R_SREP };   /* R_TAPE: FX's one-knob TAPE (DIGI .. worn tape) */          /* R_HDR: a list's section header (a = its group), never selected */
 typedef struct { uint8_t kind, a, b, c; } pref_t;
 #define PR(k, a, b, c) ((pref_t){(k), (a), (b), (c)})
 #define NONE PR(R_NONE, 0, 0, 0)
@@ -209,6 +209,12 @@ static const x0x_param_t ACT_P[] = {
     {"DELETE BAR", 0, 0, 0}, {"CLEAR SONG", 0, 0, 0}, {"PERFORMANCE", 0, 0, 0}, {"RUN PERF TEST", 0, 0, 0},
 };
 static const x0x_param_t STALLS_P = {"STALLS", 1, 0, ONOFF_N};
+static const x0x_param_t MIDICH_P[NPARTS] = {   /* 0 = OFF (no notes in or out), 1-16 */
+    {"909 MIDI CH", 16, 10, 0}, {"808 MIDI CH", 16, 11, 0}, {"303A MIDI CH", 16, 2, 0}, {"303B MIDI CH", 16, 3, 0},
+    {"BREAK MIDI CH", 16, 4, 0}};
+static const char *const OUT_N[] = {"NORMAL", "LOUD"};
+static const x0x_param_t OUT_P = {"OUTPUT", 1, 0, OUT_N};
+static const x0x_param_t SREP_P = {"REPEAT", 7, 0, 0};    /* the bar plays 1-8 times */
 static const char *const MODE_N[] = {"PATTERN", "SONG"};
 static const x0x_param_t SONG_P[] = {
     {"909", NPAT - 1, 0, 0}, {"808", NPAT - 1, 0, 0}, {"303A", NPAT - 1, 0, 0}, {"303B", NPAT - 1, 0, 0},
@@ -269,6 +275,9 @@ static const x0x_param_t *pref_desc(pref_t r)
     }
     case R_SPAT: return &SONG_P[r.a % NPARTS];
     case R_SMODE: return &SONG_P[5];
+    case R_MIDICH: return &MIDICH_P[r.a % NPARTS];
+    case R_OUTLOUD: return &OUT_P;
+    case R_SREP: return &SREP_P;
     case R_SLEN: return &SONG_P[6];
     case R_STALLS: return &STALLS_P;
     case R_TAPE: {
@@ -321,6 +330,9 @@ static int pref_get(pref_t r)
         return k >= 0 ? sg->bar[k].pat[r.a] : seq.ppat[r.a];
     }
     case R_SMODE: return seq.song_on;
+    case R_MIDICH: return seq.ch[r.a % NPARTS] == SEQ_CH_OFF ? 0 : seq.ch[r.a % NPARTS] + 1;
+    case R_OUTLOUD: return proj.set.out_loud;
+    case R_SREP: return ui.song_sel < song()->len ? song()->bar[ui.song_sel].mute >> 5 : 0;
     case R_SLEN: return song()->len;
     case R_STALLS: return perf.stalls_on;
     case R_TAPE: return proj.sound.v[T_FX][1][0];       /* (kept in an engine slot nothing reads) */
@@ -392,6 +404,16 @@ static void pref_set(pref_t r, int v)
         song()->bar[ui.song_sel].pat[r.a] = (uint8_t)v;
         break;
     case R_SMODE: seq.song_on = (uint8_t)v; break;
+    case R_MIDICH: seq.ch[r.a % NPARTS] = (uint8_t)(v ? v - 1 : SEQ_CH_OFF); break;
+    case R_OUTLOUD: proj.set.out_loud = (uint8_t)v; engine_out_loud(v); break;
+    case R_SREP:
+        if (ui.song_sel < NSONG) {
+            song_bar_t *b;
+            song_fill(ui.song_sel);
+            b = &song()->bar[ui.song_sel];
+            b->mute = (uint8_t)((b->mute & 0x1Fu) | v << 5);
+        }
+        break;
     case R_TAPE: {                                    /* 0..15 the clean digital delay; above, tape, wearing */
         uint8_t ty = (uint8_t)(v >= 16), we = (uint8_t)(ty ? (v - 16) * 127 / 111 : proj.sound.v[T_FX][0][FX_DL_WEAR]);
         proj.sound.v[T_FX][1][0] = (uint8_t)v;
@@ -601,6 +623,8 @@ static void pref_value_of(pref_t r, int v, char *num, char *unit)
     case R_TEMPO: put_i(num, v + 20); put_s(unit, "bpm"); return;
     case R_SBAR: put_i(num, v + 1); return;
     case R_SPAT: num[0] = 'P'; put_i(num + 1, v + 1); return;
+    case R_MIDICH: if (v) put_i(num, v); else put_s(num, "OFF"); return;
+    case R_SREP: num[0] = 'x'; put_i(num + 1, v + 1); return;
     case R_SLEN: put_i(num, v); put_s(unit, "bar"); return;
     default: put_i(num, v); return;
     }
@@ -809,7 +833,7 @@ static void build_pages(void)
         add_page("BAR", PR(R_SBAR, 0, 0, 0), PR(R_SPAT, PART_909, 0, 0), PR(R_SPAT, PART_808, 0, 0),
                  PR(R_SPAT, PART_303A, 0, 0));
         add_page("BAR", PR(R_SBAR, 0, 0, 0), PR(R_SPAT, PART_303B, 0, 0), PR(R_SPAT, PART_BRK, 0, 0),
-                 PR(R_SMODE, 0, 0, 0));
+                 PR(R_SREP, 0, 0, 0));
         break;
     default: break;
     }
@@ -890,6 +914,7 @@ static void open_list_of_pages(void)
     if (ui.view == V_PERF)
         list_add(PR(R_ACT, ACT_PERF_TEST, 0, 0));
     if (ui.view == V_SONG) {
+        list_add(PR(R_SMODE, 0, 0, 0));
         list_add(PR(R_SLEN, 0, 0, 0));
         list_add(PR(R_ACT, ACT_SONG_INS, 0, 0));
         list_add(PR(R_ACT, ACT_SONG_DEL, 0, 0));
@@ -910,6 +935,9 @@ static void open_global(void)
     ui.list_n = 0;
     list_add(PR(R_CLKOUT, 0, 0, 0));
     list_add(PR(R_NOTEOUT, 0, 0, 0));
+    for (int p = 0; p < NPARTS; p++)
+        list_add(PR(R_MIDICH, p, 0, 0));
+    list_add(PR(R_OUTLOUD, 0, 0, 0));
     list_add(PR(R_KEYLED, 0, 0, 0));
     list_add(PR(R_KEYSOUND, 0, 0, 0));
     list_add(PR(R_PALETTE, 0, 0, 0));
@@ -2859,7 +2887,18 @@ static void draw_header(void)
             cv_text(x + 4, vc(&FONT_XS, 1, 17), &FONT_XS, b, C_GRAY);
         }
     }
-    put_i(b, (int)(seq_tempo(&seq) + 0.5f));
+    {   /* following an external clock, the measured tempo wanders a little from clock to clock: the
+         * display averages it over about a second, and moves only when that is half a BPM away */
+        static float avg;
+        static int shown;
+        float t = seq_tempo(&seq);
+        if (!seq.ext || avg < 1.0f)
+            avg = t;
+        avg += (t - avg) * 0.03f;
+        if (!seq.ext || fm_fabsf(avg - (float)shown) > 0.6f)
+            shown = (int)(avg + 0.5f);
+        put_i(b, shown);
+    }
     text_r(212, vc(&FONT_S, 1, 17), &FONT_S, b, seq.ext ? C_AMB : C_HI);
     if (seq.playing)
         play_icon(217, 4, (eng_step[TRK_DRUM] & 3) == 0 ? C_WHITE : C_HI);
@@ -3165,6 +3204,11 @@ static void draw_song(int band)
             t[0] = 'P';
             put_i(t + 1, sg->bar[k].pat[p] + 1);
             text_c(58 + p * 36, vc(&FONT_XS, y, 11), &FONT_XS, muted ? "-" : t, muted ? C_DIM : PART_COL[p]);
+        }
+        if (SONG_REP(&sg->bar[k]) > 1) {               /* a bar played more than once: x2 .. x8 */
+            t[0] = 'x';
+            put_i(t + 1, SONG_REP(&sg->bar[k]));
+            text_r(238, vc(&FONT_XS, y, 11), &FONT_XS, t, C_WHITE);
         }
     }
 }

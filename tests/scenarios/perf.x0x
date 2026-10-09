@@ -13,7 +13,7 @@ tapkey b2
 expect mute 4194304
 # GLO > PERFORMANCE (the eleventh row)
 tap GLO
-turn SELECT 10
+turn SELECT 16
 tap SEL
 expect view 7
 tap PLAY

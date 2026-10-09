@@ -33,7 +33,10 @@ typedef struct {
     uint8_t stereo;                      /* the pans the sound has: 0 none (saved mono), 1 the parts', 2 the
                                           * drum voices' too (PROJ_STEREO); a load centres what is missing */
     uint8_t snd_rev;                     /* the sound's layout (PROJ_SND_REV): 0 = before the 909 SD's DECAY */
-    uint8_t rsv[4];                      /* room to grow: an older, shorter object loads (zeros here) */
+    uint8_t midi_ch[5];                  /* each part's MIDI channel (in and out): 0 = its default (an older
+                                          * project), 1-16, 17 = OFF */
+    uint8_t out_loud;                    /* 1: the output 6 dB hotter (the codec's full scale) */
+    uint8_t rsv[2];                      /* room to grow: an older, shorter object loads (zeros here) */
 } settings_t;
 
 /* the song and the motion lanes: one blob, split across OBJ_SONG and OBJ_MOTION */
@@ -54,6 +57,7 @@ extern project_t proj;
 void project_defaults(void);
 int project_load(void);                  /* 0 = loaded; else defaults are in place */
 int project_save(void);                  /* 0 = saved and verified; -7 = too much to fit (nothing written) */
+void project_apply_io(void);             /* the settings into the sequencer and the engine: MIDI, the output */
 int project_mem_pct(void);               /* how full the room for patterns, song and motion is, % */
 
 void ui_init(void);

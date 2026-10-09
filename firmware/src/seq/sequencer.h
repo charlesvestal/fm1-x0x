@@ -50,6 +50,8 @@ static inline uint32_t seq_part_mask(int p)
 }
 
 #define NSONG 192
+#define SEQ_CH_OFF 0xFFu
+#define SONG_REP(b) (((b)->mute >> 5) + 1)    /* a bar plays 1-8 times: mute's bits 5-7 (the parts use 0-4) */
 typedef struct {
     uint8_t pat[NTRACKS];             /* each part's pattern */
     uint8_t mute;                     /* bit p = part p muted */
@@ -97,7 +99,9 @@ typedef struct {
     volatile uint16_t song_start;     /* bar PLAY starts at */
     volatile uint8_t ext;             /* 1 = following an external clock */
     volatile uint8_t send_clock;      /* 1 = emit MIDI clock + transport when internal */
-    volatile uint8_t send_notes;      /* 1 = echo the sequence on MIDI (909 ch 10, 808 ch 11, 303s ch 2 / 3) */
+    volatile uint8_t send_notes;      /* 1 = echo the sequence on MIDI, on each part's channel */
+    volatile uint8_t ch[NTRACKS];     /* each part's MIDI channel, 0-15 (in and out); SEQ_CH_OFF = none */
+    uint8_t song_rep;                 /* the song bar playing: its passes still to play (SONG_REP) */
     volatile uint32_t mute;           /* MUTE_* bits */
     volatile uint32_t vmute;          /* drum tracks muted on their own (bit k * NDRUM + v): kept apart from
                                        * the part mutes, which the song and HOME set as a whole */

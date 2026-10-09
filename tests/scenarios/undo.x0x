@@ -54,7 +54,7 @@ expect hit0.0.8 0
 expect hit0.0.12 1
 # FACTORY RESET (GLO, the tenth row, asks) can be undone too
 tap GLO
-turn SELECT 9
+turn SELECT 15
 tap SEL
 tap SEL
 wait 600

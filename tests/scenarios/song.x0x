@@ -44,7 +44,11 @@ turn K2 3
 expect songbar2.3 5
 shot s03_song.png
 # SONG mode on (page 2, knob 4); play from bar 1
-turn K4 1
+# MODE: the SONG screen's list (its page has REPEAT there now)
+tap SEL
+turn SELECT 7
+turn ALGO 1
+tap HOME
 expect songon 1
 turn K1 -5
 tap PLAY
@@ -63,7 +67,10 @@ wait 2000
 expect songpos 1
 expect mute 0
 tap PLAY
-turn K4 -1
+tap SEL
+turn SELECT 7
+turn ALGO -1
+tap HOME
 expect songon 0
 # motion: 303 A's cutoff, swept while recording, one turn a step (16 steps of 125 ms)
 tap HOME

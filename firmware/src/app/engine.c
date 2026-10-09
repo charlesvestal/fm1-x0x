@@ -199,6 +199,15 @@ static void apply_param(int t, int v, int i, int val)    /* ISR */
 
 void engine_set(int t, int v, int i, int val) { cq_put((uint32_t)t, (uint32_t)v, (uint32_t)i, (uint32_t)val); }
 
+/* the output's scale: Felucca's -6 dBFS ceiling of the 24-bit codec (2^22), or its full scale (LOUD); the
+ * clamp keeps an over from wrapping (normal: the codec's own full scale, as before) */
+static volatile float out_scale = 4194303.0f, out_lim = 2.0f;
+void engine_out_loud(int on)
+{
+    out_scale = on ? 8388607.0f : 4194303.0f;
+    out_lim = on ? 1.0f : 2.0f;
+}
+
 void engine_sound_defaults(sound_t *s)
 {
     int t, v, i;
@@ -417,27 +426,25 @@ static void midi_in(uint32_t pkt)
     }
     if (ty == 0x90 && d2 == 0)
         ty = 0x80;
-    if ((ch == 9 || ch == 10) && ty == 0x90) {          /* ch 10 = 909, ch 11 = 808: GM drum notes */
-        static const uint8_t GM[NDRUM] = {36, 38, 41, 45, 50, 37, 39, 42, 46, 49, 51};
-        static const uint8_t GM8[NDRUM] = {36, 38, 41, 45, 50, 37, 39, 56, 49, 46, 42};
-        k = ch - 9;
-        for (v = 0; v < NDRUM; v++)
-            if ((k ? GM8 : GM)[v] == d1)
-                s_drum(0, k, v, (float)d2 / 127.0f);
-        return;
-    }
-    if (ch == 1 || ch == 2) {                           /* ch 2 / 3 = 303 A / B */
-        int b = ch - 1;
-        if (ty == 0x90) {
-            bass303_note_on(&b303[b], d1, d2 >= 100, bass_held[b] != 0);
-            bass_held[b] = d1;
-        } else if (ty == 0x80 && bass_held[b] == d1) {
-            bass303_note_off(&b303[b]);
-            bass_held[b] = 0;
+    for (k = 0; k < NKIT; k++)                          /* each part on its own channel (GLO): the drum */
+        if (seq.ch[k] == ch && ty == 0x90) {             /* machines on GM drum notes */
+            static const uint8_t GM[NDRUM] = {36, 38, 41, 45, 50, 37, 39, 42, 46, 49, 51};
+            static const uint8_t GM8[NDRUM] = {36, 38, 41, 45, 50, 37, 39, 56, 49, 46, 42};
+            for (v = 0; v < NDRUM; v++)
+                if ((k ? GM8 : GM)[v] == d1)
+                    s_drum(0, k, v, (float)d2 / 127.0f);
         }
-        return;
-    }
-    if (ch == 3 && (ty == 0x90 || ty == 0x80) && d1 >= 36 && d1 <= 43)   /* ch 4: break slices */
+    for (k = 0; k < NBASS; k++)                         /* the 303s: overlapping notes slide */
+        if (seq.ch[TRK_BASS0 + k] == ch) {
+            if (ty == 0x90) {
+                bass303_note_on(&b303[k], d1, d2 >= 100, bass_held[k] != 0);
+                bass_held[k] = d1;
+            } else if (ty == 0x80 && bass_held[k] == d1) {
+                bass303_note_off(&b303[k]);
+                bass_held[k] = 0;
+            }
+        }
+    if (seq.ch[TRK_BRK] == ch && (ty == 0x90 || ty == 0x80) && d1 >= 36 && d1 <= 43)   /* the break's slices */
         breaks_live(&brk, d1 - 36, ty == 0x90);
 }
 
@@ -720,8 +727,11 @@ void engine_render(int32_t *out_lr, uint32_t n)
         PROF_ADD(6, pt);
     }
     for (i = 0; i < n; i++) {
-        out_lr[2u * i] = (int32_t)(out_l[i] * 4194303.0f);   /* 2^22: Felucca's -6 dBFS ceiling of the 24-bit codec */
-        out_lr[2u * i + 1u] = (int32_t)(out_r[i] * 4194303.0f);
+        float l = out_l[i], r = out_r[i];            /* (out_scale: NORMAL 2^22, Felucca's; LOUD 2^23) */
+        l = l > out_lim ? out_lim : l < -out_lim ? -out_lim : l;
+        r = r > out_lim ? out_lim : r < -out_lim ? -out_lim : r;
+        out_lr[2u * i] = (int32_t)(l * out_scale);
+        out_lr[2u * i + 1u] = (int32_t)(r * out_scale);
         if (i & 1u)
             eng_scope[eng_scope_w++ & (SCOPE_N - 1u)] = (int16_t)((out_l[i] + out_r[i]) * 16383.5f);
     }

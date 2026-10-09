@@ -477,9 +477,25 @@ int project_load(void)
     return bad ? -1 : 0;
 }
 
+void project_apply_io(void)
+{
+    static const uint8_t DEF[5] = {9, 10, 1, 2, 3};   /* 909 10, 808 11, 303s 2 / 3, break 4 */
+    int p;
+    seq.send_clock = proj.set.clk_out;
+    seq.send_notes = proj.set.notes_out;
+    for (p = 0; p < 5; p++) {
+        int v = proj.set.midi_ch[p];
+        seq.ch[p] = (uint8_t)(!v ? DEF[p] : v > 16 ? SEQ_CH_OFF : v - 1);
+    }
+    engine_out_loud(proj.set.out_loud);
+}
+
 /* 0 = saved and verified; -7 = the patterns, song and motion do not fit (nothing was written) */
 int project_save(void)
 {
+    int p;
+    for (p = 0; p < 5; p++)
+        proj.set.midi_ch[p] = (uint8_t)(seq.ch[p] == SEQ_CH_OFF ? 17 : seq.ch[p] + 1);
     proj.set.bpm_x10 = (uint16_t)(seq.bpm * 10.0f + 0.5f);
     proj.set.accent_q7 = seq.accent_q7;
     proj.set.clk_out = seq.send_clock;

@@ -391,8 +391,7 @@ static void boot(void)
     engine_apply_sound(&proj.sound);
     seq.bpm = (float)proj.set.bpm_x10 / 10.0f;
     seq.accent_q7 = proj.set.accent_q7;
-    seq.send_clock = proj.set.clk_out;
-    seq.send_notes = proj.set.notes_out;
+    project_apply_io();                             /* clock and notes out, the MIDI channels, the output */
     engine_brk_loops();
     lcd_fill(0, 0, 240, 240, C_BLACK);
     ui_init();

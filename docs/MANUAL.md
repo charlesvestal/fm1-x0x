@@ -515,8 +515,10 @@ parts are muted. To open the song, press HOME twice (HOME again comes back to th
 - **Edit a bar:** turn KNOB 1 to select the bar, then use the other knobs to set each part's
   pattern for that bar.
 - **Mute parts in a bar:** press black keys 1–5.
-- **Play the song:** set MODE to SONG, on the SONG screen's second page (turn SELECT) or in
-  GLO, then press PLAY. The song starts at the selected bar and loops. While it plays, the top
+- **Repeat a bar:** on the SONG screen's second page (turn SELECT), REPEAT plays the selected bar
+  up to 8 times (x2 … x8 shows at the end of its row), so four bars of the same pattern are one
+  row.
+- **Play the song:** set MODE to SONG, in the SONG screen's SEL list or in GLO, then press PLAY. The song starts at the selected bar and loops. While it plays, the top
   line shows S and the current bar number.
 - **Record the song:** in SONG mode, turn on REC and press PLAY. As it plays, change patterns
   and mute parts however you like. Each bar is written into the song as it goes by, starting
@@ -598,6 +600,8 @@ Press GLO for these settings:
 |---|---|
 | CLOCK OUT | Sends MIDI clock and start/stop messages. |
 | NOTES OUT | Sends the patterns out as MIDI notes. |
+| 909 … BREAK MIDI CH | Each part's MIDI channel, for notes in and out: 1–16, or OFF to ignore incoming notes for that part (and send none). |
+| OUTPUT | NORMAL, or LOUD: 6 dB more at the headphones and line out (and USB audio), for headphones that need it. The master's LIMIT (on by default) keeps it from clipping. |
 | LIGHTS | ON: the key lights show the steps, and the unlit buttons glow dimly so they can be read. KEYS: the key lights only. OFF: neither. |
 | KEY SOUND | STOPPED (the default): picking a drum or editing a 303 step is silent while the pattern plays, unless REC is on. ALWAYS: you always hear it. The 303 keyboard always plays either way. |
 | THEME | The screen colour: green, amber, cyan, red or mono. |
@@ -663,6 +667,10 @@ When connected over USB, the FM-1 shows up as a MIDI device called "X0X FM-1".
 
 X0X takes MIDI from USB and from the FM-1's TRS MIDI IN jack, both the same way:
 
+Each part listens on its own channel. These are the defaults; GLO sets each part's channel (909
+MIDI CH and so on), or OFF to ignore its notes, for example when another box sends you its clock
+with notes on the same channels.
+
 | Input | What it plays |
 |---|---|
 | Channel 10 | The 909, with General MIDI drum notes: 36 kick, 38 snare, 41, 45 and 50 toms, 37 rim, 39 clap, 42 closed hat, 46 open hat, 49 crash, 51 ride. |
@@ -672,8 +680,11 @@ X0X takes MIDI from USB and from the FM-1's TRS MIDI IN jack, both the same way:
 | Channel 4 | Notes 36–43 play break slices 1–8. |
 | Clock | X0X follows an incoming MIDI clock automatically, and returns to its own tempo half a second after the clock stops. Start, Stop and Continue start and stop the patterns. |
 
-X0X can also send MIDI: clock and start/stop when CLOCK OUT is on, and the patterns as notes
-on the channels above when NOTES OUT is on.
+X0X can also send MIDI: clock and start/stop when CLOCK OUT is on, and the patterns as notes on
+each part's channel when NOTES OUT is on.
+
+While X0X follows an external clock, the tempo on the top line is averaged over about a second,
+so it doesn't flicker with every clock.
 
 ### USB audio
 

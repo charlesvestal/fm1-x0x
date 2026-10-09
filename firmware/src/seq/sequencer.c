@@ -24,6 +24,11 @@ void seq_init(seq_t *s, pattern_t *patterns)
     s->ext_bpm = 125.0f;
     s->accent_q7 = 88;                /* a 909 non-accented hit sits ~3 dB under an accent */
     s->send_clock = 1;
+    {
+        static const uint8_t CH[NTRACKS] = {9, 10, 1, 2, 3};   /* 909 10, 808 11, 303s 2 / 3, break 4 */
+        for (i = 0; i < NTRACKS; i++)
+            s->ch[i] = CH[i];
+    }
     for (i = 0; i < NTRACKS; i++) {
         s->t[i].to_next = NEVER;
         s->t[i].pp_dir = 1;
@@ -121,7 +126,8 @@ static void bass_release(seq_t *s, int b, const seq_sink_t *o)
         o->bass_off(o->ctx, b);
         tr->sounding = 0;
         if (s->send_notes && s->bass_notes_out[b]) {
-            midi(o, (uint8_t)(0x80 | (1 + b)), s->bass_notes_out[b], 0);
+            if (s->ch[TRK_BASS0 + b] != SEQ_CH_OFF)    /* (switched OFF while it sounded: 0x80 | 0xFF is a reset) */
+                midi(o, (uint8_t)(0x80 | s->ch[TRK_BASS0 + b]), s->bass_notes_out[b], 0);
             s->bass_notes_out[b] = 0;
         }
     }
@@ -140,10 +146,10 @@ static void fire_drum(seq_t *s, int k, int p, const seq_sink_t *o)
             continue;
         if (!o->drum(o->ctx, k, v, vel))
             continue;                                /* its chance said no: no MIDI either */
-        if (s->send_notes) {
+        if (s->send_notes && s->ch[k] != SEQ_CH_OFF) {
             uint8_t mv = (uint8_t)(vel * 127.0f);
-            midi(o, (uint8_t)(0x99 + k), GM_DRUM[k][v], mv);
-            midi(o, (uint8_t)(0x89 + k), GM_DRUM[k][v], 0);
+            midi(o, (uint8_t)(0x90 | s->ch[k]), GM_DRUM[k][v], mv);
+            midi(o, (uint8_t)(0x80 | s->ch[k]), GM_DRUM[k][v], 0);
         }
     }
 }
@@ -167,11 +173,11 @@ static void fire_bass(seq_t *s, int b, int p, uint32_t step_q8, uint32_t carry, 
     if (gate == G_NOTE || !tr->sounding) {
         int slide = tr->sounding && prev_slide;
         o->bass_on(o->ctx, b, note, (st->flags & BS_ACCENT) != 0, slide);
-        if (s->send_notes) {
+        if (s->send_notes && s->ch[TRK_BASS0 + b] != SEQ_CH_OFF) {
             uint8_t old = s->bass_notes_out[b];
-            midi(o, (uint8_t)(0x90 | (1 + b)), (uint8_t)note, (st->flags & BS_ACCENT) ? 127 : 90);
+            midi(o, (uint8_t)(0x90 | s->ch[TRK_BASS0 + b]), (uint8_t)note, (st->flags & BS_ACCENT) ? 127 : 90);
             if (old && old != note)
-                midi(o, (uint8_t)(0x80 | (1 + b)), old, 0);   /* legato: the new note first */
+                midi(o, (uint8_t)(0x80 | s->ch[TRK_BASS0 + b]), old, 0);   /* legato: the new note first */
             s->bass_notes_out[b] = (uint8_t)note;
         }
         tr->sounding = 1;
@@ -228,10 +234,16 @@ static uint32_t bar_end(seq_t *s, int start)
     int t, cued = 0;
     for (t = 0; t < NTRACKS; t++)
         next[t] = s->ppat[t];
-    if (song_plays(s) && !s->song_rec) {               /* the song: its next bar (looping) */
+    if (song_plays(s) && !s->song_rec) {               /* the song: its next bar (looping), or this one again */
         int k = start ? s->song_start : s->song_pos + 1;
-        if (k >= s->song->len)
-            k = 0;
+        if (!start && s->song_rep > 1 && s->song_pos < s->song->len) {
+            k = s->song_pos;
+            s->song_rep--;
+        } else {
+            if (k >= s->song->len)
+                k = 0;
+            s->song_rep = (uint8_t)SONG_REP(&s->song->bar[k]);
+        }
         s->song_pos = (uint16_t)k;
         song_read(s, k, next);
         for (t = 0; t < NTRACKS; t++)
