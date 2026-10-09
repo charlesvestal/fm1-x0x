@@ -308,6 +308,7 @@ static void s_brk(void *x, int s16, int bar, float spb, int en)
             brk_applied[i] = bp->set[i];
             breaks_set(&brk, i, bp->set[i]);
         }
+    breaks_pin(&brk, (int)bp->slice[s16 & 15] - 1);   /* the step's own slice, if it has one */
     breaks_step(&brk, s16, bar, spb, en);
 }
 static void s_brkstop(void *x) { (void)x; breaks_stop(&brk); }

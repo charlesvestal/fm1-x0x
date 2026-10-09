@@ -111,12 +111,15 @@ typedef struct breaks {
     /* status of the latest trigger (the UI's readout, and the tests' probe) */
     uint32_t st_trigs;                /* triggers fired since init */
     int8_t st_slice, st_bank, st_div, st_bp;
-    uint8_t st_forced, rsv[3];
+    uint8_t st_forced;
+    int8_t pin;                       /* X0X: the next step's own slice of loop A (breaks_pin), -1 = the generator's */
+    uint8_t rsv[2];
 } breaks_t;
 
 void breaks_init(breaks_t *b);
 void breaks_set_loop(breaks_t *b, int which /*0 = A, 1 = B*/, const brk_loop_t *loop);   /* NULL = empty (silent) */
 void breaks_step(breaks_t *b, int step16, int bar, float samples_per_16th, int enabled);
+void breaks_pin(breaks_t *b, int slice);           /* X0X: the next breaks_step plays loop A's slice (0-7), -1 = none */
 void breaks_stop(breaks_t *b);
 void breaks_live(breaks_t *b, int key, int down);  /* 0-7 hold slice of A, 8 reverse, 9 half speed, 10 stutter */
 void breaks_render(breaks_t *b, float *out, int n);  /* WRITES mono, n <= 256 */

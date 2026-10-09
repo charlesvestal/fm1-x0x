@@ -407,6 +407,26 @@ static void fire_trigger(breaks_t *b, int bp, int forced)
     b->st_forced = (uint8_t)forced;
 }
 
+/* X0X: a step with a slice of its own plays it, from its start, in place of the generator's choice
+ * (no retrigger); the generator still counts the trigger the step would have made */
+static void pin_trigger(breaks_t *b, int slice)
+{
+    b->current_slice = slice;
+    b->render_bank = 0;
+    b->sub_div = 0;
+    b->sub_count = 0;
+    b->sub_elapsed = 0;
+    b->sub_len = 0.0f;
+    slice_start(b, 0, slice);
+    b->st_trigs++;
+    b->st_slice = (int8_t)slice;
+    b->st_bank = 0;
+    b->st_div = 0;
+    b->st_forced = 0;
+}
+
+void breaks_pin(breaks_t *b, int slice) { b->pin = (int8_t)(slice >= 0 && slice < 8 ? slice : -1); }
+
 /* a clock trigger: BB Gen counts it whether or not half speed lets it fire */
 static void clock_trigger(breaks_t *b)
 {
@@ -467,7 +487,7 @@ void breaks_live(breaks_t *b, int key, int down)
 
 void breaks_step(breaks_t *b, int step16, int bar, float samples_per_16th, int enabled)
 {
-    int pb, tpt, tick, forced = 0;
+    int pb, tpt, tick, forced = 0, pin;
     perf_sync(b);
     b->sp16 = samples_per_16th;
     b->bar = bar;
@@ -510,7 +530,17 @@ void breaks_step(breaks_t *b, int step16, int bar, float samples_per_16th, int e
     b->spt = samples_per_16th * (float)tpt * (1.0f / 6.0f);
     tick = 6 * (step16 & 15);
     b->trig_left = 0;
-    if (forced) {
+    pin = b->pin;
+    b->pin = -1;
+    if (pin >= 0 && (!enabled || !b->bank[0].valid || b->perf.count))
+        pin = -1;                                          /* off, no loop A, or a held slice key wins */
+    if (pin >= 0) {
+        if (forced)
+            b->trigger_count = 1;
+        else if (tick % tpt == 0)
+            b->trigger_count++;
+        pin_trigger(b, pin);
+    } else if (forced) {
         b->trigger_count = 1;
         fire_trigger(b, 0, 1);
     } else if (tick % tpt == 0)
@@ -540,6 +570,7 @@ void breaks_init(breaks_t *b)
     b->pending_bank = -1;
     b->perf.rate_mult = 1.0f;
     b->st_slice = -1;
+    b->pin = -1;
 }
 
 /* ---- render ----------------------------------------------------------------------------- */

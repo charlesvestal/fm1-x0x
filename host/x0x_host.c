@@ -650,6 +650,10 @@ static int expect(const char *what, const char *val)
     }
     else if (!strncmp(what, "playhead", 8))        /* playheadT: track T's step (1-based) */
         got = eng_step[atoi(what + 8)] + 1;
+    else if (!strncmp(what, "brkslice", 8))        /* brksliceS: step S's own slice (1-8), 0 = the generator's */
+        got = proj.pat[seq.ppat[PART_BRK]].brk.slice[atoi(what + 8)];
+    else if (!strcmp(what, "brknow"))               /* the slice sounding now, 1-8, 0 none */
+        got = engine_brk_slice() + 1;
     else if (!strcmp(what, "mempct"))
         got = project_mem_pct();
     else if (!strcmp(what, "part"))

@@ -1,0 +1,53 @@
+# BREAK: a step held + black key 1-8 gives that 16th its own slice of loop A, which plays there in
+# place of the generator's choice; the same key again gives it back to the generator.
+wait 300
+turn ALGO 4
+expect part 4
+tapkey w0
+tapkey w1
+tapkey w2
+tapkey w3
+tapkey w4
+tapkey w5
+tapkey w6
+tapkey w7
+expect brk0 1
+# step 1: slice 5 (its key's press toggles it off, the slice puts it back on)
+key w0 down
+tapkey b4
+key w0 up
+expect brk0 1
+expect brkslice0 5
+# step 5: slice 3; step 9 (off): slice 2, which switches it on
+key w4 down
+tapkey b2
+key w4 up
+expect brkslice4 3
+key w8 down
+tapkey b1
+key w8 up
+expect brk8 1
+expect brkslice8 2
+shot s1_pinned.png
+# played: step 1 is slice 5, step 5 slice 3
+tap PLAY
+wait 60
+expect brknow 5
+wait 480
+expect brknow 3
+tap PLAY
+# the same key again: back to the generator
+key w4 down
+tapkey b2
+key w4 up
+expect brkslice4 0
+expect brk4 1
+# the black keys still play slices live when no step is held
+tapkey b6
+expect brkslice6 0
+# saved and back
+tap SAVE
+reboot
+wait 300
+expect brkslice0 5
+expect brkslice8 2

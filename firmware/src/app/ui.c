@@ -47,6 +47,8 @@ typedef struct {
     uint32_t step_t0;                  /* when the held 303 step went down: a tap toggles, a hold does not */
     uint8_t step_preview;              /* the held step is sounding (only while stopped) */
     uint8_t step_created;              /* the press turned the held step on (its release keeps it) */
+    int8_t brk_held;                   /* BREAK: the white key (16th) held, -1 none */
+    uint16_t brk_pinkeys;              /* BREAK: black keys used to give a held step its slice (their release is not live) */
     uint8_t gen_stale[NBASS];          /* TB-3PO's knobs changed since the line was written */
     uint32_t btn, keys, btn_used;
     int8_t chain_first;
@@ -1352,6 +1354,7 @@ static void set_view(int v)
         ui.prev_view = ui.view;
     ui.view = (uint8_t)v;
     ui.held_step = -1;
+    ui.brk_held = -1;
     ui.overlay = O_NONE;
     build_pages();
 }
@@ -1645,12 +1648,29 @@ static void key_event(int k, int down)
         else if (w >= 0)
             bass_step_key(w, down);
     } else {
-        if (bl >= 0)
-            engine_brk_live(bl, down);
-        else if (down && w >= 0) {
-            cur_pat()->brk.steps ^= 1u << w;
+        brkpart_t *bp = &cur_pat()->brk;
+        if (bl >= 0 && bl < 8 && down && ui.brk_held >= 0) {     /* a step held + black 1-8: its own slice */
+            int st = ui.brk_held;
+            bp->slice[st] = (uint8_t)(bp->slice[st] == bl + 1 ? 0 : bl + 1);
+            bp->steps |= 1u << st;
+            ui.brk_pinkeys |= (uint16_t)(1u << bl);
             mark_dirty();
-        }
+            if (bp->slice[st]) {
+                char t[24];
+                put_i(put_s(put_i(put_s(t, "STEP "), st + 1), ": SLICE "), bl + 1);
+                say(t, 0);
+            } else
+                say("STEP: THE GENERATOR'S SLICE", 0);
+        } else if (bl >= 0 && !down && (ui.brk_pinkeys & (1u << bl))) {
+            ui.brk_pinkeys &= (uint16_t)~(1u << bl);
+        } else if (bl >= 0)
+            engine_brk_live(bl, down);
+        else if (w >= 0 && down) {
+            bp->steps ^= 1u << w;
+            ui.brk_held = (int8_t)w;
+            mark_dirty();
+        } else if (w >= 0 && ui.brk_held == w)
+            ui.brk_held = -1;
     }
 }
 
@@ -2576,6 +2596,10 @@ static void draw_break(int band)
         for (c = 0; c < 16; c++) {
             int x = col_x(c), on = (bp->steps >> c) & 1u;
             box(x, 2, 12, 10, on ? (c == ph ? C_WHITE : col) : (c == ph ? C_DIM : C_LINE));
+            if (bp->slice[c]) {                        /* the step's own slice */
+                char d[2] = {(char)('0' + bp->slice[c]), 0};
+                text_c(x + 6, vc(&FONT_XS, 2, 10), &FONT_XS, d, on ? C_BLACK : C_GRAY);
+            }
         }
         cv_text(3, 1, &FONT_XS, "ON", C_GRAY);
         {
@@ -2591,6 +2615,7 @@ static void draw_break(int band)
                 put_i(put_s(q, "   RETRIG X"), div);
             cv_text(4, 36, &FONT_S, t, bank ? C_AMB : C_GRAY);
         }
+        cv_text(4, 47, &FONT_XS, "HOLD A STEP + 1-8: ITS OWN SLICE", C_DIM);
         segs(4, 58, &FONT_XS, C_DIM, 10, "1-8 SLICES", "9 REV", "10 HALF", "11 STUT");
     }
 }
@@ -3269,6 +3294,7 @@ void ui_init(void)
     ui.prev_view = V_PART;
     ui.part = PART_909;
     ui.held_step = -1;
+    ui.brk_held = -1;
     ui.chain_first = -1;
     ui.touched = -1;
     ui.overlay = O_NONE;
