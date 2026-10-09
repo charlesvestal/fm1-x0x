@@ -18,6 +18,7 @@
  *     one of the fired rates is picked at random; the slice's head is replayed div times.
  *   - phrase A/B: B is rolled (B chance) at the start of the bar before the fill bar and switched
  *     in at the fill bar's start; A is always scheduled back for the first bar of the next phrase.
+ *     (X0X: with Phrase off, B chance rolls at the start of every bar, for that bar.)
  *   - live layer: held slices on a last-note-priority stack (dedup on re-press), held slice beats
  *     the engine (the engine still draws), reverse wraps within the slice, half speed = rate * 0.5
  *     and only every other trigger fires, stutter forces a 4x retrigger on each trigger.
@@ -494,6 +495,15 @@ void breaks_step(breaks_t *b, int step16, int bar, float samples_per_16th, int e
                     b->pending_bank = 1;
             } else if (bip == pb - 1)
                 b->pending_bank = 0;
+        } else if (b->set[BRK_BCHANCE] && !forced) {      /* X0X: no phrase: B chance rolls for every bar */
+            int bank = brk_rand(b) < (float)b->set[BRK_BCHANCE] * 0.01f && b->bank[1].valid;
+            if (bank != b->engine_bank) {
+                b->engine_bank = (uint8_t)bank;
+                forced = 1;
+            }
+        } else if (!forced && b->engine_bank) {            /* B CHANCE turned to 0 while B played */
+            b->engine_bank = 0;
+            forced = 1;
         }
     }
     tpt = bank_ticks(b, b->engine_bank);

@@ -2,12 +2,12 @@
 # nothing else; a key, a turn or another button puts the card away and the combination works.
 wait 300
 expect helpfits 1
-# SAVE held: the card, and letting go does not save
+# SAVE held: the card (sooner than the others: SAVE is held to copy), and letting go does not save
 expect store_writes 0
 press SAVE
-wait 500
+wait 200
 expect help 0
-wait 600
+wait 400
 expect help 8
 shot h01_save.png
 release SAVE

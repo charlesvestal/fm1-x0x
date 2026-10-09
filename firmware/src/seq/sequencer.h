@@ -99,6 +99,8 @@ typedef struct {
     volatile uint8_t send_clock;      /* 1 = emit MIDI clock + transport when internal */
     volatile uint8_t send_notes;      /* 1 = echo the sequence on MIDI (909 ch 10, 808 ch 11, 303s ch 2 / 3) */
     volatile uint32_t mute;           /* MUTE_* bits */
+    volatile uint32_t vmute;          /* drum tracks muted on their own (bit k * NDRUM + v): kept apart from
+                                       * the part mutes, which the song and HOME set as a whole */
     volatile uint8_t accent_q7;       /* drum velocity of a non-accented hit, of 127 */
     float bpm;                        /* internal tempo (UI writes; read per step) */
     float ext_bpm;                    /* tempo measured from the external clock */

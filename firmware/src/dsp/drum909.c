@@ -54,7 +54,8 @@ static const d9_pspec_t d9_bd_p[] = {
 };
 static const d9_pspec_t d9_sd_p[] = {
     EXP("Tune", F_TUNE, 64, SD_TUNE), EXP("Tone", F_TONE, 68, SD_TONE),
-    LIN("Snappy", F_SNAPPY, 64, 0.0f, 1.0f), LEVEL(58), DRIVE(36), DIST, SENDS, PAN,
+    LIN("Snappy", F_SNAPPY, 64, 0.0f, 1.0f), LIN("Decay", F_DECAY, 41, 120.0f, 800.0f),   /* X0X: 9W9's fixed 340 ms */
+    LEVEL(58), DRIVE(36), DIST, SENDS, PAN,
 };
 static const d9_pspec_t d9_lt_p[] = {
     EXP("Tune", F_TUNE, 66, LT_TUNE), EXP("Decay", F_DECAY, 111, LT_DECAY), LEVEL(52),
@@ -278,7 +279,7 @@ void drum909_init(drum909_t *d)
         case 1:
             b->tune = 205.0f; b->tune2 = 325.0f; b->osc2_mix = 0.40f;
             b->sweep_depth = 1.045f; b->sweep_time = 30.0f;
-            b->decay = 320.0f; b->attack = 0.15f;
+            b->decay = 340.0f; b->attack = 0.15f;
             b->snappy = 0.5f; b->noise_decay = 1200.0f; b->noise_hp = 1000.0f;
             b->drive = 1.8f; b->level = 0.62f;
             break;
@@ -444,8 +445,7 @@ void drum909_trigger(drum909_t *d, int voice, float vel)
         b->osc2_mix = 0.40f;
         b->sweep_depth = 1.045f;
         b->sweep_time = 30.0f;
-        b->decay = 340.0f;
-        b->attack = 0.0f;
+        b->attack = 0.0f;                     /* (X0X: the body's decay is its DECAY pot, 9W9's 340 ms by default) */
         if (b->noise_hp < 990.0f || b->noise_hp > 1010.0f) {
             b->noise_hp = 1000.0f;
             d9_biquad_set(&b->noise_hpf, D9_HP, 1000.0f, 0.7071f);

@@ -18,6 +18,7 @@
 #define PROJ_MAGIC 0x50305830u           /* "0X0P" */
 #define PROJ_FORMAT 1u
 #define PROJ_STEREO 2u
+#define PROJ_SND_REV 1u                  /* 1: the 909 SD has a DECAY pot (index 3; LEVEL.. moved up one) */
 
 typedef struct {
     uint32_t magic, format;
@@ -28,7 +29,8 @@ typedef struct {
     uint8_t rsv_bright;                  /* was the screen's brightness (removed: always full); unused */
     uint8_t stereo;                      /* the pans the sound has: 0 none (saved mono), 1 the parts', 2 the
                                           * drum voices' too (PROJ_STEREO); a load centres what is missing */
-    uint8_t rsv[5];                      /* room to grow: an older, shorter object loads (zeros here) */
+    uint8_t snd_rev;                     /* the sound's layout (PROJ_SND_REV): 0 = before the 909 SD's DECAY */
+    uint8_t rsv[4];                      /* room to grow: an older, shorter object loads (zeros here) */
 } settings_t;
 
 /* the song and the motion lanes: one blob, split across OBJ_SONG and OBJ_MOTION */

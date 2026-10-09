@@ -704,6 +704,8 @@ static int expect(const char *what, const char *val)
         got = proj.sound.v[t][v][i];
     } else if (!strcmp(what, "mute"))
         got = (int)seq.mute;
+    else if (!strcmp(what, "vmute"))                /* drum tracks muted on their own (bit kit * 11 + track) */
+        got = (int)seq.vmute;
     else if (!strcmp(what, "loops"))
         got = engine_brk_nslots();
     else if (!strcmp(what, "loop_a"))

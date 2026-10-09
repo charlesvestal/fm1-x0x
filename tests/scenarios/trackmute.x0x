@@ -1,0 +1,28 @@
+# Drum tracks mute on their own: HOME + a black key on the 909 / 808 screen. The part mute (HOME,
+# black 1-5) and the song leave them alone.
+wait 300
+expect vmute 0
+press HOME
+tapkey b1
+release HOME
+expect vmute 2
+expect sel 0
+expect view 1
+# the 808: its tracks are bits 11..21
+turn ALGO 1
+press HOME
+tapkey b0
+release HOME
+expect vmute 2050
+# the 909's part mute on HOME and back: the track mutes stay
+tap HOME
+tapkey b0
+tapkey b0
+expect vmute 2050
+expect mute 0
+tap HOME
+turn ALGO -1
+press HOME
+tapkey b1
+release HOME
+expect vmute 2048

@@ -45,6 +45,7 @@ typedef struct {
     uint8_t step_edited;
     uint32_t step_t0;                  /* when the held 303 step went down: a tap toggles, a hold does not */
     uint8_t step_preview;              /* the held step is sounding (only while stopped) */
+    uint8_t step_created;              /* the press turned the held step on (its release keeps it) */
     uint8_t gen_stale[NBASS];          /* TB-3PO's knobs changed since the line was written */
     uint32_t btn, keys, btn_used;
     int8_t chain_first;
@@ -110,6 +111,7 @@ static song_t *song(void) { return &proj.arr.song; }
 static int is_303(void) { return ui.part == PART_303A || ui.part == PART_303B; }
 static int is_drum(void) { return ui.part == PART_909 || ui.part == PART_808; }
 static int bidx(void) { return ui.part == PART_303B ? 1 : 0; }
+static int held_note_of(const bpart_t *bp, int s);
 
 /* ============================================================ text helpers === */
 static char *put_s(char *b, const char *s)
@@ -383,6 +385,18 @@ static void pref_set(pref_t r, int v)
     }
 }
 
+/* the value belongs to the pattern (it changes when the pattern does), not to the sound */
+static int in_pattern(pref_t r)
+{
+    switch (r.kind) {
+    case R_SWING: case R_DLEN: case R_DRATE: case R_BLEN: case R_BRATE: case R_BDIR: case R_BTRANS: case R_GEN:
+    case R_BRKSET: case R_BRKSLOT:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
 /* a knob's label: mixer refs name their part */
 static const char *pref_name(pref_t r)
 {
@@ -645,6 +659,13 @@ static void build_pages(void)
 
 static int cur_page(void) { return ui.page[ui.view][ui.part]; }
 
+/* a drum machine's page of the selected track's own sound (not the whole kit's: SENDS, PART, KIT) */
+static int track_page(void)
+{
+    pref_t r = pg.r[cur_page()][0];
+    return ui.view == V_PART && is_drum() && r.kind == R_ENG && (r.a == T_909 || r.a == T_808) && r.b == ui.sel[ui.part];
+}
+
 /* ===================================================================== lists === */
 /* A list is rows of refs. SEL on a page opens the list of every page's knobs (the deep view);
  * GLOBAL is a list of its own. SELECT moves, ALGORITHM changes, SEL runs an action. */
@@ -712,6 +733,24 @@ static void ask(int act, int arg, const char *q1, const char *q2)
     put_s(ui.ask_q[0], q1);
     put_s(ui.ask_q[1], q2 ? q2 : "");
     ui.overlay = O_ASK;
+}
+
+/* part `part` of a pattern has something to play */
+static int part_used(const pattern_t *pt, int part)
+{
+    int v, s;
+    if (part < NKIT) {
+        for (v = 0; v < NDRUM; v++)
+            if (pt->drum[part].hit[v])
+                return 1;
+        return 0;
+    }
+    if (part == PART_BRK)
+        return pt->brk.steps != 0;
+    for (s = 0; s < NSTEPS; s++)
+        if (bstep_gate(&pt->bass[part - NKIT].step[s]) != G_REST)
+            return 1;
+    return 0;
 }
 
 static int pattern_used(const pattern_t *pt)
@@ -787,6 +826,7 @@ static void clear_part(pattern_t *p, int part)
  * its combinations included. A key, a turn or another button puts the card away (and the
  * combination works as always); letting go of the button after its card does nothing else. */
 #define HELP_HOLD 900u
+#define HELP_HOLD_SAVE 400u                    /* SAVE is held to copy: its card says what will be copied */
 static int perf_testing(void);
 #define HELP_LINES 6
 static const char *const BTN_LABEL[NB] = {"FX", "SEL", "ENV", "LFO", "EDIT", "GLO", "HOME", "SAVE", "ARP", "SEQ",
@@ -812,12 +852,20 @@ static int help_lines(int b, const char *l[HELP_LINES])
     case B_GLO: L("SETTINGS, SAVE, CLEAR,"); L("FACTORY RESET, PERFORMANCE"); L("AGAIN: CLOSE"); break;
     case B_HOME:
         L("HOME: ALL FIVE PARTS"); L("+ SELECT: TEMPO"); L("+ WHITE KEY: PATTERN");
+        if (is_drum() && part_view()) L("+ BLACK KEY: MUTE THE TRACK");
         L("+ REC: UNDO   + PLAY: REDO"); L("LIST: BACK   QUESTION: NO");
         break;
-    case B_SAVE:
-        L("SAVE EVERYTHING"); L("+ WHITE KEY: COPY PATTERN"); L("+ REC: CLEAR THIS PART");
+    case B_SAVE: {                                   /* says what a copy takes: this part, or all five */
+        static char cp[40], cl[32];
+        if (part_view())
+            put_i(put_s(put_s(put_s(cp, "+ WHITE KEY: COPY "), PART_N[ui.part]), " P"), seq.ppat[ui.part] + 1);
+        else
+            put_s(cp, "+ WHITE KEY: COPY ALL FIVE PARTS");
+        put_s(put_s(cl, "+ REC: CLEAR "), PART_N[ui.part]);
+        L("TAP: SAVE EVERYTHING"); L(cp); L("    TO THAT PATTERN"); L(cl);
         L("+ KNOB: FORGET ITS MOTION"); L(proj.set.autosave_off ? "AUTOSAVE IS OFF" : "STOPPED: SAVES BY ITSELF");
         break;
+    }
     case B_ARP:
         L("TB-3PO: THE 303 LINE"); L("GENERATOR (303A, 303B)");
         if (gen) { L("OCT+: A NEW LINE"); L("OCT-: MUTATE IT"); }
@@ -858,7 +906,7 @@ static void help_tick(uint32_t btn, uint32_t keys)
     if (!btn || (btn & (btn - 1u)) || keys || ui.overlay == O_ASK || perf_testing())
         return;                                          /* exactly one button, nothing else */
     for (i = 0; i < NB; i++)
-        if (btn == 1u << i && !(ui.btn_used & btn) && now - ui.down_t[i] >= HELP_HOLD &&
+        if (btn == 1u << i && !(ui.btn_used & btn) && now - ui.down_t[i] >= (i == B_SAVE ? HELP_HOLD_SAVE : HELP_HOLD) &&
             (int32_t)(ui.turn_t - ui.down_t[i]) <= 0) {
             ui.help = (uint8_t)(i + 1);
             ui.btn_used |= btn;                          /* its release now does nothing */
@@ -1209,7 +1257,10 @@ static void run_action(int act, int arg)
             if ((part < 0 || i == part) && seq.ppat[i] != dst)
                 rc |= copy_part(dst, seq.ppat[i], i);
         mark_dirty();
-        put_i(put_s(t, part < 0 ? "COPIED TO P" : "PART COPIED TO P"), dst + 1);
+        q = put_s(t, part < 0 ? "ALL FIVE" : PART_N[part]);
+        if (part >= 0)
+            q = put_i(put_s(q, " P"), seq.ppat[part] + 1);
+        put_i(put_s(q, " COPIED TO P"), dst + 1);
         say(rc ? "MOTION FULL: NOT ALL COPIED" : t, 0);
         break;
     }
@@ -1457,16 +1508,21 @@ static void bass_step_key(int white, int down)
     bpart_t *bp = &cur_pat()->bass[b];
     if (s >= NSTEPS)
         return;
-    if (down) {
+    if (down) {                                       /* an empty step is on at once: hold it to edit it */
         ui.held_step = (int8_t)s;
         ui.step_edited = 0;
         ui.step_t0 = plat_ms();
-        ui.step_preview = key_sounds() && bstep_gate(&bp->step[s]) != G_REST;   /* as the drum keys */
+        ui.step_created = bstep_gate(&bp->step[s]) == G_REST;
+        if (ui.step_created) {
+            bp->step[s].flags = G_NOTE;
+            mark_dirty();
+        }
+        ui.step_preview = key_sounds();               /* as the drum keys */
         if (ui.step_preview)
             engine_bass_on(b, bp->step[s].note + bp->transpose - 24, (bp->step[s].flags & BS_ACCENT) != 0, 0);
     } else if (ui.held_step == s) {
-        if (!ui.step_edited && plat_ms() - ui.step_t0 < STEP_TAP_MS) {   /* a tap; a hold only shows the step */
-            bp->step[s].flags = bstep_gate(&bp->step[s]) == G_REST ? G_NOTE : G_REST;
+        if (!ui.step_created && !ui.step_edited && plat_ms() - ui.step_t0 < STEP_TAP_MS) {   /* a tap takes it off */
+            bp->step[s].flags = G_REST;
             mark_dirty();
         }
         if (ui.step_preview)
@@ -1555,6 +1611,16 @@ static void key_event(int k, int down)
                 b->mute = (uint8_t)(part_muted(bl) ? b->mute | 1u << bl : b->mute & ~(1u << bl));
             }
             say(part_muted(bl) ? "MUTED " : "UNMUTED ", PART_N[bl]);
+        }
+        return;
+    }
+    if (is_drum() && bl >= 0 && (ui.btn & (1u << B_HOME))) {   /* HOME + black key: mute that track */
+        if (down) {
+            uint32_t m = 1u << (ui.part * NDRUM + bl);
+            const char *nm = engine_voice_name(ui.part == PART_909 ? T_909 : T_808, bl);
+            ui.btn_used |= 1u << B_HOME;
+            seq.vmute ^= m;
+            say((seq.vmute & m) ? "MUTED " : "UNMUTED ", nm);
         }
         return;
     }
@@ -1855,10 +1921,10 @@ static void input(void)
             bstep_t *st = &bp->step[ui.held_step];
             ui.step_edited = 1;
             mark_dirty();
-            if (i == 0) {
-                int n = st->note + e;
+            if (i == 0) {                               /* a rest or a tie becomes a note of its own */
+                int n = held_note_of(bp, ui.held_step) + e;
                 st->note = (uint8_t)(n < 12 ? 12 : n > 108 ? 108 : n);
-                if (bstep_gate(st) == G_REST)
+                if (bstep_gate(st) != G_NOTE)
                     st->flags = (uint8_t)((st->flags & ~BS_GATE_MASK) | G_NOTE);
                 if (key_sounds()) {                     /* as the drum keys: playing, the line is heard */
                     engine_bass_on(bidx(), st->note + bp->transpose - 24, 0, 1);
@@ -2251,8 +2317,12 @@ static void draw_header(void)
         x = w + 6;
         if (ui.view == V_GEN)
             x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, "TB-3PO", C_HI) + 6;
-        else if (is_drum())
-            x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, engine_voice_name(ui.part == PART_909 ? T_909 : T_808, ui.sel[ui.part]), C_HI) + 6;
+        else if (is_drum() && track_page())         /* one track's own sound */
+            x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, engine_voice_name(ui.part == PART_909 ? T_909 : T_808, ui.sel[ui.part]), C_WHITE) + 6;
+        else if (is_drum()) {                        /* the whole machine: ALL, in amber, and the page */
+            x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, "ALL", C_AMB) + 4;
+            x = cv_text(x, vc(&FONT_XS, 1, 17), &FONT_XS, pg.title[cur_page()], C_AMB) + 6;
+        }
         else if (is_303() && ui.kbd[bidx()])
             x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, "KEYS", C_AMB) + 6;
     } else {
@@ -2308,7 +2378,7 @@ static void draw_drum(int band)
         int y = (v - band * 6) * 12 + 1, sel = v < NDRUM && v == ui.sel[k];
         const char *nm = v < NDRUM ? engine_voice_name(k == PART_909 ? T_909 : T_808, v) : "AC";
         uint32_t bits = v < NDRUM ? d->hit[v] : d->accent;
-        int muted = v < NDRUM && (seq.mute & (1u << (k * NDRUM + v)));
+        int muted = v < NDRUM && ((seq.mute | seq.vmute) & (1u << (k * NDRUM + v)));
         if (sel)
             box(0, y - 1, 24, 12, col);
         cv_text(5, vc(&FONT_XS, y - 1, 12), &FONT_XS, nm, sel ? C_BLACK : muted ? C_LINE : v < NDRUM ? C_GRAY : C_WHITE);
@@ -2325,7 +2395,7 @@ static void draw_drum(int band)
                     rbox(x + 2, y + 4, 8, 2, 1, C_LINE);
                 continue;
             }
-            box(x, y, 12, 10, hit ? (sel ? col : on_dim) : (s == ph ? C_DIM : C_LINE));
+            box(x, y, 12, 10, hit ? (muted ? C_DIM : sel ? col : on_dim) : (s == ph ? C_DIM : C_LINE));
             if (hit && s == ph)
                 box(x + 2, y + 2, 8, 6, C_WHITE);
         }
@@ -2335,6 +2405,15 @@ static void draw_drum(int band)
 }
 
 static int note_y(int n, int lo, int hi) { return 64 - (n - lo) * 58 / (hi - lo); }
+
+/* the note step s sounds: a TIE holds the note of the NOTE it follows (its own is not played) */
+static int held_note_of(const bpart_t *bp, int s)
+{
+    int k;
+    for (k = 0; k < bp->len && bstep_gate(&bp->step[s]) == G_TIE; k++)
+        s = s ? s - 1 : bp->len - 1;
+    return bp->step[s].note;
+}
 
 static void draw_303(int band, int gen)
 {
@@ -2376,11 +2455,11 @@ static void draw_303(int band, int gen)
             if (s == ph)
                 cv_rect(x, 0, 12, 70, dim(col, 2));
             if (g != G_REST) {
-                int y = note_y(st->note, lo, hi);
+                int hn = held_note_of(bp, s), y = note_y(hn, lo, hi);
                 uint16_t fc = s == ui.held_step ? C_WHITE : (st->flags & BS_ACCENT) ? col : dim(col, 9);
                 box(x, y, 12, 5, fc);
-                if (g == G_TIE)
-                    cv_rect(x - 2, y + 2, 3, 1, fc);
+                if (g == G_TIE && c > 0)                 /* a tie: one brick with the note it holds */
+                    cv_rect(col_x(c - 1) + 6, y, x - col_x(c - 1), 5, fc);
                 if ((st->flags & BS_SLIDE) && c < 15) {
                     int nx = s + 1 < bp->len ? s + 1 : 0, ny = note_y(bp->step[nx].note, lo, hi);
                     cv_line(x + 11, y + 2, x + 14, ny + 2, C_WHITE);
@@ -2406,7 +2485,9 @@ static void draw_303(int band, int gen)
             q = put_s(q, ui.held_step >= 0 ? "STEP " : "WRITE ");
             q = put_i(q, s + 1);
             q = put_s(q, "  ");
-            q = put_note(q, st->note + bp->transpose - 24);
+            q = put_note(q, held_note_of(bp, s) + bp->transpose - 24);
+            if (bstep_gate(st) == G_TIE)
+                q = put_s(q, " TIE");
             if (st->flags & BS_ACCENT)
                 q = put_s(q, " ACC");
             if (st->flags & BS_SLIDE)
@@ -2424,7 +2505,8 @@ static void draw_303(int band, int gen)
             segs(4, 50, &FONT_XS, ui.gen_stale[b] ? C_WHITE : C_AMB, 16, ui.gen_stale[b] ? "OCT+  NEW LINE *" : "OCT+  NEW LINE",
                  "OCT-  MUTATE", 0, 0);
         else if (ui.held_step < 0)
-            segs(4, 50, &FONT_XS, C_DIM, 16, ui.kbd[b] ? "KEYS PLAY" : "TAP: STEP", ui.kbd[b] ? "REC: STEP WRITE" : "HOLD + KNOBS: EDIT", 0, 0);
+            segs(4, 50, &FONT_XS, C_DIM, 12, ui.kbd[b] ? "KEYS PLAY" : "PRESS: ON", ui.kbd[b] ? "REC: STEP WRITE" : "HOLD + KNOBS: EDIT",
+                 ui.kbd[b] ? 0 : "TAP: OFF", 0);
     }
 }
 
@@ -2503,9 +2585,9 @@ static void draw_home(int band)
                            c >= (seq.chain_a < seq.chain_b ? seq.chain_a : seq.chain_b) &&
                            c <= (seq.chain_a < seq.chain_b ? seq.chain_b : seq.chain_a);
             box(x, 3, 12, 18, pattern_used(&proj.pat[c]) ? C_DIM : C_LINE);
-            for (p = 0; p < NPARTS; p++)
+            for (p = 0; p < NPARTS; p++)                 /* the parts playing it: solid if they have notes here */
                 if (seq.ppat[p] == c)
-                    rbox(x + 2, 5 + p * 3, 8, 2, 1, PART_COL[p]);
+                    rbox(x + 2, 5 + p * 3, 8, 2, 1, part_used(&proj.pat[c], p) ? PART_COL[p] : dim(PART_COL[p], 5));
             if (c == cue && c != seq.ppat[PART_909] && (ui.frame & 16u))
                 frame(x - 1, 2, 14, 20, C_WHITE);
             if (in_chain)
@@ -2767,6 +2849,11 @@ static void draw_readout(void)
     } else {
         r = pg.r[cur_page()][ui.touched];
         nm = pref_name(r);
+        if (track_page()) {                              /* a track's own: "BD  Tune" */
+            static char t[24];
+            put_s(put_s(put_s(t, engine_voice_name(ui.part == PART_909 ? T_909 : T_808, ui.sel[ui.part])), "  "), nm);
+            nm = t;
+        }
     }
     pref_value(r, num, unit);
     {   /* one row: the name on the left, the value (+ unit) on the right, both on the box's middle */
@@ -2990,7 +3077,7 @@ static void draw_knobs(void)
             if (i)
                 cv_rect(i * 60, 6, 1, KNOB_H - 12, C_LINE);
             if (i == 0)
-                put_note(v, st->note + bp->transpose - 24);
+                put_note(v, held_note_of(bp, ui.held_step) + bp->transpose - 24);
             else if (i == 1)
                 put_s(v, G[bstep_gate(st)]);
             else
@@ -3014,6 +3101,10 @@ static void draw_knobs(void)
         if (touched)
             box(i * 60 + 2, 2, 56, KNOB_H - 4, dim(col, 4));
         text_c(cx, vc(&FONT_XS, 6, 12), &FONT_XS, pref_name(r), touched ? C_WHITE : C_GRAY);
+        if (in_pattern(r)) {                           /* saved with the pattern (changes with it): a P tag */
+            rbox(i * 60 + 3, 28, 9, 11, 2, C_LINE);
+            text_c(i * 60 + 8, vc(&FONT_XS, 28, 11), &FONT_XS, "P", C_HI);
+        }
         val = pref_get(r);
         if (has_motion(r)) {                           /* recorded motion: a mark, and what it plays now */
             int mv = motion_now(r);

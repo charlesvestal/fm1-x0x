@@ -4,6 +4,7 @@
  * Every object carries the format number; a load that finds another format keeps the
  * defaults for that object rather than guessing at the bytes. */
 #include "x0x.h"
+#include "../dsp/drum909.h"            /* DR_SD (the sound's revisions) */
 
 project_t proj;
 
@@ -25,6 +26,7 @@ void project_defaults(void)
     proj.set.bpm_x10 = 1250;
     proj.set.accent_q7 = 88;
     proj.set.stereo = PROJ_STEREO;
+    proj.set.snd_rev = PROJ_SND_REV;
     engine_sound_defaults(&proj.sound);
     arrange_defaults();
     /* the 303 lines start empty, like the drums: OCT+ on TB-3PO (or keyboard mode) writes one */
@@ -113,10 +115,26 @@ static void arrange_defaults(void)
         z[i] = 0;
 }
 
+/* the 909 SD gained DECAY at pot 3: what was 3.. (LEVEL, DRIVE, DIST, REV, DLY, PAN) moves up one,
+ * the knobs' motion with it, and DECAY takes its default (9W9's 340 ms) */
+static void sound_rev1(void)
+{
+    uint8_t *sd = proj.sound.v[T_909][DR_SD];
+    int i, n = engine_nparams(T_909, DR_SD);
+    for (i = n - 1; i > 3; i--)
+        sd[i] = sd[i - 1];
+    sd[3] = engine_param(T_909, DR_SD, 3)->def;
+    for (i = 0; i < NLANE; i++) {
+        lane_t *l = &proj.arr.lane[i];
+        if (l->used && l->t == T_909 && l->v == DR_SD && l->i >= 3)
+            l->i++;
+    }
+}
+
 /* each object is read straight into its place in proj: load_obj copies only a valid payload */
 int project_load(void)
 {
-    int bad = 0, i;
+    int bad = 0, i, sound_ok;
     settings_t set;
     project_defaults();
     set = proj.set;
@@ -124,7 +142,8 @@ int project_load(void)
         proj.set = set;
     else
         bad = 1;
-    if (load_obj(OBJ_SOUND, &proj.sound, sizeof proj.sound))
+    sound_ok = load_obj(OBJ_SOUND, &proj.sound, sizeof proj.sound) == 0;
+    if (!sound_ok)
         bad = 1;
     if (proj.set.stereo < 1)                          /* saved mono: no pans there (zeros = hard left) */
         for (i = 0; i < NPARTS; i++)
@@ -145,6 +164,9 @@ int project_load(void)
         arrange_defaults();
     if (proj.arr.song.len > NSONG)
         proj.arr.song.len = NSONG;
+    if (sound_ok && proj.set.snd_rev < 1)             /* saved before the 909 SD's DECAY: its pots move up one */
+        sound_rev1();
+    proj.set.snd_rev = PROJ_SND_REV;
     return bad ? -1 : 0;
 }
 

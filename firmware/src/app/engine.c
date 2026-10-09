@@ -236,7 +236,10 @@ void engine_sound_defaults(sound_t *s)
         s->v[T_MIX][PART_303A + v][MX_DLY] = v ? 60 : 80;
         s->v[T_MIX][PART_303A + v][MX_REV] = 12;
     }
-    s->v[T_909][DR_CP][5] = 90;                      /* the clap in the room */
+    s->v[T_909][DR_CP][5] = 50;                      /* the clap in the room (90 drowned it) */
+    s->v[T_909][DR_LT][1] = 92;                      /* the toms: shorter than 9W9's (its low tom rang */
+    s->v[T_909][DR_MT][1] = 88;                      /* on for 1.7 s, which reads as reverb) */
+    s->v[T_909][DR_HT][1] = 90;
     s->v[T_FX][0][FX_DL_TYPE] = 1;                   /* tape delay, dotted eighths */
     s->v[T_MST][0][MST_RATIO] = 4;                   /* 4:1 */
     s->v[T_MST][0][MST_THRESH] = 64;                 /* -24 dB */
