@@ -3,6 +3,8 @@
 wait 300
 turn ALGO 2
 expect part 2
+# SEQ: a held step's knobs are its own (NOTE, GATE, ACCENT, SLIDE); on EDIT they p-lock its sound
+tap SEQ
 expect gate0.0 0
 tapkey w0
 expect gate0.0 1

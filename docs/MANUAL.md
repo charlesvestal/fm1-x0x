@@ -257,10 +257,10 @@ There are two identical 303s. Each has its own sound and its own line.
 ![303A](img/screen-303.png)
 
 **Steps.** Press a white key to turn that step on; tap it again to turn it off. To edit a step,
-hold its key and turn the knobs: KNOB 1 sets the note, KNOB 2 the gate (REST, NOTE or TIE),
+hold its key on SEQ and turn the knobs: KNOB 1 sets the note, KNOB 2 the gate (REST, NOTE or TIE),
 KNOB 3 the accent and KNOB 4 the slide. An empty step turns on as soon as you press it, so you
 can press and hold it and set its note in one go. A slide glides from this step's note into the
-next one.
+next one. (Holding a step on EDIT gives it its own sound instead: see P-locks in section 11.)
 
 A **tie** holds the note before it through the step, so the note doesn't play again. On the
 screen a tied note joins the note it holds in one long bar. Turning KNOB 1 on a tie makes it a
@@ -460,6 +460,24 @@ value while it plays.
 
 There is room for 160 recorded knobs across all the patterns. When there's no room left, the
 top line says MOTION FULL.
+
+### P-locks
+
+A step can have its own sound: a kick with a higher tune on step 5, an open filter on one 303
+note, the break pitched up for one step.
+
+- On EDIT, hold a step that is on and turn a sound knob. That step plays the new value, and
+  the other steps keep the knob's own. The knob row says P-LOCK STEP 5, the knobs show the
+  step's values, and an amber dot marks the ones locked.
+- Steps with values of their own have a small notch on the step grid.
+- A tap still turns a step on or off; only a hold with a knob turn makes a lock. An empty step
+  turns on as soon as you press it, so you can press, hold and lock in one go.
+- **To clear one lock,** hold the step, hold SAVE and turn the knob.
+- On SEQ, holding a step doesn't lock anything: on a 303 the knobs set the step's note, gate,
+  accent and slide.
+
+P-locks are recorded motion on single steps, so they share its 160 knobs, and two locked steps
+next to each other glide like a recording. Stopped, a lock is heard while you hold the step.
 
 ---
 

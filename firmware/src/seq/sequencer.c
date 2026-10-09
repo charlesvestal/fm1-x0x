@@ -305,6 +305,8 @@ static uint32_t fire_step(seq_t *s, int t, const seq_sink_t *o)
     if (wrapped && t == TRK_BRK)
         tr->bars++;
     tr->pos = (uint8_t)p;
+    if (o->step)                                     /* first: the step's motion and p-locks, which the hit */
+        o->step(o->ctx, t, p);                       /* below must hear (a drum takes its tune as it fires) */
     if (is_drum(t))
         fire_drum(s, t, p, o);
     else if (t == TRK_BRK) {
@@ -313,8 +315,6 @@ static uint32_t fire_step(seq_t *s, int t, const seq_sink_t *o)
                    (s->pat[s->ppat[TRK_BRK]].brk.steps >> p & 1u) && !(s->mute & (1u << MUTE_BRK)));
     } else
         fire_bass(s, t - TRK_BASS0, p, L, carry, o);
-    if (o->step)
-        o->step(o->ctx, t, p);
     if (s->ext) {
         tr->to_next = NEVER;                         /* the clock arms the next one */
     } else {

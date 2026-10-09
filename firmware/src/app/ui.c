@@ -49,6 +49,9 @@ typedef struct {
     uint8_t step_preview;              /* the held step is sounding (only while stopped) */
     uint8_t step_created;              /* the press turned the held step on (its release keeps it) */
     int8_t brk_held;                   /* BREAK: the white key (16th) held, -1 none */
+    int8_t hold_step;                  /* a drum machine: the step (white key) held, -1 none */
+    uint8_t hold_created, hold_used;   /* drums / BREAK: the press turned the step on; a knob or a slice used it */
+    uint32_t hold_t0;                  /* when it went down (a tap takes an old step off) */
     uint16_t brk_pinkeys;              /* BREAK: black keys used to give a held step its slice (their release is not live) */
     uint8_t gen_stale[NBASS];          /* TB-3PO's knobs changed since the line was written */
     uint32_t btn, keys, btn_used;
@@ -1051,7 +1054,7 @@ static int help_lines(int b, const char *l[HELP_LINES])
         if (ui.view == V_MIX) L("HOME + BLACK KEY: MUTE");
         if (is_303()) { L("HOLD + KEY: A SLIDE"); if (kbd) L("HOLD + OCT: A TIE"); }
         break;
-    case B_EDIT: L("THE PART'S SOUND"); L("AGAIN: THE NEXT PAGE"); break;
+    case B_EDIT: L("THE PART'S SOUND"); L("AGAIN: THE NEXT PAGE"); L("HOLD A STEP + KNOB: P-LOCK"); break;
     case B_GLO: L("SETTINGS, SAVE, CLEAR,"); L("FACTORY RESET, PERFORMANCE"); L("AGAIN: CLOSE"); break;
     case B_HOME:
         L("THE PATTERN: ALL FIVE PARTS"); L("AGAIN: THE SONG   + SELECT: TEMPO"); L("+ WHITE KEY: PATTERN");
@@ -1566,6 +1569,7 @@ static void set_view(int v)
     ui.view = (uint8_t)v;
     ui.held_step = -1;
     ui.brk_held = -1;
+    ui.hold_step = -1;
     ui.overlay = O_NONE;
     build_pages();
 }
@@ -1625,6 +1629,103 @@ static int has_motion(pref_t r)
     return motion_find(proj.arr.lane, seq.ppat[part], part, r.a, r.b, r.c) >= 0;
 }
 
+/* p-locks: on EDIT, a step held (one already there: a tap still toggles it) and a sound knob turned
+ * give that step its own value, one step of the knob's lane (motion.h: the other steps keep the knob's) */
+static int lock_step(void)
+{
+    if (ui.view != V_PART || ui.overlay != O_NONE)
+        return -1;
+    if (is_303())
+        return ui.rec ? -1 : ui.held_step;
+    return is_drum() ? ui.hold_step : ui.brk_held;
+}
+static int lockable(pref_t r) { return r.kind == R_ENG && engine_motion_part(r.a, r.b) == ui.part; }
+static int lock_of(pref_t r, int s)                  /* step s's own value of r, -1 none */
+{
+    int k;
+    if (s < 0 || !lockable(r))
+        return -1;
+    k = motion_find(proj.arr.lane, seq.ppat[ui.part], ui.part, r.a, r.b, r.c);
+    return k >= 0 && proj.arr.lane[k].val[s] != MOT_NONE ? proj.arr.lane[k].val[s] : -1;
+}
+static void lock_turn(pref_t r, int e, int role)
+{
+    int s = lock_step(), part = ui.part, k, cur, nv;
+    const x0x_param_t *d = pref_desc(r);
+    lane_t *l;
+    if (!d)
+        return;
+    if (!lockable(r)) {
+        say("NO P-LOCK: ", caps_of(pref_name(r)));
+        return;
+    }
+    if (is_303())
+        ui.step_edited = 1;                           /* its release keeps the step */
+    else
+        ui.hold_used = 1;
+    k = motion_find(proj.arr.lane, seq.ppat[part], part, r.a, r.b, r.c);
+    if (ui.btn & (1u << B_SAVE)) {                    /* SAVE + the knob: the step's lock goes */
+        int j, any = 0;
+        ui.btn_used |= 1u << B_SAVE;
+        if (k < 0 || proj.arr.lane[k].val[s] == MOT_NONE)
+            return;
+        l = &proj.arr.lane[k];
+        l->val[s] = MOT_NONE;
+        for (j = 0; j < NSTEPS; j++)
+            any |= l->val[j] != MOT_NONE;
+        if (!any)
+            motion_clear(proj.arr.lane, k);
+        if (!seq.playing)
+            engine_set(r.a, r.b, r.c, proj.sound.v[r.a][r.b][r.c]);
+        mark_dirty();
+        say("P-LOCK CLEARED: ", caps_of(pref_name(r)));
+        return;
+    }
+    if (k < 0 && (k = motion_alloc(proj.arr.lane, seq.ppat[part], part, r.a, r.b, r.c)) < 0) {
+        say("MOTION FULL", 0);
+        return;
+    }
+    l = &proj.arr.lane[k];
+    cur = l->val[s] != MOT_NONE ? l->val[s] : proj.sound.v[r.a][r.b][r.c];
+    e = d->names || d->max < 24 ? (e > 0 ? 1 : -1) : accel(role, e, d->max);
+    nv = cur + e;
+    nv = nv < 0 ? 0 : nv > d->max ? d->max : nv;
+    l->val[s] = (uint8_t)nv;
+    if (!seq.playing)                                 /* stopped: heard at once, until the step is let go */
+        engine_set(r.a, r.b, r.c, nv);
+    mark_dirty();
+    ui.touched = (int8_t)(role - EN_K1);
+    ui.touch_until = plat_ms() + 900u;
+}
+static void lock_release(void)                        /* the held step let go: stopped, the knobs' own back */
+{
+    int i;
+    if (seq.playing)
+        return;
+    for (i = 0; i < 4; i++) {
+        pref_t r = pg.r[cur_page()][i];
+        if (lockable(r))
+            engine_set(r.a, r.b, r.c, proj.sound.v[r.a][r.b][r.c]);
+    }
+}
+/* the 16 steps on the keys that have values of their own (p-locks, recorded motion) for part's lanes
+ * of target t (-1: any), voice v (-1: any) */
+static uint32_t lock_marks(int t, int v, int base)
+{
+    uint32_t m = 0;
+    int k, c;
+    for (k = 0; k < NLANE; k++) {
+        const lane_t *l = &proj.arr.lane[k];
+        if (!l->used || l->part != ui.part || l->pat != seq.ppat[ui.part] || (t >= 0 && l->t != t) ||
+            (v >= 0 && l->v != v))
+            continue;
+        for (c = 0; c < 16; c++)
+            if (base + c < NSTEPS && l->val[base + c] != MOT_NONE)
+                m |= 1u << c;
+    }
+    return m;
+}
+
 static void turn_ref(pref_t r, int e, int knob)
 {
     const x0x_param_t *d = pref_desc(r);
@@ -1663,19 +1764,42 @@ static void drum_key(int v, int down)
     }
 }
 
-static void drum_step(int white)
+#define STEP_TAP_MS 300u
+/* a white key: a step. An empty one is on at once; one already on comes off on a tap (a quick
+ * release), and stays when held (EDIT: its p-locks) */
+static void drum_step(int white, int down)
 {
     int k = ui.part, s = ui.spage * 16 + white;
     dpart_t *d = &cur_pat()->drum[k];
+    uint32_t *bits = d->hit[ui.sel[k]];
     if (s >= NSTEPS)
         return;
+    if (!down) {
+        if (ui.hold_step == s) {
+            if (!ui.hold_created && !ui.hold_used && plat_ms() - ui.hold_t0 < STEP_TAP_MS) {
+                sm_flip(bits, s);
+                mark_dirty();
+            }
+            if (ui.hold_used)
+                lock_release();
+            ui.hold_step = -1;
+        }
+        return;
+    }
     if (ui.btn & (1u << B_ENV)) {
         sm_flip(d->accent, s);
         ui.btn_used |= 1u << B_ENV;
-    } else {
-        sm_flip(d->hit[ui.sel[k]], s);
+        mark_dirty();
+        return;
     }
-    mark_dirty();
+    ui.hold_step = (int8_t)s;
+    ui.hold_used = 0;
+    ui.hold_t0 = plat_ms();
+    ui.hold_created = !sm_get(bits, s);
+    if (ui.hold_created) {
+        sm_flip(bits, s);
+        mark_dirty();
+    }
 }
 
 static int kbd_note(int k) { return 41 + k + 12 * ui.oct; }
@@ -1725,7 +1849,6 @@ static void bass_kbd(int key, int down)
 
 /* an edit sounds as the drum keys do (KEY SOUND): while stopped or recording, or always */
 static int key_sounds(void) { return proj.set.keysound || !seq.playing || ui.rec; }
-#define STEP_TAP_MS 300u
 static void bass_step_key(int white, int down)
 {
     int b = bidx(), s = ui.spage * 16 + white;
@@ -1751,6 +1874,8 @@ static void bass_step_key(int white, int down)
         }
         if (ui.step_preview)
             engine_bass_off(b);
+        if (ui.step_edited && lock_step() >= 0)
+            lock_release();
         ui.step_preview = 0;
         ui.held_step = -1;
     }
@@ -1899,8 +2024,8 @@ static void key_event(int k, int down)
     if (is_drum()) {
         if (bl >= 0)
             drum_key(bl, down);
-        else if (down)
-            drum_step(w);
+        else if (w >= 0)
+            drum_step(w, down);
     } else if (is_303()) {
         if (ui.rec)                                    /* REC: the keys play and write notes */
             bass_kbd(k, down);
@@ -1912,6 +2037,7 @@ static void key_event(int k, int down)
             int st = ui.brk_held;
             bp->slice[st] = (uint8_t)(bp->slice[st] == bl + 1 ? 0 : bl + 1);
             bp->steps |= 1u << st;
+            ui.hold_used = 1;                          /* its release keeps the step */
             ui.brk_pinkeys |= (uint16_t)(1u << bl);
             mark_dirty();
             if (bp->slice[st]) {
@@ -1924,12 +2050,24 @@ static void key_event(int k, int down)
             ui.brk_pinkeys &= (uint16_t)~(1u << bl);
         } else if (bl >= 0)
             engine_brk_live(bl, down);
-        else if (w >= 0 && down) {
-            bp->steps ^= 1u << w;
+        else if (w >= 0 && down) {                     /* as the drums: empty on at once, a tap takes it off */
             ui.brk_held = (int8_t)w;
-            mark_dirty();
-        } else if (w >= 0 && ui.brk_held == w)
+            ui.hold_used = 0;
+            ui.hold_t0 = plat_ms();
+            ui.hold_created = !((bp->steps >> w) & 1u);
+            if (ui.hold_created) {
+                bp->steps |= 1u << w;
+                mark_dirty();
+            }
+        } else if (w >= 0 && ui.brk_held == w) {
+            if (!ui.hold_created && !ui.hold_used && plat_ms() - ui.hold_t0 < STEP_TAP_MS) {
+                bp->steps &= ~(1u << w);
+                mark_dirty();
+            }
+            if (ui.hold_used)
+                lock_release();
             ui.brk_held = -1;
+        }
     }
 }
 
@@ -2226,7 +2364,11 @@ static void input(void)
     for (i = 0; i < 4; i++) {
         if ((e = enc(EN_K1 + (int)i)) == 0)
             continue;
-        if (steps_view() && is_303() && ui.held_step >= 0) {     /* a held step's knobs edit it */
+        if (lock_step() >= 0) {                         /* EDIT, a step held: its p-lock */
+            lock_turn(pg.r[cur_page()][i], e, EN_K1 + (int)i);
+            continue;
+        }
+        if (ui.view == V_SEQ && is_303() && ui.held_step >= 0) {     /* SEQ, a held step's knobs edit it */
             bpart_t *bp = &cur_pat()->bass[bidx()];
             bstep_t *st = &bp->step[ui.held_step];
             ui.step_edited = 1;
@@ -2685,6 +2827,7 @@ static void draw_drum(int band)
     const dpart_t *d = &cur_pat()->drum[k];
     int ph = seq.playing ? eng_step[TRK_DRUM + k] : -1;
     uint16_t col = part_col(), on_dim = dim(col, 8);
+    uint32_t lmarks = lock_marks(k == PART_909 ? T_909 : T_808, ui.sel[k], ui.spage * 16);
     for (v = 0; v <= NDRUM; v++) {
         int y = v * DROW + 1 - band * BAND_H, sel = v < NDRUM && v == ui.sel[k];
         const char *nm = v < NDRUM ? engine_voice_name(k == PART_909 ? T_909 : T_808, v) : "AC";
@@ -2711,6 +2854,8 @@ static void draw_drum(int band)
             box(x, y, 12, DROW - 2, hit ? (muted ? C_DIM : sel ? col : on_dim) : (s == ph ? C_DIM : C_LINE));
             if (hit && s == ph)
                 box(x + 2, y + 2, 8, DROW - 6, C_WHITE);
+            if (hit && sel && ((lmarks >> c) & 1u))      /* the step's own values (p-locks): a notch */
+                cv_rect(x + 8, y + 1, 3, 3, C_BLACK);
         }
     }
 }
@@ -2734,6 +2879,7 @@ static void draw_303(int band, int gen)
     const bpart_t *bp = &cur_pat()->bass[b];
     int ph = seq.playing ? eng_step[TRK_BASS0 + b] : -1, lo = 127, hi = 0;
     uint16_t col = part_col();
+    uint32_t lmarks = gen ? 0 : lock_marks(-1, -1, ui.spage * 16);
     char t[40], *q = t;
     (void)gen;
     for (c = 0; c < bp->len && c < NSTEPS; c++)
@@ -2770,6 +2916,8 @@ static void draw_303(int band, int gen)
             int hn = held_note_of(bp, s), y = note_y(hn, lo, hi) - o;
             uint16_t fc = s == ui.held_step ? C_WHITE : (st->flags & BS_ACCENT) ? col : dim(col, 9);
             box(x, y, 12, 5, fc);
+            if ((lmarks >> c) & 1u)                  /* the step's own values (p-locks): a notch */
+                cv_rect(x + 5, y - 3, 2, 2, C_WHITE);
             if (g == G_TIE && c > 0)                 /* a tie: one brick with the note it holds */
                 cv_rect(col_x(c - 1) + 6, y, x - col_x(c - 1), 5, fc);
             if ((st->flags & BS_SLIDE) && c < 15) {
@@ -2811,6 +2959,7 @@ static void draw_break(int band)
     const brkpart_t *bp = &cur_pat()->brk;
     int c, ph = seq.playing ? eng_step[TRK_BRK] : -1, slice, bank, div, running;
     uint16_t col = part_col();
+    uint32_t lmarks = lock_marks(-1, -1, 0);           /* (the break: its 16 steps) */
     engine_brk_state(&slice, &bank, &div, &running);
     if (!ui.outline_ok || ui.outline_slot != bp->slot_a) {
         ui.outline_ok = (uint8_t)engine_brk_outline(0, ui.outline, 232);
@@ -2839,6 +2988,8 @@ static void draw_break(int band)
         for (c = 0; c < 16; c++) {
             int x = col_x(c), on = (bp->steps >> c) & 1u;
             box(x, 2, 12, 10, on ? (c == ph ? C_WHITE : col) : (c == ph ? C_DIM : C_LINE));
+            if (on && ((lmarks >> c) & 1u))            /* the step's own values (p-locks): a notch */
+                cv_rect(x + 8, 3, 3, 3, C_BLACK);
             if (bp->slice[c]) {                        /* the step's own slice */
                 char d[2] = {(char)('0' + bp->slice[c]), 0};
                 text_c(x + 6, vc(&FONT_XS, 2, 10), &FONT_XS, d, on ? C_BLACK : C_GRAY);
@@ -3473,6 +3624,7 @@ static uint32_t knobs_sig(void)
     MIXIN(pgi);
     MIXIN(ui.touched);
     MIXIN(ui.held_step);
+    MIXIN(lock_step() + 1);
     MIXIN(proj.set.palette);
     MIXIN(ui.sel[0] | ui.sel[1] << 8);
     MIXIN(seq.ppat[ui.part]);
@@ -3488,6 +3640,7 @@ static uint32_t knobs_sig(void)
         MIXIN(r.kind | r.a << 8 | r.b << 16 | (uint32_t)r.c << 24);
         MIXIN(pref_get(r));
         MIXIN(has_motion(r) | (motion_now(r) + 1) << 1);
+        MIXIN(lock_of(r, lock_step()) + 1);
     }
     if (ui.held_step >= 0) {
         const bstep_t *st = &cur_pat()->bass[bidx()].step[ui.held_step];
@@ -3511,7 +3664,10 @@ static void knob_tag(char *t)
 {
     int g = pg.group[cur_page()], dm = drum_mix_page();
     const char *ti = pg.title[cur_page()];
-    if (steps_view() && is_303() && ui.held_step >= 0)
+    if (lock_step() >= 0)
+        put_i(put_s(put_s(t, is_drum() ? engine_voice_name(ui.part == PART_909 ? T_909 : T_808, ui.sel[ui.part])
+                                        : PART_N[ui.part]), " P-LOCK STEP "), lock_step() + 1);
+    else if (ui.view == V_SEQ && is_303() && ui.held_step >= 0)
         put_i(put_s(put_s(t, PART_N[ui.part]), " STEP "), ui.held_step + 1);
     else if (dm >= 0)
         put_s(put_s(put_s(t, ti), ": "), engine_voice_name(dm ? T_808 : T_909, ui.sel[dm]));
@@ -3562,7 +3718,7 @@ static void draw_knobs(void)
         }
     }
     draw_footer();
-    if (steps_view() && is_303() && ui.held_step >= 0) {     /* the held step's own knobs */
+    if (ui.view == V_SEQ && is_303() && ui.held_step >= 0) {     /* SEQ: the held step's own knobs */
         static const char *const SN[4] = {"NOTE", "GATE", "ACCENT", "SLIDE"};
         static const char *const G[3] = {"REST", "NOTE", "TIE"};
         const bpart_t *bp = &cur_pat()->bass[bidx()];
@@ -3598,7 +3754,13 @@ static void draw_knobs(void)
             box(i * 60 + 2, 11, 56, 56, dim(col, 4));
         text_c(cx, vc(&FONT_XS, 13, 10), &FONT_XS, caps_of(pref_name(r)), touched ? C_WHITE : C_GRAY);
         val = pref_get(r);
-        if (has_motion(r)) {                           /* recorded motion: a mark, and what it plays now */
+        if (lock_step() >= 0) {                        /* a held step: its own value (amber mark: locked) */
+            int lv = lock_of(r, lock_step());
+            if (lv >= 0)
+                val = lv;
+            if (lockable(r))
+                dot(i * 60 + 52, 17, 2, lv >= 0 ? C_AMB : C_LINE);
+        } else if (has_motion(r)) {                    /* recorded motion: a mark, and what it plays now */
             int mv = motion_now(r);
             dot(i * 60 + 52, 17, 2, mv >= 0 ? C_WHITE : C_DIM);
             if (mv >= 0)
@@ -3748,6 +3910,7 @@ void ui_init(void)
     ui.part = PART_909;
     ui.held_step = -1;
     ui.brk_held = -1;
+    ui.hold_step = -1;
     ui.chain_first = -1;
     ui.touched = -1;
     ui.overlay = O_NONE;
