@@ -138,7 +138,8 @@ static void fire_drum(seq_t *s, int k, int p, const seq_sink_t *o)
     for (v = 0; v < NDRUM; v++) {
         if (!(d->hit[v][w] & bit) || ((s->mute | s->vmute) & (1u << (k * NDRUM + v))))
             continue;
-        o->drum(o->ctx, k, v, vel);
+        if (!o->drum(o->ctx, k, v, vel))
+            continue;                                /* its chance said no: no MIDI either */
         if (s->send_notes) {
             uint8_t mv = (uint8_t)(vel * 127.0f);
             midi(o, (uint8_t)(0x99 + k), GM_DRUM[k][v], mv);

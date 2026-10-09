@@ -1,0 +1,43 @@
+# Probability: hold a step (SEQ or EDIT) and turn SELECT: its chance, in 5 % steps (a T_PROB lane,
+# one per drum track; 100 % is no lane). Played: a kick on every step, step 1 at 50 %, step 2 at
+# 5 %, with NOTES OUT on, so midi_out.txt counts the kicks that played.
+wait 300
+expect part 0
+tapkey w0
+tapkey w1
+tapkey w2
+tapkey w3
+key w0 down
+turn SELECT -10
+key w0 up
+expect hit0.0.0 1
+expect lanes 1
+expect laneval7.0.0.0 50
+key w1 down
+turn SELECT -30
+key w1 up
+expect laneval7.0.0.1 5
+# back to 100 %: the lane's step is empty again (the lane stays for step 2)
+key w0 down
+turn SELECT 20
+key w0 up
+expect laneval7.0.0.0 255
+expect lanes 1
+# and step 2 back too: no lane left
+key w1 down
+turn SELECT 30
+key w1 up
+expect lanes 0
+# SEQ works the same; the 303: its step
+tap SEQ
+key w0 down
+turn SELECT -10
+key w0 up
+expect laneval7.0.0.0 50
+turn ALGO 2
+tapkey w4
+key w4 down
+turn SELECT -4
+key w4 up
+expect laneval7.32.0.4 80
+expect gate0.4 1

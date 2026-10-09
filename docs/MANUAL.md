@@ -476,6 +476,15 @@ note, the break pitched up for one step.
 - On SEQ, holding a step doesn't lock anything: on a 303 the knobs set the step's note, gate,
   accent and slide.
 
+### Probability
+
+Hold a step (on SEQ or EDIT) and turn SELECT to set the chance that it plays: from 100% down to
+5%, in steps of 5. The top line shows it (STEP 5: 50%). Each time the step comes round, X0X rolls
+the dice, so a step at 50% plays about every other pass. On the 909 and 808 the chance belongs to
+the selected track's step, so the kick and the hats on one step can each have their own; on the
+303s a skipped step is a rest; on the break, a skipped step doesn't fire. Steps with a chance
+below 100% have the same notch as p-locks, and a skipped hit sends no MIDI note.
+
 P-locks are recorded motion on single steps, so they share its 160 knobs, and two locked steps
 next to each other glide like a recording. Stopped, a lock is heard while you hold the step.
 

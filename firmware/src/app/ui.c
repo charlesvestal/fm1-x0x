@@ -971,7 +971,8 @@ static void clear_lanes(int pat, int part)
         lane_t *l = &proj.arr.lane[k];
         if (l->used && l->pat == pat && l->part == part) {
             motion_clear(proj.arr.lane, k);
-            engine_set(l->t, l->v, l->i, proj.sound.v[l->t][l->v][l->i]);
+            if (l->t < NTARGETS)                      /* (T_PROB: no knob) */
+                engine_set(l->t, l->v, l->i, proj.sound.v[l->t][l->v][l->i]);
         }
     }
 }
@@ -1054,7 +1055,8 @@ static int help_lines(int b, const char *l[HELP_LINES])
         if (ui.view == V_MIX) L("HOME + BLACK KEY: MUTE");
         if (is_303()) { L("HOLD + KEY: A SLIDE"); if (kbd) L("HOLD + OCT: A TIE"); }
         break;
-    case B_EDIT: L("THE PART'S SOUND"); L("AGAIN: THE NEXT PAGE"); L("HOLD A STEP + KNOB: P-LOCK"); break;
+    case B_EDIT: L("THE PART'S SOUND"); L("AGAIN: THE NEXT PAGE"); L("HOLD A STEP + KNOB: P-LOCK");
+        L("HOLD A STEP + SELECT: ITS CHANCE"); break;
     case B_GLO: L("SETTINGS, SAVE, CLEAR,"); L("FACTORY RESET, PERFORMANCE"); L("AGAIN: CLOSE"); break;
     case B_HOME:
         L("THE PATTERN: ALL FIVE PARTS"); L("AGAIN: THE SONG   + SELECT: TEMPO"); L("+ WHITE KEY: PATTERN");
@@ -1075,7 +1077,7 @@ static int help_lines(int b, const char *l[HELP_LINES])
         L("AGAIN: THE NEXT PAGE");
         break;
     case B_SEQ:
-        L("THE PART'S STEPS: LENGTH, RATE"); L("AGAIN: THE NEXT PAGE");
+        L("THE PART'S STEPS: LENGTH, RATE"); L("AGAIN: THE NEXT PAGE"); L("HOLD A STEP + SELECT: ITS CHANCE");
         break;
     case B_PLAY: L("START / STOP"); L("HOME + PLAY: REDO"); break;
     case B_REC:
@@ -1708,6 +1710,45 @@ static void lock_release(void)                        /* the held step let go: s
             engine_set(r.a, r.b, r.c, proj.sound.v[r.a][r.b][r.c]);
     }
 }
+/* probability: SEQ or EDIT, a step held, SELECT sets its chance (5..100 %, a T_PROB lane: motion.h's
+ * MOT_NONE = always). Drums: the selected track's step; the 303s and the break: the step */
+static int held_any_step(void)
+{
+    if (!steps_view() || ui.overlay != O_NONE)
+        return -1;
+    if (is_303())
+        return ui.rec ? -1 : ui.held_step;
+    return is_drum() ? ui.hold_step : ui.brk_held;
+}
+static void prob_turn(int e)
+{
+    int s = held_any_step(), part = ui.part, v = part << 4 | (is_drum() ? ui.sel[part] : 0), k, nv, j, any = 0;
+    char t[24];
+    lane_t *l;
+    if (is_303())
+        ui.step_edited = 1;
+    else
+        ui.hold_used = 1;
+    k = motion_find(proj.arr.lane, seq.ppat[part], part, T_PROB, v, 0);
+    nv = (k >= 0 && proj.arr.lane[k].val[s] != MOT_NONE ? proj.arr.lane[k].val[s] : 100) + (e > 0 ? 5 : -5);
+    nv = nv < 5 ? 5 : nv > 100 ? 100 : nv;
+    if (nv < 100 && k < 0 && (k = motion_alloc(proj.arr.lane, seq.ppat[part], part, T_PROB, v, 0)) < 0) {
+        say("MOTION FULL", 0);
+        return;
+    }
+    if (k >= 0) {
+        l = &proj.arr.lane[k];
+        l->val[s] = (uint8_t)(nv < 100 ? nv : MOT_NONE);
+        for (j = 0; j < NSTEPS; j++)
+            any |= l->val[j] != MOT_NONE;
+        if (!any)
+            motion_clear(proj.arr.lane, k);
+    }
+    mark_dirty();
+    put_s(put_i(put_s(put_i(put_s(t, "STEP "), s + 1), ": "), nv), "%");
+    say(t, 0);
+}
+
 /* the 16 steps on the keys that have values of their own (p-locks, recorded motion) for part's lanes
  * of target t (-1: any), voice v (-1: any) */
 static uint32_t lock_marks(int t, int v, int base)
@@ -2316,7 +2357,9 @@ static void input(void)
         return;
     }
     if ((e = enc(EN_SELECT)) != 0) {             /* SELECT: move; with HOME held: tempo */
-        if (ui.btn & (1u << B_HOME)) {
+        if (held_any_step() >= 0 && !(ui.btn & (1u << B_HOME))) {
+            prob_turn(e);                             /* a step held: its chance */
+        } else if (ui.btn & (1u << B_HOME)) {
             float bpm = seq.bpm + (float)accel(EN_SELECT, e, 200);
             seq.bpm = bpm < 20.0f ? 20.0f : bpm > 275.0f ? 275.0f : bpm;
             ui.btn_used |= 1u << B_HOME;
@@ -2827,7 +2870,8 @@ static void draw_drum(int band)
     const dpart_t *d = &cur_pat()->drum[k];
     int ph = seq.playing ? eng_step[TRK_DRUM + k] : -1;
     uint16_t col = part_col(), on_dim = dim(col, 8);
-    uint32_t lmarks = lock_marks(k == PART_909 ? T_909 : T_808, ui.sel[k], ui.spage * 16);
+    uint32_t lmarks = lock_marks(k == PART_909 ? T_909 : T_808, ui.sel[k], ui.spage * 16) |
+                      lock_marks(T_PROB, k << 4 | ui.sel[k], ui.spage * 16);
     for (v = 0; v <= NDRUM; v++) {
         int y = v * DROW + 1 - band * BAND_H, sel = v < NDRUM && v == ui.sel[k];
         const char *nm = v < NDRUM ? engine_voice_name(k == PART_909 ? T_909 : T_808, v) : "AC";

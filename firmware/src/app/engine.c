@@ -288,6 +288,28 @@ void engine_bass_off(int part) { cq_put(C_BOFF, (uint32_t)part, 0, 0); }
 void engine_brk_live(int key, int down) { cq_put(C_BRK, (uint32_t)key, (uint32_t)(down != 0), 0); }
 
 /* ------------------------------------------------------- sequencer sink --- */
+/* probability: each part's (and drum track's) chance on the step playing now, set by its T_PROB lane
+ * before the step fires (motion_step runs first); 100 = always */
+static uint8_t prob[NPARTS][NDRUM];
+static uint32_t prob_rng = 0x2545F491u;
+static int prob_skip(int part, int v)                 /* ISR: 1 = this hit does not play */
+{
+    uint32_t p = prob[part][v];
+    if (p >= 100u)
+        return 0;
+    prob_rng ^= prob_rng << 13;
+    prob_rng ^= prob_rng >> 17;
+    prob_rng ^= prob_rng << 5;
+    return prob_rng % 100u >= p;
+}
+static void s_drum(void *x, int kit, int v, float vel);
+static int s_drum_seq(void *x, int kit, int v, float vel)
+{
+    if (prob_skip(kit, v))
+        return 0;
+    s_drum(x, kit, v, vel);
+    return 1;
+}
 static void s_drum(void *x, int kit, int v, float vel)
 {
     (void)x;
@@ -300,13 +322,22 @@ static void s_drum(void *x, int kit, int v, float vel)
     else                                 /* the 808's unaccented hit sits at D8_VEL_NORMAL, not at our 909 level */
         drum808_trigger(&d808, v, vel >= 0.999f ? 1.0f : vel * (D8_VEL_NORMAL / (88.0f / 127.0f)));
 }
-static void s_bon(void *x, int p, int note, int acc, int sl) { (void)x; bass303_note_on(&b303[p], note, acc, sl); }
+static void s_bon(void *x, int p, int note, int acc, int sl)
+{
+    (void)x;
+    if (prob_skip(PART_303A + p, 0))                  /* skipped: a rest */
+        bass303_note_off(&b303[p]);
+    else
+        bass303_note_on(&b303[p], note, acc, sl);
+}
 static void s_boff(void *x, int p) { (void)x; bass303_note_off(&b303[p]); }
 static uint8_t brk_applied[BRK_NSET];  /* the pattern settings the break was last given */
 static void s_brk(void *x, int s16, int bar, float spb, int en)
 {
     const brkpart_t *bp = &seq.pat[seq.ppat[TRK_BRK]].brk;
     int i;
+    if (en && prob_skip(PART_BRK, 0))
+        en = 0;
     (void)x;
     if (brk_hold)
         return;
@@ -338,9 +369,19 @@ static void s_step(void *x, int t, int p)
 static int mot_base(void *x, int t, int v, int i)
 {
     (void)x;
+    if (t >= NTARGETS)
+        return 100;                                   /* T_PROB: always */
     return mot_base_snd ? mot_base_snd->v[t][v][i] : 0;
 }
-static void mot_apply(void *x, int t, int v, int i, int val) { (void)x; apply_param(t, v, i, val); }
+static void mot_apply(void *x, int t, int v, int i, int val)
+{
+    (void)x;
+    if (t == T_PROB) {
+        if ((v >> 4) < NPARTS && (v & 15) < NDRUM)
+            prob[v >> 4][v & 15] = (uint8_t)val;
+    } else if (t < NTARGETS)
+        apply_param(t, v, i, val);
+}
 
 int engine_motion_part(int t, int v)
 {
@@ -350,13 +391,14 @@ int engine_motion_part(int t, int v)
     case T_303: return PART_303A + (v & 1);
     case T_BRK: return PART_BRK;
     case T_MIX: return v < NPARTS ? v : PART_909;
+    case T_PROB: return (v >> 4) < NPARTS ? v >> 4 : PART_909;
     default: return PART_909;                     /* FX, master: the bar */
     }
 }
 int engine_motion_value(int k) { return motion_value(&mot, k); }
 void engine_motion_rec(int k) { motion_req_rec(&mot, k); }
 void engine_motion_hold(int k) { motion_req_hold(&mot, k); }
-static const seq_sink_t SINK = {s_drum, s_bon, s_boff, s_brk, s_brkstop, s_midi, s_step, 0};
+static const seq_sink_t SINK = {s_drum_seq, s_bon, s_boff, s_brk, s_brkstop, s_midi, s_step, 0};
 
 /* ---------------------------------------------------------------- MIDI in --- */
 static uint8_t bass_held[NBASS];       /* note held from MIDI, for legato = slide */
@@ -862,6 +904,8 @@ void engine_brk_loops(void)
 void engine_init(pattern_t *patterns, song_t *song, lane_t *lanes, const sound_t *base)
 {
     int p;
+    for (p = 0; p < NPARTS * NDRUM; p++)
+        prob[p / NDRUM][p % NDRUM] = 100;             /* every step plays, until a lane says */
     drum909_init(&d909);
     drum808_init(&d808);
     bass303_init(&b303[0]);
