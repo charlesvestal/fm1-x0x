@@ -627,10 +627,7 @@ static void build_pages(void)
     case V_GLO:
         add_page("PERFORM", PR(R_TEMPO, 0, 0, 0), PR(R_SWING, 0, 0, 0), PR(R_ENG, T_MST, 0, MST_PUMP),
                  PR(R_ENG, T_MST, 0, MST_CUTOFF));
-        add_page("LEVELS", PR(R_ENG, T_MIX, PART_909, 0), PR(R_ENG, T_MIX, PART_808, 0), PR(R_ENG, T_MIX, PART_303A, 0),
-                 PR(R_ENG, T_MIX, PART_303B, 0));
-        add_page("MORE", PR(R_ENG, T_MIX, PART_BRK, 0), NONE, PR(R_ENG, T_MST, 0, MST_MODE), PR(R_ENG, T_MST, 0, MST_RESO));
-        break;
+        break;                                      /* (levels, pans and the master's filter: MIX) */
     case V_PART:
         if (is_drum()) {
             int t = p == PART_909 ? T_909 : T_808, k = p;
@@ -2451,10 +2448,8 @@ static void draw_header(void)
         x = w + 6;
         if (ui.view == V_GEN)
             x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, "TB-3PO", C_HI) + 6;
-        else if (!(is_303() && ui.kbd[bidx()])) {   /* the page: white = this track / sound, amber = all of it */
-            int g = pg.group[cur_page()];
-            x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, pg.title[cur_page()], g == GR_KIT || g == GR_PAT ? C_AMB : C_WHITE) + 6;
-        }
+        else if (!(is_303() && ui.kbd[bidx()]))     /* the page's name says whose knobs these are */
+            x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, pg.title[cur_page()], C_HI) + 6;
         else if (is_303() && ui.kbd[bidx()])
             x = cv_text(x, vc(&FONT_S, 1, 17), &FONT_S, "KEYS", C_AMB) + 6;
     } else {
@@ -2506,7 +2501,7 @@ static int32_t col_x(int c) { return GX + c * 13 + (c >> 2); }   /* a pixel betw
 #define DROW 11                                    /* drum rows: 12 of them over both bands, then the footer */
 static void draw_drum(int band)
 {
-    int k = ui.part, v, c, len = cur_pat()->drum[k].len, own = track_page();
+    int k = ui.part, v, c, len = cur_pat()->drum[k].len;
     const dpart_t *d = &cur_pat()->drum[k];
     int ph = seq.playing ? eng_step[TRK_DRUM + k] : -1;
     uint16_t col = part_col(), on_dim = dim(col, 8);
@@ -2517,12 +2512,9 @@ static void draw_drum(int band)
         int muted = v < NDRUM && ((seq.mute | seq.vmute) & (1u << (k * NDRUM + v)));
         if (y < -DROW || y >= BAND_H)
             continue;
-        if (sel && own)                                /* the knobs are this track's */
+        if (sel)
             box(0, y - 1, 24, DROW, col);
-        else if (sel)                                  /* selected, but the knobs are the whole machine's */
-            frame(0, y - 1, 24, DROW, col);
-        cv_text(5, vc(&FONT_XS, y - 1, DROW), &FONT_XS, nm,
-                sel && own ? C_BLACK : sel ? col : muted ? C_LINE : v < NDRUM ? C_GRAY : C_WHITE);
+        cv_text(5, vc(&FONT_XS, y - 1, DROW), &FONT_XS, nm, sel ? C_BLACK : muted ? C_LINE : v < NDRUM ? C_GRAY : C_WHITE);
         for (c = 0; c < 16; c++) {
             int s = step_of(c), x = col_x(c), hit = s < NSTEPS && sm_get(bits, s);
             if (s >= len) {
