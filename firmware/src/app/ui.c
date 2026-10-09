@@ -3172,7 +3172,7 @@ static int help_fits(void)
                         ui.rec = (uint8_t)(b & 2);
                         any_button = (uint8_t)(b != 0);
                         footer_text(&fa, &fb, &fc);
-                        w = 4 + tw(&FONT_XS, fa) + (fb ? FOOT_GAP + tw(&FONT_XS, fb) : 0) + (fc ? FOOT_GAP + tw(&FONT_XS, fc) : 0);
+                        w = 4 + tw(&FONT_T, fa) + (fb ? FOOT_GAP + tw(&FONT_T, fb) : 0) + (fc ? FOOT_GAP + tw(&FONT_T, fc) : 0);
                         if (w > 236) {
                             if (ok)
                                 printf("footer too wide: \"%s / %s / %s\" (%d px)\n", fa, fb ? fb : "", fc ? fc : "", (int)w);
@@ -3246,12 +3246,12 @@ static uint16_t footer_text(const char **a, const char **b, const char **c)
     }
     return C_DIM;
 }
-#define FOOT_Y 64                     /* in the knob row: its last line */
+#define FOOT_Y 65                     /* in the knob row: its last line, in the tiny face */
 static void draw_footer(void)
 {
     const char *a, *b, *c;
     uint16_t col = footer_text(&a, &b, &c);
-    segs(4, vc(&FONT_XS, FOOT_Y, 11), &FONT_XS, col, FOOT_GAP, a, b, c, 0);
+    segs(4, vc(&FONT_T, FOOT_Y, 9), &FONT_T, col, FOOT_GAP, a, b, c, 0);
 }
 
 static void draw_main(void)
@@ -3416,7 +3416,7 @@ static void draw_knobs(void)
             else
                 put_s(v, (st->flags & (i == 2 ? BS_ACCENT : BS_SLIDE)) ? "ON" : "OFF");
             text_c(cx, vc(&FONT_XS, 12, 10), &FONT_XS, SN[i], C_GRAY);
-            text_c(cx, vc(&FONT_M, 26, 34), &FONT_M, v, C_WHITE);
+            text_c(cx, vc(&FONT_M, 28, 34), &FONT_M, v, C_WHITE);
         }
         cv_commit(3, 0, KNOB_Y);
         return;
@@ -3445,13 +3445,13 @@ static void draw_knobs(void)
             int n = d->max + 1, k, pw = n > 6 ? 3 : 6, gap = 2, w0 = n * (pw + gap) - gap;
             if (n <= 12)
                 for (k = 0; k < n; k++)
-                    box(cx - w0 / 2 + k * (pw + gap), 30, pw, 9, k == val ? col : C_LINE);
+                    box(cx - w0 / 2 + k * (pw + gap), 31, pw, 9, k == val ? col : C_LINE);
         } else {
-            arc(cx, 35, 11, d->max ? (float)val / (float)d->max : 0.0f, C_LINE, col,
+            arc(cx, 36, 11, d->max ? (float)val / (float)d->max : 0.0f, C_LINE, col,
                 r.kind == R_BTRANS || is_pan(r));                                              /* from the middle */
         }
         pref_value_of(r, val, num, unit);
-        cell_value(cx, vc(&FONT_B, 48, 13), num, unit, touched ? C_WHITE : C_HI);
+        cell_value(cx, vc(&FONT_B, 50, 13), num, unit, touched ? C_WHITE : C_HI);
     }
     cv_commit(3, 0, KNOB_Y);
 }
