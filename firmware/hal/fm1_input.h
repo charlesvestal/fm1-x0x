@@ -232,12 +232,13 @@ static void fm1__frame(void)
             fm1_in.enc_rest[e] = (uint8_t)(1u << cur);
         }
         if (fm1_in.enc_still[e] < 255u && ++fm1_in.enc_still[e] == FM1_REST_FRAMES) {
-            /* learn detent states: one state, or a complementary pair (00/11 or
-             * 01/10). Anything else restarts the set; with 3-4 rest states every
-             * arrival would look like a detent with |sub| < 2. */
+            /* learn detent states: the state at power-on, and its complement (00/11 or 01/10) if
+             * the knob rests there too (a half-cycle detent). X0X: nothing else is learned. A
+             * knob left halfway through a click used to restart the set there, and the clicks
+             * after it then landed between detents and some were lost. */
             uint32_t r = fm1_in.enc_rest[e], bit = 1u << cur, comp = 1u << (cur ^ 3u);
-            if (!(r & bit))
-                fm1_in.enc_rest[e] = (uint8_t)(r == comp ? (r | bit) : bit);
+            if (!(r & bit) && r == comp)
+                fm1_in.enc_rest[e] = (uint8_t)(r | bit);
         }
         if (cur == fm1_in.enc_prev[e])
             continue;

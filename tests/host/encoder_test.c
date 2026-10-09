@@ -89,6 +89,23 @@ int main(void)
             frame(0);
     }
     CHECK(fm1_in.enc_steps[0] == 0, "a one-scan glitch at rest counted %d", fm1_in.enc_steps[0]);
+    /* a slow turn that pauses halfway through a click (state 1, ~40 ms), then finishes it, and five
+     * more: six steps. The pause must not become the knob's detent (it did: the next clicks then
+     * landed between detents and some were lost) */
+    reset();
+    {
+        int k, p;
+        for (p = 0; p < 70; p++)
+            frame(1);
+        for (k = 1; k < 4; k++)
+            for (p = 0; p < 4; p++)
+                frame(CW[k]);
+        for (p = 0; p < 60; p++)
+            frame(0);
+        got = fm1_in.enc_steps[0];
+        got += turn(5, 4, 0, 1);
+    }
+    CHECK(got == 6, "a pause halfway through a click, then 5 more: %d (6)", got);
     printf(fails ? "encoder: %d FAILED\n" : "encoder: ok\n", fails);
     return fails != 0;
 }

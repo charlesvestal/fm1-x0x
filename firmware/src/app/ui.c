@@ -54,6 +54,7 @@ typedef struct {
     uint32_t btn, keys, btn_used;
     int8_t chain_first;
     uint32_t enc_t[NE];
+    uint8_t enc_run[NE];               /* quick detents in a row (acceleration waits for a spin) */
     char msg[28];
     uint32_t msg_until;
     int8_t touched;                    /* knob cell being turned (4 = tempo), -1 none */
@@ -1529,11 +1530,14 @@ static int32_t accel(int role, int32_t s, int range)
 {
     uint32_t now = plat_ms(), dt = now - ui.enc_t[role], a = (uint32_t)(s < 0 ? -s : s), m;
     ui.enc_t[role] = now;
-    if (range <= 24 || !a || accel_off)
+    if (!a)
         return s;
     if (a > 1)
         dt /= a;                                      /* per detent */
-    m = dt < 12u ? 8u : dt < 25u ? 5u : dt < 45u ? 3u : dt < 80u ? 2u : 1u;
+    ui.enc_run[role] = (uint8_t)(dt < 60u ? (ui.enc_run[role] + a > 255u ? 255u : ui.enc_run[role] + a) : a);
+    if (range <= 24 || accel_off || ui.enc_run[role] < 4u)
+        return s;                                     /* a few clicks, however quick: one each */
+    m = dt < 12u ? 8u : dt < 25u ? 5u : dt < 45u ? 3u : 1u;
     if (range < 100 && m > 3u)
         m = 3u;
     if (range > 150 && m > 1u)

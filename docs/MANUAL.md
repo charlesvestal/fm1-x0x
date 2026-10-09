@@ -111,7 +111,7 @@ screen's pages. ALGORITHM only picks the part.
 | ALGORITHM | Chooses the part you're working on: 909, 808, 303A, 303B or BREAK. |
 | PRESETS | Chooses the next pattern. On a part's screen it changes only that part; on HOME it changes all five. |
 | SELECT | Moves to the next or previous page. In a list, it moves up and down. Hold HOME and turn SELECT to set the tempo. |
-| KNOB 1–4 | Change the four values shown at the bottom of the screen. Turn slowly for single steps, quickly to sweep: a fast half turn covers the whole range. |
+| KNOB 1–4 | Change the four values shown at the bottom of the screen. Each click is one step, however quickly you turn a few; keep spinning quickly and they speed up, to sweep the range. |
 | SEL | Shows everything on the current screen as a list. In a list, it runs the highlighted action. When X0X asks a question, SEL means yes. |
 | HOME | The pattern: all five parts. Press it again for the song, and again to come back. In a list, it goes back; when X0X asks a question, HOME means no. |
 | SEQ | The selected part's steps, with its LENGTH, RATE and (on a 303) DIRECTION and TRANSPOSE (SWING is on HOME: it's every part's). Press it again for the next page. |

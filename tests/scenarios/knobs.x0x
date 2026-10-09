@@ -1,17 +1,16 @@
-# Knob acceleration: slow turns are exact, quick ones sweep. 909 BD Tune (0..127) starts at 34.
+# Knob acceleration: a few clicks are exact at any speed, a quick spin sweeps. 909 BD Tune (0..127) starts at 34.
 wait 300
 expect sound0.0.0 34
 # slow, 80 ms a detent: one step each
 turn K1 5 80
 expect sound0.0.0 39
-# quick, 10 ms a detent: 8 each (the first of a burst is timed from the last turn: one), so ten
-# detents nearly sweep the range
+# quick, 10 ms a detent: the first three one each, then 8 each, so ten detents sweep most of the range
 turn K1 10 10
-expect sound0.0.0 112
-# medium, 30 ms a detent: 3 each
+expect sound0.0.0 98
+# three quick clicks (30 ms apart): one each, no acceleration
 wait 500
 turn K1 -3 30
-expect sound0.0.0 105
+expect sound0.0.0 95
 # a quick full sweep down, then fine steps back up
 wait 500
 turn K1 -16 10
@@ -19,10 +18,10 @@ expect sound0.0.0 0
 wait 500
 turn K1 2 100
 expect sound0.0.0 2
-# tempo (wide range): slow is 1 BPM a detent, quick is 16
+# tempo (wide range): slow is 1 BPM a detent; a quick spin, after its first three, 16
 press HOME
 turn SELECT 3 100
 expect tempo 128
 turn SELECT 4 10
 release HOME
-expect tempo 177
+expect tempo 147
