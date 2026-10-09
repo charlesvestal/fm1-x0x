@@ -50,6 +50,10 @@ static const fx_pspec_t fx_p[FX_NPARAMS] = {
     [FX_DL_PING]  = { { "Ping", 1, 0, fx_onoff_names }, CV_SW, 0, 0.0f, 0.0f },
 };
 
+#if X0X_PLATE
+static const int32_t fx_plen[FX_PN];
+#endif
+
 int fxbus_nparams(void) { return FX_NPARAMS; }
 
 const x0x_param_t *fxbus_param(int i)
@@ -148,6 +152,14 @@ void fxbus_init(fxbus_t *f, int16_t *dly_buf, int dly_len)
     f->rv_decay = 0.62f; f->rv_tone = 0.45f; f->rv_level = 0.8f;
     d9_biquad_set(&f->rv_hp, D9_HP, 150.0f, 0.7071f);
     f->rv_quiet = FX_RV_QUIET;
+#if X0X_PLATE
+    for (int k = 0, at = 0; k < FX_PN; ++k) {
+        f->pl_at[k] = at;
+        f->pl_len[k] = fx_plen[k];
+        at += fx_plen[k];
+    }
+    f->pl_c = 1.0f;
+#endif
 
     f->dl_div = 7;
     f->bpm = 120.0f;
@@ -176,6 +188,111 @@ void fxbus_init(fxbus_t *f, int16_t *dly_buf, int dly_len)
 /* ===================================================================== */
 /* Reverb (er99_verb_tick), adds its return into out                      */
 /* ===================================================================== */
+#if X0X_PLATE
+/* ---- the plate: Dattorro's figure-eight tank (see fxbus.h), one tick per two samples ---- */
+static const int32_t fx_plen[FX_PN] = {
+    FX_PD(142), FX_PD(107), FX_PD(379), FX_PD(277), FX_PS(672) + FX_PEXC + 2, FX_PS(4453), FX_PS(1800), FX_PS(3720),
+    FX_PS(908) + FX_PEXC + 2, FX_PS(4217), FX_PS(2656), FX_PS(3163)
+};
+#undef FX_RV_QUIET
+#define FX_RV_QUIET (FX_PS(4453) + 4)       /* ticks with nothing written: every line is zero */
+#define FX_PQ 8192.0f                       /* the lines' scale: 16 bits over +-4 */
+
+static inline float pl_tap(const fxbus_t *f, int l, int k)    /* written k ticks ago, 1..len */
+{
+    int32_t j = f->pl_pos[l] - k;
+    return (float)f->pl[f->pl_at[l] + (j < 0 ? j + f->pl_len[l] : j)] * (1.0f / FX_PQ);
+}
+static inline int32_t pl_push(fxbus_t *f, int l, float x)
+{
+    int32_t k = (int32_t)(x * FX_PQ), p = f->pl_pos[l];   /* truncated toward zero: the tail ends */
+    k = k > 32767 ? 32767 : k < -32767 ? -32767 : k;
+    f->pl[f->pl_at[l] + p] = (int16_t)k;
+    f->pl_pos[l] = p + 1 >= f->pl_len[l] ? 0 : p + 1;
+    return k;
+}
+static inline float pl_ap(fxbus_t *f, int l, int len, float x, float g, int32_t *wr)
+{
+    float z = pl_tap(f, l, len), v = x - g * z;
+    *wr |= pl_push(f, l, v);
+    return z + g * v;
+}
+static inline float pl_apm(fxbus_t *f, int l, float len, float x, float g, int32_t *wr)
+{
+    int k = (int)len;
+    float z0 = pl_tap(f, l, k), z = z0 + (pl_tap(f, l, k + 1) - z0) * (len - (float)k), v = x - g * z;
+    *wr |= pl_push(f, l, v);
+    return z + g * v;
+}
+
+static void fx_reverb(fxbus_t *f, const float *in, float *out, float *out_r, int n)
+{
+    if (f->rv_quiet >= FX_RV_QUIET) {
+        int any = 0;
+        for (int i = 0; i < n; ++i)
+            any |= in[i] != 0.0f;
+        if (!any)
+            return;
+    }
+    /* DECAY sets the tail's T60: 0.15 s, 0.5 s at the factory's (the old reverb's), 3 s at the top. The tank
+     * takes decay^2 a half-pass of ~165 ms: decay = 2^(-0.822 / T60) */
+    const float t = fm_maxf((f->rv_decay - 0.2f) * (1.0f / 0.73f), 1e-4f);
+    const float t60 = 0.15f * fm_exp2f(4.32f * fm_exp2f(1.645f * fm_log2f(t)));
+    const float decay = fm_exp2f(-0.822f / t60), dd2 = fm_minf(decay + 0.15f, 0.5f);
+    const float damp = 0.25f + 0.6f * f->rv_tone, lvl = f->rv_level * 0.5f;
+    int32_t quiet = f->rv_quiet;
+    for (int i = 0; i < n; ++i) {
+        const float x0 = d9_biquad_tick(&f->rv_hp, in[i]);
+        if (f->pl_half == 0.0f) {                       /* the first of two: the midpoint out */
+            f->pl_half = x0 == 0.0f ? 1e-30f : x0;
+            float ml = 0.5f * (f->pl_pl + f->pl_ol), mr = 0.5f * (f->pl_pr + f->pl_or);
+            out[i] += (out_r ? ml : 0.5f * (ml + mr)) * lvl;
+            if (out_r)
+                out_r[i] += mr * lvl;
+            continue;
+        }
+        float x = 0.5f * (f->pl_half + x0), a, b;
+        int32_t wr = 0;
+        f->pl_half = 0.0f;
+        const float fb_l = pl_tap(f, FX_PD2R, FX_PS(3163)), fb_r = pl_tap(f, FX_PD2L, FX_PS(3720));
+        f->pl_bw += 0.7f * (x - f->pl_bw);              /* input bandwidth */
+        x = pl_ap(f, FX_PIN1, FX_PD(142), f->pl_bw, 0.75f, &wr);
+        x = pl_ap(f, FX_PIN2, FX_PD(107), x, 0.75f, &wr);
+        x = pl_ap(f, FX_PIN3, FX_PD(379), x, 0.625f, &wr);
+        x = pl_ap(f, FX_PIN4, FX_PD(277), x, 0.625f, &wr);
+        {   /* the tank's modulation, ~0.9 Hz: sine and cosine for its halves */
+            float s = f->pl_s + 0.000256f * f->pl_c, c = f->pl_c - 0.000256f * s;
+            f->pl_s = s;
+            f->pl_c = c;
+        }
+        a = pl_apm(f, FX_PAPL, (float)FX_PS(672) + (float)FX_PEXC * f->pl_s, x + decay * fb_l, -0.7f, &wr);
+        wr |= pl_push(f, FX_PD1L, a);
+        b = pl_tap(f, FX_PD1L, FX_PS(4453));
+        f->pl_dl += damp * (b - f->pl_dl);
+        b = pl_ap(f, FX_PAP2L, FX_PS(1800), f->pl_dl * decay, dd2, &wr);
+        wr |= pl_push(f, FX_PD2L, b);
+        a = pl_apm(f, FX_PAPR, (float)FX_PS(908) + (float)FX_PEXC * f->pl_c, x + decay * fb_r, -0.7f, &wr);
+        wr |= pl_push(f, FX_PD1R, a);
+        b = pl_tap(f, FX_PD1R, FX_PS(4217));
+        f->pl_dr += damp * (b - f->pl_dr);
+        b = pl_ap(f, FX_PAP2R, FX_PS(2656), f->pl_dr * decay, dd2, &wr);
+        wr |= pl_push(f, FX_PD2R, b);
+        f->pl_pl = f->pl_ol;
+        f->pl_pr = f->pl_or;
+        f->pl_ol = pl_tap(f, FX_PD1R, FX_PS(266)) + pl_tap(f, FX_PD1R, FX_PS(2974)) - pl_tap(f, FX_PAP2R, FX_PS(1913)) +
+                   pl_tap(f, FX_PD2R, FX_PS(1996)) - pl_tap(f, FX_PD1L, FX_PS(1990)) - pl_tap(f, FX_PAP2L, FX_PS(187)) -
+                   pl_tap(f, FX_PD2L, FX_PS(1066));
+        f->pl_or = pl_tap(f, FX_PD1L, FX_PS(353)) + pl_tap(f, FX_PD1L, FX_PS(3627)) - pl_tap(f, FX_PAP2L, FX_PS(1228)) +
+                   pl_tap(f, FX_PD2L, FX_PS(2673)) - pl_tap(f, FX_PD1R, FX_PS(2111)) - pl_tap(f, FX_PAP2R, FX_PS(335)) -
+                   pl_tap(f, FX_PD2R, FX_PS(121));
+        out[i] += (out_r ? f->pl_pl : 0.5f * (f->pl_pl + f->pl_pr)) * lvl;   /* one tick late: the midpoint has both */
+        if (out_r)
+            out_r[i] += f->pl_pr * lvl;
+        quiet = (wr == 0 && x == 0.0f) ? quiet + 1 : 0;
+    }
+    f->rv_quiet = quiet;
+}
+#else
 static void fx_reverb(fxbus_t *f, const float *in, float *out, float *out_r, int n)
 {
     if (f->rv_quiet >= FX_RV_QUIET) {
@@ -249,6 +366,7 @@ static void fx_reverb(fxbus_t *f, const float *in, float *out, float *out_r, int
     }
     f->rv_quiet = quiet;
 }
+#endif
 
 /* ===================================================================== */
 /* Delay (er99_dly_tick), adds its return into out                        */

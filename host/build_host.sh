@@ -15,5 +15,5 @@ U="firmware/src/dsp/drum909.c firmware/src/dsp/drum808.c firmware/src/dsp/bass30
    firmware/src/seq/pattern.c firmware/src/seq/motion.c firmware/src/app/engine.c"
 # shellcheck disable=SC2086
 $CC -O2 -ffp-contract=off -std=c99 -Wall -Wextra -Wno-unused-function -Wno-unused-parameter \
-    -DX0X_HOST -Ifirmware/src -Ifirmware/src/dsp -Ibuild/gen -o build/host/x0x_host host/x0x_host.c $U -lm
+    -DX0X_HOST ${X0X_HOST_DEFS:-} -Ifirmware/src -Ifirmware/src/dsp -Ibuild/gen -o ${X0X_HOST_OUT:-build/host/x0x_host} host/x0x_host.c $U -lm
 echo "host: build/host/x0x_host"
