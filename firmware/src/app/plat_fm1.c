@@ -25,6 +25,18 @@ int32_t plat_enc(int role)
 static volatile uint32_t master_q12 = 2048;
 uint32_t plat_master(void) { return master_q12; }
 
+/* the battery: ADC ch3 (its divider), smoothed by the main loop. The stock firmware's thresholds, as
+ * melodee and dxsloop use them, give 0-3 bars; there is no charger line, so a USB host means power */
+static int32_t batt_raw;
+int plat_battery(void)
+{
+    if (usb.config && !usb.suspended)
+        return 4;
+    if (!batt_raw)
+        return -1;
+    return batt_raw >= 591 ? 3 : batt_raw >= 561 ? 2 : batt_raw >= 531 ? 1 : 0;
+}
+
 /* LEDs: the picture is built off-line and copied one byte per column (Felucca: clearing
  * and relighting would let the 10 kHz scan catch the dark gap and flicker) */
 static uint8_t led_pos[FM1_NKEY];

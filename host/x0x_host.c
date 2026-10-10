@@ -82,6 +82,7 @@ int32_t plat_enc(int role)
     return v;
 }
 uint32_t plat_master(void) { return master; }
+int plat_battery(void) { return 3; }    /* the simulator: a full battery */
 void plat_leds(uint32_t b, uint32_t k)
 {
     lit_btn = b;

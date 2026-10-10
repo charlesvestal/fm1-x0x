@@ -351,6 +351,11 @@ static void fm1_main(void)
             bootguard.failed = 0;
         }
         {
+            int32_t b = fm1_adc_read(FM1_ADC_BATT);     /* the battery: a slow average (plat_battery) */
+            if (b > 0)
+                batt_raw = batt_raw ? batt_raw + (b - batt_raw) / 32 : b;
+        }
+        {
             int32_t a = fm1_adc_read(FM1_ADC_MASTER);
             if (a >= 0) {
                 uint32_t k10;
