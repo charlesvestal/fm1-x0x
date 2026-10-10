@@ -98,10 +98,10 @@ arrange them into a song.
 
 ## 3. Controls
 
-![The FM-1 (a drawing), running X0X: under each button that opens a screen, which screen](img/fm1-panel.svg)
+![The FM-1 (a drawing), running X0X, each control labelled](img/fm1-panel.svg)
 
-A button that opens a screen (labelled on the drawing) always opens the same one; press it again
-for that screen's next page. SEQ, EDIT and ARP show the part you choose with ALGORITHM.
+A button that opens a screen always opens the same one; press it again for that screen's next
+page. SEQ, EDIT and ARP show the part you choose with ALGORITHM.
 
 | Control | What it does |
 |---|---|

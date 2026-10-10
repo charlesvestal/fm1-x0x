@@ -94,25 +94,28 @@ STYLE = (f"<style>.lbl{{font:600 17px {FONT};fill:{LABEL};letter-spacing:.06em}}
 
 
 def panel(screen_png):
-    """the FM-1's front panel, with the firmware's screen in it: under the knobs what they choose, under each
-    button that opens a screen which screen"""
+    """the FM-1's front panel, with the firmware's screen in it and, under each control, what it does in a word
+    or two"""
     W, H = 1000, 720
     s = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" role="img" '
-         f'aria-label="The FM-1 front panel, each button that opens a screen labelled with the screen">', STYLE,
+         f'aria-label="The FM-1 front panel, each control labelled with what it does">', STYLE,
          f'<rect x="4" y="4" width="{W - 8}" height="{H - 8}" rx="44" fill="{BODY}"/>',
          knob(105, 92, 24, "MASTER", "Volume"), knob(215, 92, 24, "SELECT", "Page"),
          knob(105, 210, 24, "PRESETS", "Pattern"), knob(215, 210, 24, "ALGORITHM", "Part"),
          f'<rect x="58" y="284" width="210" height="58" rx="14" fill="{TRAY}"/>',
          button(72, 294, 82, 38, "OCT-"), button(170, 294, 82, 38, "OCT+"),
+         what(113, 362, "16 steps back"), what(211, 362, "16 steps on"),
          f'<rect x="300" y="44" width="236" height="236" rx="26" fill="#111214"/>',
          f'<image x="318" y="62" width="200" height="200" href="{png_data_uri(screen_png)}" style="image-rendering:pixelated"/>']
     for i in range(4):
         s.append(knob(610 + i * 104, 92, 22, f"KNOB{i + 1}"))
     s.append(what(766, 136, "The page's four values"))
     s.append(f'<rect x="568" y="146" width="400" height="236" rx="18" fill="{TRAY}"/>')
-    # the buttons that open a screen: which one (the others: the manual's table)
-    top = [("FX", "Effects"), ("SEL", "List all"), ("ENV", ""), ("LFO", "Mixer"), ("EDIT", "Sound"), ("GLO", "Settings")]
-    bot = [("HOME", "Pattern,|song"), ("SAVE", ""), ("ARP", "TB-3PO"), ("SEQ", "Steps"), (("PLAY", "STOP"), ""), ("REC", "")]
+    # each button: what it does, in a word or two (the details: the manual's table)
+    top = [("FX", "Effects"), ("SEL", "List all"), ("ENV", "Hold:|accent"), ("LFO", "Mixer"), ("EDIT", "Sound"),
+           ("GLO", "Settings")]
+    bot = [("HOME", "Pattern,|song"), ("SAVE", "Save,|hold: copy"), ("ARP", "TB-3PO"), ("SEQ", "Steps"),
+           (("PLAY", "STOP"), "Play"), ("REC", "Record")]
     for i in range(6):
         x = 582 + i * 63
         s.append(button(x, 158, 54, 48, top[i][0]))
