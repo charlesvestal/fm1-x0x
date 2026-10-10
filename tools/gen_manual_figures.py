@@ -104,7 +104,7 @@ def panel(screen_png):
          knob(105, 210, 24, "PRESETS", "Pattern"), knob(215, 210, 24, "ALGORITHM", "Part"),
          f'<rect x="58" y="284" width="210" height="58" rx="14" fill="{TRAY}"/>',
          button(72, 294, 82, 38, "OCT-"), button(170, 294, 82, 38, "OCT+"),
-         what(113, 362, "16 steps back"), what(211, 362, "16 steps on"),
+         what(113, 362, "16 steps back"), what(211, 362, "16 steps fwd"),
          f'<rect x="300" y="44" width="236" height="236" rx="26" fill="#111214"/>',
          f'<image x="318" y="62" width="200" height="200" href="{png_data_uri(screen_png)}" style="image-rendering:pixelated"/>']
     for i in range(4):
