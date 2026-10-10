@@ -367,10 +367,10 @@ sample slots of about 7 seconds each. A one-bar loop takes about a third of a sl
 nine loops fit in total.
 
 The easiest way is the **break loops page** on the X0X website
-(charlesvestal.github.io/fm1-x0x/breaks), in Chrome or Edge. Connect the FM-1 with X0X running,
-drop your audio files on the page (WAV, AIFF, MP3 and the other formats the browser can read),
-and press Upload. The page shows which slot and name each loop will get and how full the slots
-are, before anything is sent.
+(charlesvestal.github.io/fm1-x0x/breaks), in Chrome or Edge. Connect the FM-1 with X0X running and
+press Connect: the page shows the three slots, each with a picture of what's in it. Drop audio
+files on a slot (WAV, AIFF, MP3 and the other formats the browser reads), check the picture and
+how full the slot will be, and press Send. Each slot is filled, replaced or cleared on its own.
 
 From the command line, with the FM-1 connected, run:
 

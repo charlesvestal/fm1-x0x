@@ -104,6 +104,37 @@ export function imaEncode(s) {
   return out;
 }
 
+// the reverse, for drawing a slot read back from the FM-1: nibbles -> int16, from predictor 0 / index 0
+export function imaDecode(b, n) {
+  let pred = 0, idx = 0;
+  const out = new Int16Array(n);
+  for (let i = 0; i < n; i++) {
+    const code = (b[i >> 1] >> (i & 1 ? 4 : 0)) & 15, step = IMA_STEP[idx];
+    let vd = step >> 3;
+    if (code & 4) vd += step;
+    if (code & 2) vd += step >> 1;
+    if (code & 1) vd += step >> 2;
+    pred = code & 8 ? pred - vd : pred + vd;
+    if (pred > 32767) pred = 32767; else if (pred < -32768) pred = -32768;
+    idx += IMA_IDX[code & 7];
+    if (idx < 0) idx = 0; else if (idx > 88) idx = 88;
+    out[i] = pred;
+  }
+  return out;
+}
+
+// a slot header (userSlot's layout) -> {nz, name, dataLen, zones: [{off, n}]}, or null if not a slot
+export function parseSlot(hdr) {
+  const v = new DataView(hdr.buffer || hdr, hdr.byteOffset || 0, hdr.byteLength);
+  if (hdr.byteLength < SLOT_HDR_LEN || v.getUint32(0, true) !== 0x504D5346) return null;
+  const nz = hdr[6], zones = [];
+  let name = "";
+  for (let i = 8; i < 16 && hdr[i]; i++) name += String.fromCharCode(hdr[i]);
+  for (let i = 0; i < nz && i < SLOT_ZONES; i++)
+    zones.push({ off: v.getUint32(32 + i * 28, true), n: v.getUint32(32 + i * 28 + 4, true) });
+  return { nz, name, dataLen: v.getUint32(16, true), zones };
+}
+
 let CRC_T = null;
 export function crc32(b) {                    // zlib.crc32
   if (!CRC_T) {

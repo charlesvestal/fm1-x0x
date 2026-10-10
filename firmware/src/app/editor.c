@@ -9,9 +9,10 @@
 #define ED_HDR0 0x7D
 #define ED_HDR1 0x46
 #define ED_HDR2 0x4C
-enum { ED_INFO = 1, ED_SMP_BEGIN = 11, ED_SMP_WRITE, ED_SMP_END, ED_SMP_ERASE, ED_SMP_INFO, ED_PING = 25 };
+enum { ED_INFO = 1, ED_SMP_BEGIN = 11, ED_SMP_WRITE, ED_SMP_END, ED_SMP_ERASE, ED_SMP_INFO, ED_SMP_READ, ED_PING = 25 };
+#define ED_READ_MAX 224u                     /* X0X: SMP_READ's bytes a frame (the break page draws the slots) */
 
-static uint8_t ed_out[160];
+static uint8_t ed_out[288];
 static uint32_t ed_n;
 
 static void ed_begin(uint32_t cmd)
@@ -220,6 +221,34 @@ static void ed_handle(const uint8_t *f, uint32_t n)
             return;
         break;
 #endif
+    case ED_SMP_READ: {                              /* X0X: slot, offset (3 x 7 bits, from the slot's start,
+                                                      * its header included), count -> slot, offset, the bytes
+                                                      * packed 7 to 8 (as WRITE takes them) */
+        uint32_t off, n, k, j;
+        const uint8_t *src;
+        if (na < 5u || a[0] >= SMP_USER_SLOTS)
+            return;
+        off = (uint32_t)a[1] | (uint32_t)a[2] << 7 | (uint32_t)a[3] << 14;
+        n = a[4] > ED_READ_MAX / 2u ? ED_READ_MAX : a[4] * 2u;   /* the count is in pairs (7 bits) */
+        if (off >= SMP_USER_SIZE)
+            return;
+        if (n > SMP_USER_SIZE - off)
+            n = SMP_USER_SIZE - off;
+        src = smp_user_xip(a[0]) + off;
+        ed_b(a[0]);
+        ed_b(off);
+        ed_b(off >> 7);
+        ed_b(off >> 14);
+        for (k = 0; k < n; k += 7) {
+            uint32_t m = 0;
+            for (j = 0; j < 7u && k + j < n; j++)
+                m |= (uint32_t)(src[k + j] >> 7) << j;
+            ed_b(m);
+            for (j = 0; j < 7u && k + j < n; j++)
+                ed_b(src[k + j]);
+        }
+        break;
+    }
     case ED_SMP_INFO:
         ed_b(SMP_USER_SLOTS);
         ed_b(SMP_USER_SIZE / 1024u);
@@ -246,7 +275,7 @@ static void ed_service(void)
     uint32_t n;
     if (!ota_frame_get(&p, &n) || n < 4u || p[0] != ED_HDR0 || p[1] != ED_HDR1 || p[2] != ED_HDR2)
         return;                                       /* not an editor frame: ota_service() reads it */
-    if (p[3] >= ED_SMP_BEGIN && p[3] <= ED_SMP_INFO) {
+    if (p[3] >= ED_SMP_BEGIN && p[3] <= ED_SMP_READ) {
         ed_handle(p, n);
         ota_frame_done();
         return;

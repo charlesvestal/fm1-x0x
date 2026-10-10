@@ -53,6 +53,7 @@ after an engine change.
 | 13 SMP_END | slot, pack7 header (480 bytes) | slot, rc: 0 ok, 1 size, 2 header, 3 data CRC, 4 flash, 5 zones |
 | 14 SMP_ERASE | slot | slot, rc (erases the whole slot, ~1 s) |
 | 15 SMP_INFO | — | slots, slot KiB, then per slot: zone count (0 = empty), name string, data KiB |
+| 16 SMP_READ (X0X) | slot, offset (3 × 7 bits, from the slot's start, header included), count in pairs (7 bits) | slot, offset (3 × 7 bits), up to 224 bytes packed 7 to 8 as SMP_WRITE takes them |
 | 16 UP_LIST | start, count (1..16) | start, count, total slots, then per slot: used (0/1), engine, name string ("" if unused) |
 | 17 UP_GET | slot | slot, used, engine, name, P_COUNT × v14, 16 × (note, flags) |
 | 18 UP_PUT | slot, engine, name, P_COUNT × v14, 16 × (note, flags) | slot, rc (0 ok, 1 args, 2 flash). Writes flash: allow 1 s |

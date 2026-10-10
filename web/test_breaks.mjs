@@ -6,7 +6,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readWav, cut, pack, userSlot, NSLOTS } from "./x0x_breaks.js";
+import { readWav, cut, pack, userSlot, NSLOTS, imaDecode, parseSlot } from "./x0x_breaks.js";
 
 const dir = mkdtempSync(join(tmpdir(), "x0x-breaks-"));
 let bad = 0;
@@ -56,6 +56,20 @@ for (const bars of [false, true]) {
     console.log(`  ${same ? "ok" : "FAIL"} ${bars ? "one bar" : "whole"}, slot ${i + 1}: ${sl.length} loop(s), ${img.data.length} B`);
     if (!same) bad++;
   });
+}
+// reading back: the header parses, and the decoded loops follow what went in (ADPCM: close, not exact)
+{
+  const loops = files.map((f) => { const { rate, x } = readWav(readFileSync(f[0])); return cut(x, rate, true); });
+  const img = userSlot("BR1", loops), h = parseSlot(img.hdr);
+  let ok = h && h.nz === loops.length && h.name === "BR1" && h.dataLen === img.data.length;
+  loops.forEach((s, i) => {
+    const z = h.zones[i], y = imaDecode(img.data.subarray(z.off, z.off + ((z.n + 1) >> 1)), z.n);
+    let e = 0, p = 0;
+    for (let k = 0; k < s.length; k++) { e += (y[k] - s[k]) ** 2; p += s[k] ** 2; }
+    ok = ok && z.n === s.length && e / p < 0.05;
+  });
+  console.log(`  ${ok ? "ok" : "FAIL"} read back: header and decoded loops`);
+  if (!ok) bad++;
 }
 console.log(bad ? "BREAKS WEB FAILED" : "breaks web: same bytes as upload_breaks.py");
 process.exit(bad ? 1 : 0);
