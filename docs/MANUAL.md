@@ -4,9 +4,8 @@ X0X turns the M-VAVE FM-1 into a groovebox: a 909, an 808, two 303s and a breakb
 all playing at once, in stereo. Each part can play its own pattern, you can arrange patterns
 into a song, record knob moves, and give single steps a sound and a chance of their own.
 
-**X0X is in beta.** It's solid for everyday playing, but a very busy pattern can push the FM-1 to
-its limit. When that happens, X0X gives up a little sound quality to keep playing rather than drop
-out (see Performance in section 15).
+> **X0X is in beta.** It's solid for everyday playing, but a very busy pattern can push the FM-1
+> to its limit. When that happens, X0X gives up a little sound quality rather than drop out.
 
 ---
 
@@ -36,33 +35,33 @@ out (see Performance in section 15).
 
 ## 1. Install
 
-You can try X0X before installing it: **https://charlesvestal.github.io/fm1-x0x/emu/** runs the
-same code in the browser, with sound, played with the mouse, a touch screen or the keyboard. You
-can load your own breaks into it too, as you would upload them to the FM-1.
+**Try it first:** the [X0X emulator](https://charlesvestal.github.io/fm1-x0x/emu/) runs the same
+code in the browser, with sound, played with the mouse, a touch screen or the keyboard.
 
-The easiest way to install X0X is the web installer at
-**https://charlesvestal.github.io/fm1-x0x/install/**. It works in Chrome or Edge on a computer,
-and you don't need to install anything else. Connect the FM-1 to the computer with a USB data
-cable, open the page and press Install. Don't unplug the cable while it's writing. When it
-finishes, the FM-1 restarts into X0X.
+**Install:** open the [web installer](https://charlesvestal.github.io/fm1-x0x/install/) in Chrome or
+Edge, connect the FM-1 with a USB data cable and press Install. Don't unplug it while it's
+writing; when it finishes, the FM-1 restarts into X0X.
 
-You can also install from the command line. Download the firmware file (for example
-`x0x-0.10-beta.fwsc`) from the
-[releases page](https://github.com/charlesvestal/fm1-x0x/releases), get the X0X source code from
-GitHub, install Python 3 with the `mido` and `python-rtmidi` packages
-(`pip3 install mido python-rtmidi`), and run:
+**Go back:** "Back to the stock firmware", at the bottom of the same page, puts M-VAVE's firmware
+back (download the FM-1 V15 file from the link there, choose it, press the button). M-VAVE's own
+updater, M-UPGRADE, works too.
+
+> Installing other firmware is at your own risk. If the FM-1 ever won't start, see
+> [Recovering an FM-1 that won't start](#recovering-an-fm-1-that-won-t-start).
+
+<details><summary>Install from the command line</summary>
+
+Download the firmware file (for example `x0x-1.0.fwsc`) from the
+[releases page](https://github.com/charlesvestal/fm1-x0x/releases), get the X0X source from GitHub,
+install Python 3 with `pip3 install mido python-rtmidi`, and run:
 
 ```
-python3 tools/fm1_install.py x0x-0.10-beta.fwsc
+python3 tools/fm1_install.py x0x-1.0.fwsc
 ```
 
 (The web installer on hugelton.github.io installs Felucca, not X0X.)
 
-To go back to the original firmware, use "Back to the stock firmware" at the bottom of the
-web installer: download M-VAVE's FM-1 V15 file from the link there, choose it, and press the
-button. (M-VAVE's own updater, M-UPGRADE, works too.) If the FM-1 no longer starts, see
-[Recovering an FM-1 that won't start](#recovering-an-fm-1-that-won-t-start). Installing
-third-party firmware is at your own risk.
+</details>
 
 ---
 
@@ -148,11 +147,8 @@ notes: SEL for yes, HOME for no.
 ![A list](img/screen-list.png)
 ![A question](img/screen-ask.png)
 
-### Help
-
-Hold any button for a second on its own, and a card shows what it does on the screen you're on,
-with its combinations. Let go and nothing happens. The card goes as soon as you press anything
-else, so combinations work as usual.
+> **Not sure what a button does?** Hold it for a second on its own: a card says what it does on
+> the screen you're on, with its combinations. Let go and nothing happens.
 
 ### Undo
 
@@ -163,7 +159,7 @@ one turn of a knob, or a whole recording pass. Undo covers the sounds, patterns,
 motion, even CLEAR PATTERN and FACTORY RESET, but not the tempo or the settings. The history is
 cleared when you switch off.
 
-### Key lights
+<details><summary>What the key lights show</summary>
 
 The key lights have two levels: bright for what is on or chosen, dim for what is there to
 choose.
@@ -177,6 +173,8 @@ choose.
 | 303 with REC on | the keys you hold | the Cs, to find your place |
 | BREAK | the steps it plays | the slice pads 1–8 |
 | Mixer (PARTS, 909 MIX, 808 MIX) | the channel the knobs set (blinking while muted) | the other channels |
+
+</details>
 
 ---
 
@@ -541,8 +539,7 @@ Press LFO to open the mixer; press it again (or turn SELECT) for its four pages.
 the right is the compressor's gain reduction.
 
 - **PARTS**: a level and a meter for each part. Press black keys 1-5 to pick the 909, 808,
-  303A, 303B or the break; the knobs are its LEVEL, PAN, REV and DLY. As you turn a pan, the part stays at full level on that side and
-  fades out of the other.
+  303A, 303B or the break; the knobs are its LEVEL, PAN, REV and DLY.
 - **909 MIX** and **808 MIX**: each drum machine's own mixer, every track's level at a glance;
   the black keys pick a track, and the knobs set its LEVEL, PAN, REV and DLY.
 - **MASTER**: four knobs over the whole mix. The screen shows the output level over the last
@@ -564,15 +561,19 @@ machines, PARTS (with the part picked) for the 303s and the break.
 
 FILTER and PUMP are also on HOME's PERFORM page, for playing live.
 
-The factory mix is set up for big beat: the break is up front with the 909 kick under it, the
-303s run through RAT distortion into a tape delay, and the clap has reverb. For a clean mix, set
-COMP and PUMP to 0.
+> **The factory mix is set up for big beat:** the break up front with the 909 kick under it, the
+> 303s through RAT distortion into a tape delay, reverb on the clap. For a clean mix, set COMP and
+> PUMP to 0.
 
-The details are in SEL's list, under MORE: the compressor's THRESH (-48 to 0 dB), RATIO (1:1 to
+<details><summary>The master in detail</summary>
+
+In SEL's list, under MORE: the compressor's THRESH (-48 to 0 dB), RATIO (1:1 to
 20:1 and INF), ATTACK (0.1 to 100 ms), RELEASE (10 to 1500 ms), MAKEUP (0 to 24 dB) and MIX (dry
 to fully compressed, for parallel compression); PUMP BY (the 909's kick, the 808's, or both); the
 filter's RESO; LIMIT, which prevents clipping (leave it on); and the drive stage's DIST type, its
 GLUE compressor and VOLUME. Turning COMP or FILTER sets their details again.
+
+</details>
 
 ---
 
@@ -608,9 +609,11 @@ anything unsaved is lost when you switch off.
 With **AUTOSAVE** on (the default) you'll rarely need SAVE: whenever the pattern is stopped and
 nothing has been touched for four seconds, X0X saves and says AUTOSAVED.
 
-Saving pauses the sound for a moment, because the FM-1 plays from the same memory it saves to.
-So X0X never saves while playing: a SAVE pressed while playing says SAVES WHEN STOPPED and saves
-when you stop.
+> **X0X never saves while playing.** Saving pauses the sound for a moment (the FM-1 plays from the
+> same memory it saves to), so a SAVE pressed while playing says SAVES WHEN STOPPED and saves when
+> you stop.
+
+<details><summary>How much fits</summary>
 
 X0X packs the patterns, the song and the knob motion to fit them in the FM-1's memory; empty
 steps take almost no room, so a typical project uses a small part of it (GLO > ABOUT X0X shows
@@ -618,8 +621,9 @@ how much, as MEM). If a project ever grows too big to fit, X0X says MEMORY FULL:
 keeps what was saved before; clearing patterns you don't need makes room. Projects saved by
 earlier versions load as they were, with their steps on 1–32 and their patterns on 1–16.
 
+</details>
 
-### Performance
+<details><summary>Performance: how hard the FM-1 is working</summary>
 
 GLO > PERFORMANCE shows how hard the FM-1 is working, updated every second: the audio load and
 its peak, any dropouts, and how much of the processor each part is using.
@@ -628,8 +632,8 @@ For a proper measurement, press SEL and choose RUN PERF TEST. X0X plays three pa
 own for about 15 seconds, from a simple loop up to everything as busy as it gets, then puts your
 project back exactly as it was and shows the results. HOME or PLAY stops the test early.
 
-X0X uses both of the FM-1's processor cores: the 808 and the break run on the second, so the 808's share on the
-performance page is the time the first core waits for them, and the whole load is lower: on
+X0X uses both of the FM-1's processor cores: the 808 and the break run on the second, so the 808's
+share on the performance page is the time the first core waits for them, and the whole load is lower: on
 one FM-1 the test's three patterns went from 43%, 83% and 115% on one core to 39%, 54% and 68%,
 and the busiest moment of the worst case from over the limit to 84%.
 
@@ -645,17 +649,16 @@ most useful thing you can send.
 KNOB 1 turns on some extra counters (STALLS). They're experimental: if the FM-1 acts up with them
 on, switch it off and on again.
 
+</details>
+
 ---
 
 ## 16. MIDI and USB audio
 
 When connected over USB, the FM-1 shows up as a MIDI device called "X0X FM-1".
 
-X0X takes MIDI from USB and from the FM-1's TRS MIDI IN jack, both the same way:
-
-Each part listens on its own channel. These are the defaults; GLO sets each part's channel (909
-MIDI CH and so on), or OFF to ignore its notes, for example when another box sends you its clock
-with notes on the same channels.
+X0X takes MIDI from USB and from the FM-1's TRS MIDI IN jack, both the same way. Each part
+listens on its own channel; these are the defaults:
 
 | Input | What it plays |
 |---|---|
@@ -666,8 +669,10 @@ with notes on the same channels.
 | Channel 4 | Notes 36–43 play break slices 1–8. |
 | Clock | X0X follows an incoming MIDI clock automatically, and returns to its own tempo half a second after the clock stops. Start, Stop and Continue start and stop the patterns. |
 
-X0X can also send MIDI: clock and start/stop when CLOCK OUT is on, and the patterns as notes on
-each part's channel when NOTES OUT is on.
+GLO sets each part's channel (909 MIDI CH and so on), or OFF to ignore its notes, for example when
+another box sends you its clock with notes on the same channels. X0X can also send MIDI: clock and
+start/stop when CLOCK OUT is on, and the patterns as notes on each part's channel when NOTES OUT
+is on.
 
 While X0X follows an external clock, the tempo on the top line is averaged over about a second,
 so it doesn't flicker with every clock.
@@ -702,10 +707,14 @@ firmware back from the same page. Press PLAY to try starting X0X normally again.
 mode fails twice, the FM-1 drops into the chip's own update mode, and only the rescue below can
 reach it.
 
-**Stuck on the start screen after changing BRIGHTNESS:** versions up to 0.9-beta had a brightness
-setting that could freeze the FM-1, and because the setting was saved, it stayed frozen at every
-start, even after reinstalling. Install 0.10-beta or later from the web installer: the setting is
-gone, the saved value is ignored, and the FM-1 starts normally.
+<details><summary>Stuck on the start screen after changing BRIGHTNESS (0.9-beta and earlier)</summary>
+
+Versions up to 0.9-beta had a brightness setting that could freeze the FM-1, and because the
+setting was saved, it stayed frozen at every start, even after reinstalling. Install 0.10-beta or
+later from the web installer: the setting is gone, the saved value is ignored, and the FM-1 starts
+normally.
+
+</details>
 
 ### Recovering an FM-1 that won't start
 
@@ -748,6 +757,8 @@ PDIST, FOLD or CRUSH. PAN goes from L64 through C (the middle) to R63.
 Each track's Level, Pan, Rev and Dly are on the mixer (909 MIX, 808 MIX); its Drive and Dist are
 in SEL's list; the rest are its sound pages.
 
+<details><summary>909 tracks</summary>
+
 | 909 track | Settings |
 |---|---|
 | BD | Tune, Attack, Decay, Level, Pitch depth, Pitch, Drive, Dist, Rev, Dly, Pan |
@@ -759,6 +770,10 @@ in SEL's list; the rest are its sound pages.
 | CR, RD | Tune, Level, Decay, Drive, Dist, Rev, Dly, Pan |
 | KIT | Accent (how much louder accented steps are) |
 
+</details>
+
+<details><summary>808 tracks</summary>
+
 | 808 track | Settings |
 |---|---|
 | BD | Level, Tone, Decay, Tune, Attack, Drive, Dist, Rev, Dly, Pan |
@@ -769,6 +784,10 @@ in SEL's list; the rest are its sound pages.
 | CB, CH | Level, Tune, Decay, Drive, Dist, Rev, Dly, Pan |
 | CY, OH | Level, Decay, Tune, Drive, Dist, Rev, Dly, Pan |
 | KIT | Accent |
+
+</details>
+
+<details><summary>303</summary>
 
 | 303 setting | Range |
 |---|---|
@@ -782,6 +801,10 @@ in SEL's list; the rest are its sound pages.
 | Slide | 2–360 ms |
 | Accent decay | 30–3000 ms |
 
+</details>
+
+<details><summary>Break</summary>
+
 | Break setting | Range |
 |---|---|
 | Complexity, Anchor, Roll, Fill | 0–100 |
@@ -791,6 +814,10 @@ in SEL's list; the rest are its sound pages.
 | A length, B length | 1/4, 1/2, 1, 2, 4 or 8 bars |
 | Level | 0–127 |
 | Pitch | -12 to +12 semitones |
+
+</details>
+
+<details><summary>Effects and master</summary>
 
 | Effect page | Settings |
 |---|---|
@@ -802,6 +829,8 @@ The delay follows the tempo, including an external MIDI clock. A delay longer th
 (1/2. below 90 BPM, 1/2 below 60) plays at half that length, which still lands on the beat. With
 PING on, the echoes bounce from left to right, one delay time apart; delays longer than one
 second play in the middle instead.
+
+</details>
 
 ---
 
