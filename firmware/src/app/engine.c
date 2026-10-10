@@ -786,29 +786,21 @@ static int nloops;
 
 static void scan_loops(void)
 {
-    int i, k, z;
+    int i, k, z, u = 0;
     nloops = 0;
     for (i = 0; i < X0X_NBREAKS; i++)
         loop_names[nloops++] = X0X_BREAKS[i].name;
-    for (k = 0; k < PLAT_NSLOTS; k++) {
-        int nz = plat_slot_zones(k);
+    for (k = 0; k < PLAT_NSLOTS; k++) {                 /* yours: BR1, BR2 ... in order, whatever slot */
+        int nz = plat_slot_zones(k);                    /* holds them (the break page packs the list) */
         for (z = 0; z < nz && z < PLAT_SLOT_ZONES; z++) {
-            char *n = user_names[k * PLAT_SLOT_ZONES + z], nm[9];
-            uint32_t ns, rate;
-            int j = 0;
-            plat_slot(k, z, &ns, &rate, nm);
-            while (nm[j] && j < (nz > 1 ? 3 : 6)) {   /* "AMEN", or "BRK.3" for a slot of several */
-                n[j] = nm[j];
-                j++;
-            }
-            if (!j)
-                n[j++] = 'U';
-            if (nz > 1) {
-                n[j++] = '.';
-                if (z + 1 >= 10)
-                    n[j++] = (char)('0' + (z + 1) / 10);
-                n[j++] = (char)('0' + (z + 1) % 10);
-            }
+            char *n = user_names[k * PLAT_SLOT_ZONES + z];
+            int j = 2;
+            u++;
+            n[0] = 'B';
+            n[1] = 'R';
+            if (u >= 10)
+                n[j++] = (char)('0' + u / 10);
+            n[j++] = (char)('0' + u % 10);
             n[j] = 0;
             loop_slot[nloops] = (uint8_t)k;
             loop_zone[nloops] = (uint8_t)z;

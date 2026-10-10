@@ -157,17 +157,21 @@ function keySplit(roots) {
 
 // sampleio.user_slot for loops (each its own zone, roots ROOT_BASE + i): -> {hdr, data}
 export function userSlot(name, loops) {
-  const parts = loops.map((s) => imaEncode(s));
-  const total = parts.reduce((a, p) => a + p.length, 0);
+  return userSlotRaw(name, loops.map((s) => ({ adpcm: imaEncode(s), n: s.length })));
+}
+
+// the same from loops already encoded ({adpcm, n}: the break page keeps a loop read back as it is)
+export function userSlotRaw(name, parts) {
+  const total = parts.reduce((a, p) => a + p.adpcm.length, 0);
   if (total > SLOT_MAX_DATA) throw new Error(`too long: ${total} B of ADPCM, a slot holds ${SLOT_MAX_DATA} B`);
-  if (loops.length < 1 || loops.length > SLOT_ZONES) throw new Error(`1..${SLOT_ZONES} loops per slot`);
+  if (parts.length < 1 || parts.length > SLOT_ZONES) throw new Error(`1..${SLOT_ZONES} loops per slot`);
   const data = new Uint8Array(total);
   const zs = [];
   let off = 0;
-  loops.forEach((s, i) => {
-    data.set(parts[i], off);
-    zs.push({ off, n: s.length, root: ROOT_BASE + i });
-    off += parts[i].length;
+  parts.forEach((p, i) => {
+    data.set(p.adpcm, off);
+    zs.push({ off, n: p.n, root: ROOT_BASE + i });
+    off += p.adpcm.length;
   });
   const split = keySplit(zs.map((z) => z.root));
   const rate = Math.round(SLOT_RATE / 44100 * 65536);

@@ -354,31 +354,24 @@ and sends are on the mixer's PARTS page (LFO, black key 5).
 
 ### Your own breaks
 
-X0X doesn't come with any recorded breaks, but you can load your own. The FM-1 has three
-sample slots of about 7 seconds each. A one-bar loop takes about a third of a slot, so about
-nine loops fit in total.
+Load your own loops with the [break loops page](https://charlesvestal.github.io/fm1-x0x/breaks/), in
+Chrome or Edge with the FM-1 connected. They appear after X0X's own loops as BR1, BR2 and so on.
+There's room for about 21 seconds in all: around nine one-bar loops.
 
-The easiest way is the **break loops page** on the X0X website
-(charlesvestal.github.io/fm1-x0x/breaks), in Chrome or Edge. Connect the FM-1 with X0X running and
-press Connect: the page shows the three slots, each with a picture of what's in it. Drop audio
-files on a slot (WAV, AIFF, MP3 and the other formats the browser reads), check the picture and
-how full the slot will be, and press Send. Each slot is filled, replaced or cleared on its own. With **Detect first bar** on (the default), each file is cut to its first bar, judged from
-its length, so more loops fit; turn it off for a slot to keep files whole.
+<details><summary>From the command line</summary>
 
-From the command line, with the FM-1 connected, run:
+With the FM-1 connected, run:
 
 ```
 python3 tools/upload_breaks.py --bars amen.wav think.wav funky.wav ...
 ```
 
-The `--bars` option takes one bar from each file; without it, each file is uploaded whole.
-The loops are named BR1.1, BR1.2 and so on, up to BR2.1 and beyond, and they appear after
-X0X's own loops. Uploading to a slot replaces whatever was in it.
+`--bars` keeps one bar of each file; without it, each file is sent whole. This replaces all your
+loops. `--dry-run FOLDER` shows what would fit without the FM-1. If you have schwung-breakbeat next
+to X0X, `--bbgen` sends BB Gen's classic breaks. To build loops into the firmware itself, see
+BUILDING.md.
 
-To check what will fit without connecting the FM-1, add `--dry-run FOLDER`. If you have
-schwung-breakbeat next to X0X, `--bbgen` uploads BB Gen's classic breaks.
-
-To build loops into the firmware itself instead, see BUILDING.md.
+</details>
 
 ---
 

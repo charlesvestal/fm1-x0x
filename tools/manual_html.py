@@ -67,6 +67,12 @@ td:first-child { white-space: nowrap; }
 .lede { color: var(--muted); margin-bottom: 1.6rem; }
 .status { background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 16px; }
 .status p { margin: 0; }
+.callout { border-left: 3px solid var(--accent); background: var(--sheet); border-radius: 0 8px 8px 0; padding: 10px 16px; margin: 0 0 1.2rem; max-width: 65ch; }
+.callout p { margin: 0; }
+details { border: 1px solid var(--rule); border-radius: 8px; padding: 0 16px; margin: 0 0 1.2rem; }
+details > summary { cursor: pointer; padding: 10px 0; font-weight: 600; color: var(--muted); }
+details[open] > summary { margin-bottom: .4rem; }
+details > :last-child { margin-bottom: 1rem; }
 .swatch { display: inline-block; width: .7em; height: .7em; border-radius: 3px; margin-right: .4em; vertical-align: .02em; box-shadow: 0 0 0 1px var(--swatch-ring); }
 nav.contents ol { columns: 2 14rem; column-gap: 2rem; padding-left: 1.3rem; }
 .figs { display: flex; flex-wrap: wrap; gap: 20px; margin: .4rem 0 1.6rem; }
@@ -139,6 +145,22 @@ def convert(md):
                 i += 1
             out.append('<div class="figs">' + "".join(figs) + "</div>")
             continue
+        if ln.strip().startswith("<details>"):          # a toggle: <details><summary>…</summary> … </details>
+            m = re.match(r"\s*<details>\s*<summary>(.*)</summary>\s*$", ln)
+            out.append(f"<details><summary>{inline(m.group(1)) if m else ''}</summary>")
+            i += 1
+            continue
+        if ln.strip() == "</details>":
+            out.append("</details>")
+            i += 1
+            continue
+        if ln.startswith("> "):                           # a callout: the important bit
+            para = []
+            while i < len(lines) and lines[i].startswith(">"):
+                para.append(lines[i][1:].strip())
+                i += 1
+            out.append(f'<div class="callout"><p>{inline(" ".join(para))}</p></div>')
+            continue
         if ln.startswith("# "):
             out.append(f"<h1>{inline(ln[2:])}</h1>")
         elif ln.startswith("## "):
@@ -186,7 +208,7 @@ def convert(md):
             continue
         elif ln.strip():
             para = [ln]
-            while i + 1 < len(lines) and lines[i + 1].strip() and not re.match(r"(#|\||```|---|\d+\. |- |!\[)", lines[i + 1]):
+            while i + 1 < len(lines) and lines[i + 1].strip() and not re.match(r"(#|\||```|---|\d+\. |- |!\[|> |\s*</?details)", lines[i + 1]):
                 i += 1
                 para.append(lines[i])
             text = inline(" ".join(p.strip() for p in para))

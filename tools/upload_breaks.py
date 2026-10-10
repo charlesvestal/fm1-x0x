@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Upload break loops to the X0X BREAK part: the three user slots of the FM-1, packed with
 as many loops as fit (each loop is one zone; ~80 KiB = ~7 s of audio per slot). On the device
-they follow the built-in loops in LOOP A / LOOP B, named after the slot and the loop's place in
-it ("BR1.1", "BR1.2", ... "BR2.1"; a slot holding one loop shows just its name).
+they follow the built-in loops in LOOP A / LOOP B as BR1, BR2, ... (the firmware numbers the loops
+of every slot straight through, in order).
 
   tools/upload_breaks.py [--bars] [--dry-run OUTDIR] [--slots 1,2,3] [--name BR] FILE.wav ...
   tools/upload_breaks.py --bbgen [BBGEN_SAMPLES_DIR] ...    (BB Gen's classic breaks, one bar each)

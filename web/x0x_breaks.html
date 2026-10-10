@@ -1,9 +1,11 @@
 <!doctype html>
 <!-- SPDX-License-Identifier: GPL-3.0-only
-     X0X break loops: the FM-1's three sample slots, each read back and drawn, each filled or cleared on
-     its own (Chrome or Edge, Web MIDI). The slot images are tools/upload_breaks.py's (web/x0x_breaks.js),
-     sent with Felucca's sample-slot protocol (web/EDITOR_PROTOCOL.md, commands 11-15) and read with X0X's
-     SMP_READ (16). tools/make_pages.py inlines x0x_breaks.js at LIB. -->
+     X0X break loops: your loops on the FM-1 as one list, BR1, BR2 ... as LOOP A / LOOP B show them (Chrome or
+     Edge, Web MIDI). Connect reads the three sample slots back (X0X's SMP_READ, 16); add, replace and remove
+     loops; Send repacks the list in order into the slots and rewrites only the slots that changed, a loop read
+     back kept as it is (no re-encoding). The slot images are tools/upload_breaks.py's (web/x0x_breaks.js), sent
+     with Felucca's sample-slot protocol (web/EDITOR_PROTOCOL.md, 11-15). tools/make_pages.py inlines
+     x0x_breaks.js at LIB. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -23,36 +25,35 @@
   .small { color: var(--dim); font-size: 13px; }
   button { font: inherit; font-size: 14px; background: var(--fg); color: var(--bg); border: 0; padding: 6px 16px; cursor: pointer; }
   button.quiet { background: none; color: var(--fg); border: 1px solid var(--rule); }
+  button.link { background: none; color: var(--dim); border: 0; padding: 0 4px; text-decoration: underline; font-size: 13px; }
   button:disabled { opacity: .3; cursor: default; }
-  .bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 0 0 24px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 0 0 20px; }
   #status { color: var(--dim); font-size: 14px; }
   label { font-size: 14px; display: inline-flex; gap: 6px; align-items: center; }
-  .slot { border: 1px solid var(--rule); padding: 16px; margin: 0 0 16px; }
-  .slot.over { border-color: var(--accent); }
-  .head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-  .head h2 { font-size: 17px; font-weight: 600; margin: 0; }
-  .state { color: var(--dim); font-size: 13px; }
-  .state.new { color: var(--accent); }
-  .state.bad { color: #d33; }
-  .loops { margin: 12px 0; }
-  .loop { display: grid; grid-template-columns: 4.5em 1fr; gap: 8px; align-items: center; margin: 0 0 6px; }
-  .loop span { font-size: 13px; color: var(--dim); line-height: 1.3; word-break: break-word; }
-  .loop canvas { display: block; width: 100%; height: 40px; }
-  .full { height: 4px; background: var(--rule); margin: 0 0 12px; }
-  .full > div { height: 100%; background: var(--dim); }
-  .full.new > div { background: var(--accent); }
-  .note { font-size: 13px; color: var(--dim); margin: 0 0 12px; }
-  .acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .acts .hint { color: var(--dim); font-size: 13px; }
-  progress { width: 100%; height: 4px; margin-top: 12px; }
+  #list { border-top: 1px solid var(--rule); margin: 0 0 12px; }
+  #list.over { outline: 1px dashed var(--accent); outline-offset: 4px; }
+  .loop { display: grid; grid-template-columns: 4.5em 1fr auto; gap: 12px; align-items: center;
+          padding: 8px 0; border-bottom: 1px solid var(--rule); }
+  .loop.over { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .loop .name { font-weight: 600; line-height: 1.25; }
+  .loop .name small { display: block; font-weight: 400; font-size: 12px; color: var(--dim); }
+  .loop.new .name { color: var(--accent); }
+  .loop canvas { display: block; width: 100%; height: 40px; min-width: 0; }
+  .loop .acts { display: flex; gap: 4px; }
+  .empty { color: var(--dim); font-size: 14px; padding: 16px 0; border-bottom: 1px solid var(--rule); }
+  .full { height: 4px; background: var(--rule); margin: 16px 0 6px; }
+  .full > div { height: 100%; background: var(--accent); }
+  #room { font-size: 13px; color: var(--dim); margin: 0 0 16px; }
+  #room.bad { color: #d33; }
+  progress { width: 100%; height: 4px; }
   input[type=file] { display: none; }
 </style>
 </head>
 <body>
 <main>
   <h1>Break loops</h1>
-  <p>X0X has three slots for your own breaks, about 7 seconds each. A slot can hold one loop or several.
-    On the FM-1 they appear on the BREAK part's EDIT page, as choices for LOOP A and LOOP B.</p>
+  <p>Your own loops for X0X's BREAK part. They appear on the FM-1 as BR1, BR2 and so on, after X0X's own
+    loops, when you turn LOOP A or LOOP B (BREAK, then EDIT).</p>
   <p class="small">Connect the FM-1 by USB with X0X running, and use Chrome or Edge.</p>
 
   <div class="bar">
@@ -60,118 +61,82 @@
     <span id="status"></span>
   </div>
 
-  <div id="slots"></div>
+  <div id="list"><div class="empty">Connect to see the loops on the FM-1.</div></div>
+  <div class="bar">
+    <button class="quiet" id="add">Add loops</button>
+    <span class="small">or drop files here. Drop one on a loop to replace it.</span>
+    <label title="Keeps only the first bar of each file you add (its length tells how many bars it has), so more loops fit">
+      <input type="checkbox" id="bars" checked> Detect first bar</label>
+  </div>
+  <div class="full"><div id="fill"></div></div>
+  <p id="room"></p>
 
-  <p class="small">Loops follow the tempo by playing faster or slower, so their pitch follows it too. The break's
-    PITCH knob shifts it. <a href="../manual/#8-break" style="color:inherit">The manual's BREAK section</a> says
-    how X0X rearranges a loop as it plays.</p>
-  <p class="small">From the command line: <code>python3 tools/upload_breaks.py --bars amen.wav think.wav …</code>.
-    X0X is GPL-3.0, built on Felucca by Hügelton Instruments; the break generator is BB Gen's.
+  <div class="bar">
+    <button id="send" disabled>Send to the FM-1</button>
+    <button class="quiet" id="discard" hidden>Discard changes</button>
+  </div>
+  <progress id="progress" max="100" value="0" hidden></progress>
+  <input type="file" id="files" multiple accept="audio/*,.wav,.aif,.aiff,.mp3,.flac,.m4a,.ogg">
+
+  <p class="small" style="margin-top:32px">Loops follow the tempo by playing faster or slower, so their pitch
+    follows it too; the break's PITCH knob shifts it. Removing a loop renumbers the ones after it, so patterns
+    that used them play the next loop instead.
+    <a href="../manual/#s8" style="color:inherit">The manual's BREAK section</a> says how X0X plays a loop.</p>
+  <p class="small">X0X is GPL-3.0, built on Felucca by Hügelton Instruments; the break generator is BB Gen's.
     <a href="https://github.com/charlesvestal/fm1-x0x" style="color:inherit">github.com/charlesvestal/fm1-x0x</a></p>
 </main>
 <script type="module">
 /*LIB*/
 const $ = (id) => document.getElementById(id);
 const HDR = [0x7D, 0x46, 0x4C];
-const RC = { 1: "a size the FM-1 doesn't accept", 2: "a bad header", 3: "a checksum error", 4: "a flash error", 5: "no loops found" };
+const NSLOT = 3;
+const CAP = NSLOT * SLOT_MAX_DATA;
 const KB = (b) => `${(b / 1024).toFixed(0)} KB`;
-let link = null, busy = false;
+let link = null, busy = false, readOk = false;
 
-// each slot: what the FM-1 has (null = not read yet; else {count, bytes, loops: [Int16Array], noWave}) and
-// what you've chosen for it ({files: [{name, rate, x, s}]} or null)
-const slots = [0, 1, 2].map((k) => ({ k, dev: null, pick: null, el: null }));
+// the loops in order, as the FM-1 numbers them: {adpcm, n, s, file, isNew} (adpcm, n: as stored, adpcm null for a
+// new one until it's encoded; s: the samples, for the picture), and the slots as read ({hdr, data} or null)
+let loops = [], dev = [null, null, null], replaceAt = -1;
 
 function say(t) { $("status").textContent = t; }
+const bytesOf = (l) => (l.n + 1) >> 1;
 
-// ---- the page ----------------------------------------------------------------
-function build() {
-  for (const sl of slots) {
-    const el = document.createElement("section");
-    el.className = "slot";
-    el.innerHTML = `<div class="head"><h2>Slot ${sl.k + 1}</h2><span class="state"></span></div>
-      <div class="loops"></div><div class="full"><div></div></div><div class="note"></div>
-      <div class="acts">
-        <button class="quiet choose">Choose files</button><span class="hint">or drop them here</span>
-        <button class="send" hidden></button><button class="quiet cancel" hidden>Cancel</button>
-        <button class="quiet clear" hidden>Clear</button>
-        <label title="Keeps only each file's first bar (its length tells how many bars it has), so more loops fit">
-          <input type="checkbox" class="bars" checked> Detect first bar</label>
-      </div><progress max="100" value="0" hidden></progress><input type="file" multiple
-        accept="audio/*,.wav,.aif,.aiff,.mp3,.flac,.m4a,.ogg">`;
-    const q = (c) => el.querySelector(c);
-    q(".choose").onclick = () => q("input").click();
-    q("input").onchange = (ev) => { pick(sl, [...ev.target.files]); ev.target.value = ""; };
-    q(".send").onclick = () => send(sl);
-    q(".cancel").onclick = () => { sl.pick = null; draw(sl); };
-    q(".clear").onclick = () => clear(sl);
-    q(".bars").onchange = () => { if (sl.pick) recut(sl); };
-    el.ondragover = (ev) => { ev.preventDefault(); el.classList.add("over"); };
-    el.ondragleave = () => el.classList.remove("over");
-    el.ondrop = (ev) => { ev.preventDefault(); el.classList.remove("over"); pick(sl, [...ev.dataTransfer.files]); };
-    sl.el = el;
-    $("slots").appendChild(el);
-    draw(sl);
-  }
-}
-
-function pickBytes(sl) { return sl.pick.files.reduce((a, f) => a + ((f.s.length + 1) >> 1), 0); }
-
-function draw(sl) {
-  const q = (c) => sl.el.querySelector(c), st = q(".state"), note = q(".note");
-  const pk = sl.pick, dev = sl.dev;
-  let loops, colour;
-  st.className = "state";
-  if (pk) {
-    const bytes = pickBytes(sl), fits = bytes <= SLOT_MAX_DATA && pk.files.length <= SLOT_ZONES;
-    loops = pk.files.map((f) => f.s);
-    colour = "--accent";
-    st.className = fits ? "state new" : "state bad";
-    st.textContent = fits ? `New: ${pk.files.length} loop${pk.files.length > 1 ? "s" : ""}, ${KB(bytes)} of ${KB(SLOT_MAX_DATA)}`
-                          : `Too long: ${KB(bytes)} of ${KB(SLOT_MAX_DATA)}. Use fewer or shorter files.`;
-    note.textContent = "";
-    q(".send").hidden = false;
-    q(".send").textContent = dev && dev.count ? `Replace slot ${sl.k + 1}` : `Send to slot ${sl.k + 1}`;
-    q(".send").disabled = busy || !fits;
-    q(".cancel").hidden = false;
-    q(".clear").hidden = true;
-  } else {
-    const n = dev ? dev.count : 0;
-    loops = dev ? dev.loops : [];
-    colour = "--wave";
-    st.textContent = !link ? "Not connected" : !dev ? "Reading…"
-      : n ? `${n} loop${n > 1 ? "s" : ""}, ${KB(dev.bytes)} of ${KB(SLOT_MAX_DATA)}` : "Empty";
-    note.textContent = dev && dev.noWave ? `${[...Array(n).keys()].map((i) => slotName(sl.k, i, n)).join(", ")}. ` +
-      "Update X0X to see the waveforms." : "";
-    q(".send").hidden = q(".cancel").hidden = true;
-    q(".clear").hidden = !n;
-    q(".clear").disabled = busy;
-  }
-  q(".choose").disabled = busy;
-  const names = pk ? pk.files.map((f) => f.name) : null, used = pk ? pickBytes(sl) : dev ? dev.bytes : 0;
-  rows(q(".loops"), loops, colour, (i) => slotName(sl.k, i, loops.length), names);
-  q(".full").className = pk ? "full new" : "full";
-  q(".full > div").style.width = `${Math.min(100, used / SLOT_MAX_DATA * 100)}%`;
-}
-
-// a row per loop: the name X0X shows (and the file's, for new ones), its length, its waveform
-function rows(box, loops, colour, nameOf, files) {
-  box.textContent = "";
-  loops.forEach((s, i) => {
-    const r = document.createElement("div"), lab = document.createElement("span"), cv = document.createElement("canvas");
-    r.className = "loop";
-    lab.textContent = `${nameOf(i)}\n${(s.length / SLOT_RATE).toFixed(1)} s`;
-    lab.style.whiteSpace = "pre-line";
-    if (files) lab.title = files[i];
-    cv.width = 1000;
-    cv.height = 80;
-    r.append(lab, cv);
-    box.appendChild(r);
-    wave(cv, s, colour);
+// ---- the list ----------------------------------------------------------------
+function render() {
+  const list = $("list");
+  list.textContent = "";
+  if (!readOk)
+    list.innerHTML = `<div class="empty">${link ? "Reading…" : "Connect to see the loops on the FM-1."}</div>`;
+  else if (!loops.length)
+    list.innerHTML = '<div class="empty">No loops yet. Add some below.</div>';
+  loops.forEach((l, i) => {
+    const r = document.createElement("div");
+    r.className = l.isNew ? "loop new" : "loop";
+    r.innerHTML = `<div class="name">BR${i + 1}<small>${(l.n / SLOT_RATE).toFixed(1)} s${l.isNew ? " · new" : ""}</small></div>
+      <canvas width="900" height="80"></canvas>
+      <div class="acts"><button class="link rep">Replace</button><button class="link del">Remove</button></div>`;
+    if (l.file) r.title = l.file;
+    r.querySelector(".rep").onclick = () => { replaceAt = i; $("files").multiple = false; $("files").click(); };
+    r.querySelector(".del").onclick = () => { loops.splice(i, 1); render(); };
+    r.querySelector(".rep").disabled = r.querySelector(".del").disabled = busy;
+    r.ondragover = (ev) => { ev.preventDefault(); ev.stopPropagation(); r.classList.add("over"); };
+    r.ondragleave = () => r.classList.remove("over");
+    r.ondrop = (ev) => { ev.preventDefault(); ev.stopPropagation(); r.classList.remove("over"); addFiles([...ev.dataTransfer.files], i); };
+    list.appendChild(r);
+    wave(r.querySelector("canvas"), l.s, l.isNew ? "--accent" : "--wave");
   });
+  const used = loops.reduce((a, l) => a + bytesOf(l), 0), plan = packLoops();
+  $("fill").style.width = `${Math.min(100, used / CAP * 100)}%`;
+  $("room").className = plan ? "" : "bad";
+  $("room").textContent = !readOk ? "" : plan ? `${loops.length} loop${loops.length === 1 ? "" : "s"}, ${KB(used)} of ${KB(CAP)}.`
+    : `Too much: ${KB(used)} of ${KB(CAP)}. Remove a loop, or use shorter ones.`;
+  const changed = readOk && plan && changedSlots(plan).length > 0;
+  $("send").disabled = busy || !changed;
+  $("discard").hidden = !changed;
+  $("discard").disabled = busy;
+  $("add").disabled = busy || !readOk;
+  $("connect").disabled = busy;
 }
-
-// the name X0X shows: BR1 for a slot's only loop, BR1.1, BR1.2 ... for several
-function slotName(k, i, n) { return n > 1 ? `BR${k + 1}.${i + 1}` : `BR${k + 1}`; }
 
 // one loop's waveform: its peak in each pixel column
 function wave(cv, s, colour) {
@@ -189,6 +154,45 @@ function wave(cv, s, colour) {
   }
 }
 
+// ---- the list -> the three slots ---------------------------------------------------
+// in order, a slot filled before the next (16 loops or 80 KB a slot); null if it doesn't all fit
+function packLoops() {
+  const slots = [[]];
+  let used = 0;
+  for (const l of loops) {
+    const b = bytesOf(l);
+    if (used + b > SLOT_MAX_DATA || slots[slots.length - 1].length >= SLOT_ZONES) {
+      slots.push([]);
+      used = 0;
+    }
+    if (slots.length > NSLOT || b > SLOT_MAX_DATA) return null;
+    slots[slots.length - 1].push(l);
+    used += b;
+  }
+  while (slots.length < NSLOT) slots.push([]);
+  return slots;
+}
+
+function image(k, ls) {
+  if (!ls.length) return null;
+  for (const l of ls) if (!l.adpcm) l.adpcm = imaEncode(l.s);
+  return userSlotRaw(`BR${k + 1}`, ls.map((l) => ({ adpcm: l.adpcm, n: l.n })));
+}
+
+function same(a, b) {
+  if (!a || !b) return !a && !b;
+  if (a.data.length !== b.data.length) return false;
+  for (let i = 0; i < a.hdr.length; i++) if (a.hdr[i] !== b.hdr[i]) return false;
+  for (let i = 0; i < a.data.length; i++) if (a.data[i] !== b.data[i]) return false;
+  return true;
+}
+
+function changedSlots(plan) {
+  const out = [];
+  plan.forEach((ls, k) => { const im = image(k, ls); if (!same(im, dev[k])) out.push({ k, im }); });
+  return out;
+}
+
 // ---- files -> loops ------------------------------------------------------------
 async function decode(file) {
   const buf = new Uint8Array(await file.arrayBuffer());
@@ -201,26 +205,21 @@ async function decode(file) {
   return { rate: ab.sampleRate, x };
 }
 
-async function pick(sl, list) {
-  if (busy || !list.length) return;
-  const files = [], bad = [];
-  for (const f of list) {
+async function addFiles(list, at = -1) {
+  if (busy || !readOk || !list.length) return;
+  const got = [], bad = [];
+  for (const f of at >= 0 ? list.slice(0, 1) : list) {
     try {
       const { rate, x } = await decode(f);
       if (!x.length) throw new Error("no audio");
-      files.push({ name: f.name, rate, x });
+      const s = cut(x, rate, $("bars").checked);
+      got.push({ adpcm: null, n: s.length, s, file: f.name, isNew: true, rate, x });
     } catch (_) { bad.push(f.name); }
   }
-  if (bad.length) say(`Couldn't read ${bad.join(", ")}.`);
-  if (!files.length) return;
-  sl.pick = { files };
-  recut(sl);
-}
-
-function recut(sl) {
-  const bars = sl.el.querySelector(".bars").checked;
-  for (const f of sl.pick.files) f.s = cut(f.x, f.rate, bars);
-  draw(sl);
+  say(bad.length ? `Couldn't read ${bad.join(", ")}.` : "");
+  if (at >= 0 && got.length) loops[at] = got[0];
+  else loops.push(...got);
+  render();
 }
 
 // ---- the FM-1 ------------------------------------------------------------------
@@ -263,21 +262,6 @@ async function connect() {
   throw new Error("No FM-1 running X0X found. Connect it by USB, and close other apps that use its MIDI port.");
 }
 
-// a slot's bytes from `off`, `n` of them (SMP_READ: up to 224 a request, in pairs)
-async function readBytes(k, off, n, onPart) {
-  const out = new Uint8Array(n);
-  for (let at = 0; at < n;) {
-    const want = Math.min(224, n - at), adr = off + at;
-    const r = await link.retry(16, [k, adr & 0x7F, (adr >> 7) & 0x7F, (adr >> 14) & 0x7F, (want + 1) >> 1], 3000);
-    const b = unpack7(r.slice(4));
-    if (!b.length) throw new Error("The FM-1 didn't send the slot. Is X0X up to date?");
-    out.set(b.subarray(0, Math.min(b.length, n - at)), at);
-    at += Math.min(b.length, n - at);
-    if (onPart) onPart(at / n);
-  }
-  return out;
-}
-
 function unpack7(a) {
   const out = [];
   for (let i = 0; i < a.length;) {
@@ -287,94 +271,114 @@ function unpack7(a) {
   return new Uint8Array(out);
 }
 
-// the slot read back and decoded; an X0X too old to send it back: what it says it holds, no picture
-async function readSlot(sl, nz, kb) {
-  const bar = sl.el.querySelector("progress");
-  sl.dev = null;
-  if (nz) {
-    bar.hidden = false;
-    bar.value = 0;
-    try {
-      const h = parseSlot(await readBytes(sl.k, 0, SLOT_HDR_LEN));
-      const data = h ? await readBytes(sl.k, SLOT_DATA_OFF, h.dataLen, (f) => { bar.value = f * 100; }) : null;
-      if (h) sl.dev = { bytes: h.dataLen, count: h.nz,
-                        loops: h.zones.map((z) => imaDecode(data.subarray(z.off, z.off + ((z.n + 1) >> 1)), z.n)) };
-    } catch (_) {
-      sl.dev = { bytes: kb * 1024, count: nz, loops: [], noWave: true };
-    }
-    bar.hidden = true;
+// a slot's bytes from `off` (SMP_READ: up to 224 a request, asked for in pairs)
+async function readBytes(k, off, n, onPart) {
+  const out = new Uint8Array(n);
+  for (let at = 0; at < n;) {
+    const want = Math.min(224, n - at), adr = off + at;
+    const r = await link.retry(16, [k, adr & 0x7F, (adr >> 7) & 0x7F, (adr >> 14) & 0x7F, (want + 1) >> 1], 3000);
+    const b = unpack7(r.slice(4));
+    if (!b.length) throw new Error("no data");
+    out.set(b.subarray(0, Math.min(b.length, n - at)), at);
+    at += Math.min(b.length, n - at);
+    if (onPart) onPart(at / n);
   }
-  if (!sl.dev)
-    sl.dev = { bytes: 0, count: 0, loops: [] };
-  draw(sl);
+  return out;
 }
 
 async function readAll() {
-  const r = await link.req(15, []), nz = [], kb = [];       // SMP_INFO: slots, size, then per slot zones, name, KB
-  for (let k = 0, i = 2; k < r[0]; k++) {
-    const j = r.indexOf(0, i + 1);
-    nz.push(r[i]);
-    kb.push(r[j + 1]);
-    i = j + 2;
+  const info = await link.req(15, []), nz = [];
+  for (let k = 0, i = 2; k < info[0]; k++) { nz.push(info[i]); i = info.indexOf(0, i + 1) + 2; }
+  const bar = $("progress");
+  bar.hidden = false;
+  loops = [];
+  dev = [null, null, null];
+  try {
+    for (let k = 0; k < NSLOT; k++) {
+      if (!nz[k]) continue;
+      const hdr = await readBytes(k, 0, SLOT_HDR_LEN), h = parseSlot(hdr);
+      if (!h) continue;
+      const data = await readBytes(k, SLOT_DATA_OFF, h.dataLen, (f) => { bar.value = (k + f) / NSLOT * 100; });
+      dev[k] = { hdr, data };
+      for (const z of h.zones) {
+        const adpcm = data.slice(z.off, z.off + ((z.n + 1) >> 1));
+        loops.push({ adpcm, n: z.n, s: imaDecode(adpcm, z.n), isNew: false });
+      }
+    }
+  } catch (_) {
+    bar.hidden = true;
+    throw new Error("This X0X can't send its loops back to the page. Update X0X, then connect again.");
   }
-  for (const sl of slots) { sl.dev = null; draw(sl); }
-  for (const sl of slots) await readSlot(sl, nz[sl.k] || 0, kb[sl.k] || 0);
+  bar.hidden = true;
+  readOk = true;
 }
 
 async function run(fn) {
   busy = true;
-  slots.forEach(draw);
+  render();
   try { await fn(); } catch (e) { say(e.message || String(e)); }
   busy = false;
-  slots.forEach(draw);
+  render();
 }
 
-$("connect").onclick = () => run(async () => {
+async function readFromDevice() {
   say("Connecting…");
+  readOk = false;
   link = await connect();
-  $("connect").textContent = "Read again";
-  say("Connected.");
+  render();
+  say("Reading the loops…");
   await readAll();
-  say("Connected.");
+  $("connect").textContent = "Read again";
+  say("");
+}
+
+$("connect").onclick = () => run(readFromDevice);
+$("discard").onclick = () => run(readFromDevice);
+
+$("send").onclick = () => run(async () => {
+  const todo = changedSlots(packLoops()), bar = $("progress");
+  const total = todo.reduce((a, t) => a + (t.im ? t.im.data.length : 1), 0);
+  let sent = 0;
+  bar.hidden = false;
+  bar.value = 0;
+  for (const { k, im } of todo) {
+    if (!im) {                                       // nothing left in this slot: clear it
+      say("Clearing…");
+      const r = await link.req(14, [k], 30000);
+      if (r[1]) throw new Error("The FM-1 couldn't clear its memory.");
+      sent += 1;
+      continue;
+    }
+    say("Erasing…");
+    const b = await link.req(11, [k], 10000);
+    if (b[1]) throw new Error("The FM-1 couldn't erase its memory.");
+    say("Sending…");
+    for (let off = 0; off < im.data.length; off += 256) {
+      const adr = SLOT_DATA_OFF + off;
+      const r = await link.retry(12, [k, adr & 0x7F, (adr >> 7) & 0x7F, (adr >> 14) & 0x7F, ...pack7(im.data.subarray(off, off + 256))], 3000);
+      if (r[4]) throw new Error("Writing to the FM-1 failed.");
+      sent += Math.min(256, im.data.length - off);
+      bar.value = sent / total * 100;
+    }
+    const e = await link.req(13, [k, ...pack7(im.hdr)], 5000);
+    if (e[1]) throw new Error("The FM-1 didn't accept the loops.");
+  }
+  bar.hidden = true;
+  say("Reading back…");
+  await readAll();
+  say("Done. On the FM-1: BREAK, then EDIT, then LOOP A or LOOP B.");
 });
 
-async function send(sl) {
-  await run(async () => {
-    if (!link) { say("Connecting…"); link = await connect(); $("connect").textContent = "Read again"; }
-    const { hdr, data } = userSlot(`BR${sl.k + 1}`, sl.pick.files.map((f) => f.s));
-    const bar = sl.el.querySelector("progress");
-    bar.hidden = false;
-    bar.value = 0;
-    say(`Slot ${sl.k + 1}: erasing…`);
-    const b = await link.req(11, [sl.k], 10000);
-    if (b[1]) throw new Error(`Slot ${sl.k + 1}: the FM-1 couldn't erase it.`);
-    say(`Slot ${sl.k + 1}: sending…`);
-    for (let off = 0; off < data.length; off += 256) {
-      const adr = SLOT_DATA_OFF + off;
-      const r = await link.retry(12, [sl.k, adr & 0x7F, (adr >> 7) & 0x7F, (adr >> 14) & 0x7F, ...pack7(data.subarray(off, off + 256))], 3000);
-      if (r[4]) throw new Error(`Slot ${sl.k + 1}: writing failed.`);
-      bar.value = Math.min(100, (off + 256) / data.length * 100);
-    }
-    const e = await link.req(13, [sl.k, ...pack7(hdr)], 5000);
-    if (e[1]) throw new Error(`Slot ${sl.k + 1}: the FM-1 didn't accept it (${RC[e[1]] || e[1]}).`);
-    bar.hidden = true;
-    sl.pick = null;
-    say(`Slot ${sl.k + 1} is done. On the FM-1: BREAK, then EDIT, then LOOP A or LOOP B.`);
-    await readSlot(sl, 1, Math.ceil(data.length / 1024));
-  });
-}
-
-async function clear(sl) {
-  await run(async () => {
-    say(`Clearing slot ${sl.k + 1}…`);
-    const r = await link.req(14, [sl.k], 30000);
-    if (r[1]) throw new Error(`Slot ${sl.k + 1}: the FM-1 couldn't clear it.`);
-    sl.dev = { loops: [], bytes: 0, count: 0 };
-    say(`Slot ${sl.k + 1} is empty.`);
-  });
-}
-
-build();
+$("add").onclick = () => { replaceAt = -1; $("files").multiple = true; $("files").click(); };
+$("files").onchange = (ev) => { addFiles([...ev.target.files], replaceAt); ev.target.value = ""; replaceAt = -1; };
+document.body.ondragover = (ev) => { if (readOk) { ev.preventDefault(); $("list").classList.add("over"); } };
+document.body.ondragleave = (ev) => { if (!ev.relatedTarget) $("list").classList.remove("over"); };
+document.body.ondrop = (ev) => { ev.preventDefault(); $("list").classList.remove("over"); addFiles([...ev.dataTransfer.files]); };
+$("bars").onchange = () => {                         // the new loops, cut again
+  for (const l of loops) if (l.isNew) { l.s = cut(l.x, l.rate, $("bars").checked); l.n = l.s.length; l.adpcm = null; }
+  render();
+};
+render();
 </script>
 </body>
 </html>

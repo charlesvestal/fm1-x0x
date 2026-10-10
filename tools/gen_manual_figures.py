@@ -126,6 +126,8 @@ def panel(screen_png):
         if bot[i][1]:
             s.append(what(x + 27, 330, bot[i][1]))
     s.append(keybed(36, 400, W - 72, h=270))
+    s.append(what(W / 2, 696, "Black keys: drum tracks, break slices, part mutes, mixer channels   ·   "
+                              "White keys: steps (on HOME, patterns)"))
     s.append("</svg>")
     return "".join(s)
 
