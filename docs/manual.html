@@ -57,6 +57,9 @@ td:first-child { white-space: nowrap; }
 .lede { color: var(--muted); margin-bottom: 1.6rem; }
 .status { background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 16px; }
 .status p { margin: 0; }
+a.home { color: inherit; text-decoration: none; }
+main > a.home { display: inline-block; font: 700 1rem "Barlow Semi Condensed", "Barlow", sans-serif; letter-spacing: .03em; color: var(--muted); margin: 0 0 .4rem; }
+a.home:hover { color: var(--accent); }
 .callout { border-left: 3px solid var(--accent); background: var(--sheet); border-radius: 0 8px 8px 0; padding: 10px 16px; margin: 0 0 1.2rem; max-width: 65ch; }
 .callout p { margin: 0; }
 details { border: 1px solid var(--rule); border-radius: 8px; padding: 0 16px; margin: 0 0 1.2rem; }
@@ -79,7 +82,7 @@ nav.contents li { break-inside: avoid; }
 </head>
 <body>
 <main>
-<h1>X0X</h1>
+<h1><a class="home" href="../">X0X</a></h1>
 <p class="lede">X0X turns the M-VAVE FM-1 into a groovebox: a 909, an 808, two 303s and a breakbeat player, all playing at once, in stereo. Each part can play its own pattern, you can arrange patterns into a song, record knob moves, and give single steps a sound and a chance of their own.</p>
 <p>New in this version: see <a href="https://charlesvestal.github.io/fm1-x0x/new/">What's new</a>.</p>
 <hr>

@@ -67,6 +67,9 @@ td:first-child { white-space: nowrap; }
 .lede { color: var(--muted); margin-bottom: 1.6rem; }
 .status { background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 16px; }
 .status p { margin: 0; }
+a.home { color: inherit; text-decoration: none; }
+main > a.home { display: inline-block; font: 700 1rem "Barlow Semi Condensed", "Barlow", sans-serif; letter-spacing: .03em; color: var(--muted); margin: 0 0 .4rem; }
+a.home:hover { color: var(--accent); }
 .callout { border-left: 3px solid var(--accent); background: var(--sheet); border-radius: 0 8px 8px 0; padding: 10px 16px; margin: 0 0 1.2rem; max-width: 65ch; }
 .callout p { margin: 0; }
 details { border: 1px solid var(--rule); border-radius: 8px; padding: 0 16px; margin: 0 0 1.2rem; }
@@ -161,8 +164,12 @@ def convert(md):
                 i += 1
             out.append(f'<div class="callout"><p>{inline(" ".join(para))}</p></div>')
             continue
-        if ln.startswith("# "):
-            out.append(f"<h1>{inline(ln[2:])}</h1>")
+        if ln.startswith("# "):                         # the title; X0X's own a way home (the site's root)
+            t = ln[2:].strip()
+            if t == "X0X":
+                out.append('<h1><a class="home" href="../">X0X</a></h1>')
+            else:
+                out.append(f'<a class="home" href="../">X0X</a>\n<h1>{inline(t)}</h1>')
         elif ln.startswith("## "):
             t = ln[3:].strip()
             m = re.match(r"(\d+)\. (.+)", t)
