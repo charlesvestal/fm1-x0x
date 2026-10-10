@@ -207,6 +207,8 @@ int plat_cpu2_run(void (*fn)(uint32_t), uint32_t arg)
     return 1;
 }
 int plat_cpu2_wait(void) { return 0; }
+int plat_cpu2_gave_up(void) { return 0; }
+uint32_t plat_cpu2_bad(void) { return 0; }
 uint32_t plat_cpu_pct(void) { return cpu_pct; }
 uint32_t plat_xruns(void) { return 0; }
 /* performance: no CPU counter here: the "cycles" are nanoseconds (plat_cycles_hz) */

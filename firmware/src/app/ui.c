@@ -3369,6 +3369,16 @@ static void draw_perf(int band)
         } else
             put_s(q, plat_cycles_cpu() ? "..." : "? (NO CYCLE COUNTER)");
         cv_text(4, 2, &FONT_B, t, C_WHITE);
+        if (plat_cpu2_on())                           /* the cores: one after the second gave up (fm1-x0x#10) */
+            text_r(236, 6, &FONT_XS, "2 CORES", C_GRAY);
+        else {
+            q = put_s(t, "1 CORE");
+            if (plat_cpu2_gave_up() == 1)
+                put_i(put_s(q, ": BAD READS "), (int)plat_cpu2_bad());
+            else if (plat_cpu2_gave_up() == 2)
+                put_s(q, ": 2ND TIMED OUT");
+            text_r(236, 6, &FONT_XS, t, plat_cpu2_gave_up() ? RGB(255, 80, 60) : C_GRAY);
+        }
         if (perf.test >= 0) {
             int done = perf.phase == 4;
             q = put_s(t, done ? "PERF TEST DONE" : "PERF TEST ");

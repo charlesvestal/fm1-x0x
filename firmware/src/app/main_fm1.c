@@ -300,7 +300,8 @@ static void fm1_main(void)
         b[1] = 'C';
         b[2] = ' ';
         hexs(b + 3, fm1_crash.pc);
-        draw_text_box(0, 176, 240, &FONT_S, "RESTARTED AFTER A CRASH", RGB(255, 80, 60), 1);
+        draw_text_box(0, 176, 240, &FONT_S, fm1_crash.core == 1 ? "THE SECOND CORE CRASHED"
+                      : "RESTARTED AFTER A CRASH", RGB(255, 80, 60), 1);
         draw_text_box(0, 196, 240, &FONT_S, b, C_GRAY, 1);
         fm1_wdt_feed();
         fm1_delay_ms(2500);
@@ -415,6 +416,8 @@ static void fm1_main(void)
 void fm1_cstart(void)
 {
     uint32_t *s, *d, p3, src, wdt;
+    fm1_cpu1_halt();                                /* a second core left running by the reset would read
+                                                     * the RAM cleared below (Jangada, fm1-x0x#10) */
     fm1_time_init();
     fm1_reset_reason();
     p3 = fm1_boot.p3_rst;
