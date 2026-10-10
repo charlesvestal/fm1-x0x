@@ -6,6 +6,8 @@ into a song, record knob moves, and give single steps a sound and a chance of th
 
 New in this version: see [What's new](https://charlesvestal.github.io/fm1-x0x/new/).
 
+![The FM-1 (a drawing), running X0X, each control labelled](img/fm1-panel.svg)
+
 ---
 
 ## Contents
@@ -96,7 +98,7 @@ arrange them into a song.
 
 ## 3. Controls
 
-![The FM-1 (a drawing), running X0X, each control labelled](img/fm1-panel.svg)
+The drawing at the top of the manual names every control. In more detail:
 
 A button that opens a screen always opens the same one; press it again for that screen's next
 page. SEQ, EDIT and ARP show the part you choose with ALGORITHM.
