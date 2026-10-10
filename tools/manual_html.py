@@ -229,9 +229,12 @@ def main():
     EMBED = fragment
     src = Path(args[0]) if args else SRC / "docs" / "MANUAL.md"
     dst = Path(args[1]) if len(args) > 1 else SRC / "docs" / "manual.html"
-    body = convert(src.read_text())
-    page = ("<title>X0X Manual</title>\n"
-            '<meta name="description" content="The manual for X0X, groovebox firmware for the M-VAVE FM-1.">\n'
+    md = src.read_text()
+    h1 = re.search(r"^# (.+)$", md, re.M)
+    title, what = ("X0X Manual", "The manual") if not h1 or h1.group(1) == "X0X" else (f"X0X: {h1.group(1)}", h1.group(1))
+    body = convert(md)
+    page = (f"<title>{html.escape(title)}</title>\n"
+            f'<meta name="description" content="{html.escape(what)} for X0X, groovebox firmware for the M-VAVE FM-1.">\n'
             '<link rel="preconnect" href="https://fonts.googleapis.com">\n'
             '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n'
             '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600&'

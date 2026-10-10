@@ -9,6 +9,7 @@
   breaks/index.html           your own break loops onto the FM-1 (web/x0x_breaks.html with
                               x0x_breaks.js inlined; Chrome or Edge, Web MIDI)
   manual/index.html, img/     the manual (tools/manual_html.py, from docs/MANUAL.md)
+  new/index.html, img/new/    what's new in each version (the same, from docs/NEW.md)
   firmware/x0x-VERSION.fwsc   the package the installer writes; also the download
 
   tools/make_pages.py build/x0x-0.1-beta.fwsc 0.1-beta OUT_DIR
@@ -71,13 +72,14 @@ line generator, and a breakbeat player, all running at once, with patterns, a so
 recorded knob moves.</p>
 <div class="video"><iframe src="https://www.youtube-nocookie.com/embed/cZLYrZaLDUk" title="X0X running on the FM-1"
   allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div>
-<div class="status"><strong>Version __VERSION__, a beta.</strong> X0X runs on the FM-1; with every part
-playing a dense pattern at once it can still overload. It installs and uninstalls the way Felucca
-does, and the installer can put M-VAVE's own firmware back. Installing is at your own risk.</div>
+<div class="status"><strong>Version __VERSION__.</strong> <a href="new/">What's new</a>. X0X installs and
+uninstalls the way Felucca does, and the installer can put M-VAVE's own firmware back. Installing is
+at your own risk.</div>
 <nav class="ways" aria-label="Get X0X">
   <a href="emu/"><strong>Try it in the browser</strong><span>The same code the FM-1 runs, with sound. Mouse, touch or keyboard; no FM-1 needed.</span></a>
   <a href="install/"><strong>Install</strong><span>From Chrome or Edge, with the FM-1 connected by USB. Nothing to install on the computer.</span></a>
   <a href="manual/"><strong>Manual</strong><span>Getting started in ten steps, then everything else.</span></a>
+  <a href="new/"><strong>What's new</strong><span>Each version's changes, newest first, with pictures.</span></a>
   <a href="breaks/"><strong>Your own breaks</strong><span>Drop in loops and send them to the BREAK part, from Chrome or Edge.</span></a>
   <a href="firmware/__PKG__"><strong>Download __PKG__</strong><span>For the command-line installer: <code>python3 tools/fm1_install.py __PKG__</code></span></a>
   <a href="__REPO__"><strong>Source</strong><span>GitHub, GPL-3.0. Built on Felucca by Hügelton Instruments.</span></a>
@@ -101,7 +103,7 @@ def main(pkg, version, out):
     name = f"x0x-{re.sub(r'[^A-Za-z0-9.-]', '-', version)}.fwsc"
     if out.exists():
         shutil.rmtree(out)
-    for d in ("install", "manual", "firmware", "breaks"):
+    for d in ("install", "manual", "firmware", "breaks", "new"):
         (out / d).mkdir(parents=True)
     shutil.copy(pkg, out / "firmware" / name)
     # the installer
@@ -123,6 +125,10 @@ def main(pkg, version, out):
     subprocess.run([sys.executable, str(SRC / "tools" / "manual_html.py"), str(SRC / "docs" / "MANUAL.md"),
                     str(out / "manual" / "index.html")], check=True, capture_output=True)
     shutil.copytree(SRC / "docs" / "img", out / "manual" / "img")
+    # what's new (the same converter; its pictures beside it)
+    subprocess.run([sys.executable, str(SRC / "tools" / "manual_html.py"), str(SRC / "docs" / "NEW.md"),
+                    str(out / "new" / "index.html")], check=True, capture_output=True)
+    shutil.copytree(SRC / "docs" / "img" / "new", out / "new" / "img" / "new")
     # the landing page
     (out / "index.html").write_text(LANDING.replace("__VERSION__", html.escape(version)).replace("__PKG__", name)
                                     .replace("__REPO__", REPO), encoding="utf-8")

@@ -4,6 +4,8 @@ X0X turns the M-VAVE FM-1 into a groovebox: a 909, an 808, two 303s and a breakb
 all playing at once, in stereo. Each part can play its own pattern, you can arrange patterns
 into a song, record knob moves, and give single steps a sound and a chance of their own.
 
+New in this version: see [What's new](https://charlesvestal.github.io/fm1-x0x/new/).
+
 ---
 
 ## Contents
