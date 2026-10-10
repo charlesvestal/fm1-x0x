@@ -370,7 +370,8 @@ The easiest way is the **break loops page** on the X0X website
 (charlesvestal.github.io/fm1-x0x/breaks), in Chrome or Edge. Connect the FM-1 with X0X running and
 press Connect: the page shows the three slots, each with a picture of what's in it. Drop audio
 files on a slot (WAV, AIFF, MP3 and the other formats the browser reads), check the picture and
-how full the slot will be, and press Send. Each slot is filled, replaced or cleared on its own.
+how full the slot will be, and press Send. Each slot is filled, replaced or cleared on its own. With **Detect first bar** on (the default), each file is cut to its first bar, judged from
+its length, so more loops fit; turn it off for a slot to keep files whole.
 
 From the command line, with the FM-1 connected, run:
 

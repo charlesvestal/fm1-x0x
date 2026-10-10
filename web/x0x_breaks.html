@@ -51,7 +51,6 @@
 
   <div class="bar">
     <button id="connect">Connect</button>
-    <label><input type="checkbox" id="bars" checked> Use one bar of each file</label>
     <span id="status"></span>
   </div>
 
@@ -89,6 +88,8 @@ function build() {
         <button class="quiet choose">Choose files</button><span class="hint">or drop them here</span>
         <button class="send" hidden></button><button class="quiet cancel" hidden>Cancel</button>
         <button class="quiet clear" hidden>Clear</button>
+        <label title="Keeps only each file's first bar (its length tells how many bars it has), so more loops fit">
+          <input type="checkbox" class="bars" checked> Detect first bar</label>
       </div><progress max="100" value="0" hidden></progress><input type="file" multiple
         accept="audio/*,.wav,.aif,.aiff,.mp3,.flac,.m4a,.ogg">`;
     const q = (c) => el.querySelector(c);
@@ -97,6 +98,7 @@ function build() {
     q(".send").onclick = () => send(sl);
     q(".cancel").onclick = () => { sl.pick = null; draw(sl); };
     q(".clear").onclick = () => clear(sl);
+    q(".bars").onchange = () => { if (sl.pick) recut(sl); };
     el.ondragover = (ev) => { ev.preventDefault(); el.classList.add("over"); };
     el.ondragleave = () => el.classList.remove("over");
     el.ondrop = (ev) => { ev.preventDefault(); el.classList.remove("over"); pick(sl, [...ev.dataTransfer.files]); };
@@ -198,7 +200,7 @@ async function pick(sl, list) {
 }
 
 function recut(sl) {
-  const bars = $("bars").checked;
+  const bars = sl.el.querySelector(".bars").checked;
   for (const f of sl.pick.files) f.s = cut(f.x, f.rate, bars);
   draw(sl);
 }
@@ -354,7 +356,6 @@ async function clear(sl) {
   });
 }
 
-$("bars").onchange = () => slots.forEach((sl) => { if (sl.pick) recut(sl); });
 build();
 </script>
 </body>
