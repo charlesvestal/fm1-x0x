@@ -1,0 +1,657 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-only
+     X0X break loops: your loops on the FM-1 as one list, BR1, BR2 ... as LOOP A / LOOP B show them (Chrome or
+     Edge, Web MIDI). Connect reads the three sample slots back (X0X's SMP_READ, 16); add, replace and remove
+     loops; Send repacks the list in order into the slots and rewrites only the slots that changed, a loop read
+     back kept as it is (no re-encoding). The slot images are tools/upload_breaks.py's (web/x0x_breaks.js), sent
+     with Felucca's sample-slot protocol (web/EDITOR_PROTOCOL.md, 11-15). tools/make_pages.py inlines
+     x0x_breaks.js at LIB. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>X0X break loops</title>
+<style>
+  :root { --bg: #fff; --fg: #000; --dim: #777; --rule: #ddd; --wave: #999; --accent: #c8700a; color-scheme: light; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #000; --fg: #fff; --dim: #888; --rule: #333; --wave: #666; --accent: #f0a043; color-scheme: dark; }
+  }
+  :root[data-theme="dark"] { --bg: #000; --fg: #fff; --dim: #888; --rule: #333; --wave: #666; --accent: #f0a043; color-scheme: dark; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding-inline: 16px; padding-block: 48px; }
+  h1 { font-size: 24px; font-weight: 600; margin: 0 0 16px; }
+  p { margin: 0 0 16px; }
+  .small { color: var(--dim); font-size: 13px; }
+  button { font: inherit; font-size: 14px; background: var(--fg); color: var(--bg); border: 0; padding: 6px 16px; cursor: pointer; }
+  button.quiet { background: none; color: var(--fg); border: 1px solid var(--rule); }
+  button.link { background: none; color: var(--dim); border: 0; padding: 0 4px; text-decoration: underline; font-size: 13px; }
+  button:disabled { opacity: .3; cursor: default; }
+  .bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 0 0 20px; }
+  #status { color: var(--dim); font-size: 14px; }
+  label { font-size: 14px; display: inline-flex; gap: 6px; align-items: center; }
+  #list { border-top: 1px solid var(--rule); margin: 0 0 12px; }
+  #list.over { outline: 1px dashed var(--accent); outline-offset: 4px; }
+  .loop { display: grid; grid-template-columns: 4.5em 1fr auto; gap: 12px; align-items: center;
+          padding: 8px 0; border-bottom: 1px solid var(--rule); }
+  .loop.over { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .loop .name { font-weight: 600; line-height: 1.25; }
+  .loop .name small { display: block; font-weight: 400; font-size: 12px; color: var(--dim); }
+  .loop.new .name { color: var(--accent); }
+  .loop canvas { display: block; width: 100%; height: 40px; min-width: 0; }
+  .loop .acts { display: flex; gap: 4px; }
+  .empty { color: var(--dim); font-size: 14px; padding: 16px 0; border-bottom: 1px solid var(--rule); }
+  .full { height: 4px; background: var(--rule); margin: 16px 0 6px; }
+  .full > div { height: 100%; background: var(--accent); }
+  #room { font-size: 13px; color: var(--dim); margin: 0 0 16px; }
+  #room.bad { color: #d33; }
+  progress { width: 100%; height: 4px; }
+  .home { display: inline-block; font-weight: 700; letter-spacing: .03em; color: var(--dim); text-decoration: none; margin: 0 0 12px; }
+  .home:hover, .home:focus-visible { color: var(--accent); }
+  input[type=file] { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <a class="home" href="../">X0X</a>
+  <h1>Break loops</h1>
+  <p>Your own loops for X0X's BREAK part. They appear on the FM-1 as BR1, BR2 and so on, after X0X's own
+    loops, when you turn LOOP A or LOOP B (BREAK, then EDIT).</p>
+  <p class="small">Connect the FM-1 by USB with X0X running, and use Chrome or Edge.</p>
+
+  <div class="bar">
+    <button id="connect">Connect</button>
+    <span id="status"></span>
+  </div>
+
+  <div id="list"><div class="empty">Connect to see the loops on the FM-1.</div></div>
+  <div class="bar">
+    <button class="quiet" id="add">Add loops</button>
+    <span class="small">or drop files here. Drop one on a loop to replace it.</span>
+    <label title="Keeps only the first bar of each file you add (its length tells how many bars it has), so more loops fit">
+      <input type="checkbox" id="bars" checked> Detect first bar</label>
+  </div>
+  <div class="full"><div id="fill"></div></div>
+  <p id="room"></p>
+
+  <div class="bar">
+    <button id="send" disabled>Send to the FM-1</button>
+    <button class="quiet" id="discard" hidden>Discard changes</button>
+  </div>
+  <progress id="progress" max="100" value="0" hidden></progress>
+  <input type="file" id="files" multiple accept="audio/*,.wav,.aif,.aiff,.mp3,.flac,.m4a,.ogg">
+
+  <p class="small" style="margin-top:32px">Loops follow the tempo by playing faster or slower, so their pitch
+    follows it too; the break's PITCH knob shifts it. Removing a loop renumbers the ones after it, so patterns
+    that used them play the next loop instead.
+    <a href="../manual/#s8" style="color:inherit">The manual's BREAK section</a> says how X0X plays a loop.</p>
+  <p class="small">X0X is GPL-3.0, built on Felucca by Hügelton Instruments; the break generator is BB Gen's.
+    <a href="https://github.com/charlesvestal/fm1-x0x" style="color:inherit">github.com/charlesvestal/fm1-x0x</a></p>
+</main>
+<script type="module">
+// SPDX-License-Identifier: GPL-3.0-only
+// X0X break loops in the browser: tools/upload_breaks.py and its helpers (tools/sampleio.py,
+// Felucca's encoder; tools/import_breaks.py's bar guess) as plain functions, so the page
+// (web/x0x_breaks.html) builds the same slot images the command line does, byte for byte
+// (web/test_breaks.mjs checks it against upload_breaks.py --dry-run).
+//
+// The float arithmetic follows sampleio.py's order of operations: keep it when touching these.
+
+const SLOT_SIZE = 0x14000, SLOT_DATA_OFF = 512, SLOT_RATE = 22050, SLOT_ZONES = 16;
+const SLOT_HDR_LEN = 32 + SLOT_ZONES * 28;
+const SLOT_MAX_DATA = SLOT_SIZE - SLOT_DATA_OFF;
+const ROOT_BASE = 36;              // loop i is zone root 36 + i: the slot sorts its zones by root
+const NSLOTS = 3;
+
+const IMA_STEP = [7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 19, 21, 23, 25, 28, 31, 34, 37, 41, 45, 50, 55, 60, 66, 73, 80, 88,
+  97, 107, 118, 130, 143, 157, 173, 190, 209, 230, 253, 279, 307, 337, 371, 408, 449, 494, 544, 598, 658,
+  724, 796, 876, 963, 1060, 1166, 1282, 1411, 1552, 1707, 1878, 2066, 2272, 2499, 2749, 3024, 3327, 3660,
+  4026, 4428, 4871, 5358, 5894, 6484, 7132, 7845, 8630, 9493, 10442, 11487, 12635, 13899, 15289, 16818,
+  18500, 20350, 22385, 24623, 27086, 29794, 32767];
+const IMA_IDX = [-1, -1, -1, -1, 2, 4, 6, 8];
+
+// import_breaks.bars_of: the bar count (1, 2 or 4) that puts the loop's tempo nearest 120 inside 80-180
+function barsOf(seconds) {
+  let best = null;
+  for (const b of [1, 2, 4]) {
+    const bpm = b * 240.0 / seconds;
+    if (bpm >= 80 && bpm <= 180 && (best === null || Math.abs(bpm - 120) < Math.abs(best[1] - 120))) best = [b, bpm];
+  }
+  return best || [1, 240.0 / seconds];
+}
+
+// sampleio.resample: a moving average over the ratio, then linear interpolation
+function resample(x, sr, to) {
+  if (sr === to) return x;
+  if (sr > to) {
+    const k = Math.max(1, Math.round(sr / to));
+    if (k === 2) {
+      const y = new Array(x.length);
+      for (let i = 0; i + 1 < x.length; i++) y[i] = (x[i] + x[i + 1]) / 2;
+      if (x.length) y[x.length - 1] = x[x.length - 1] / 2;
+      x = y;
+    } else if (k > 1) {
+      const y = new Array(x.length);
+      for (let i = 0; i < x.length; i++) {
+        let acc = x[i];                           // reduce(add, x[i:i + k]): left to right
+        for (let j = i + 1; j < i + k && j < x.length; j++) acc += x[j];
+        y[i] = acc / k;
+      }
+      x = y;
+    }
+  }
+  const step = sr / to, out = [], last = x.length - 1;
+  let p = 0.0;
+  while (p < last) {
+    const i = Math.trunc(p), f = p - i;
+    out.push(x[i] * (1 - f) + x[i + 1] * f);
+    p += step;
+  }
+  return out;
+}
+
+function peak(x, floor = 1e-9) {
+  let m = floor;
+  for (const v of x) { const a = Math.abs(v); if (a > m) m = a; }
+  return m;
+}
+
+// sampleio.to_int16: peak normalised to 30000
+function toInt16(x) {
+  const pk = peak(x), out = new Int16Array(x.length);
+  for (let i = 0; i < x.length; i++) out[i] = Math.max(-32768, Math.min(32767, Math.trunc(x[i] / pk * 30000)));
+  return out;
+}
+
+// upload_breaks.cut: mono floats at their rate -> int16 at the slot's rate (one bar if bars)
+function cut(x, sr, bars) {
+  if (bars) {
+    const n = barsOf(x.length / sr)[0];
+    x = x.slice(0, Math.round(x.length / n));
+  }
+  const y = resample(x, sr, SLOT_RATE);
+  const pk = peak(y);
+  return toInt16(y.map((v) => v * (0.95 / pk)));
+}
+
+// sampleio.ima_encode: 4-bit IMA ADPCM, low nibble first, from predictor 0 / index 0
+function imaEncode(s) {
+  let pred = 0, idx = 0;
+  const out = new Uint8Array((s.length + 1) >> 1);
+  for (let n = 0; n < s.length; n++) {
+    const step = IMA_STEP[idx];
+    let diff = s[n] - pred, code = 0;
+    if (diff < 0) { code = 8; diff = -diff; }
+    let vd = step >> 3;
+    if (diff >= step) { code |= 4; diff -= step; vd += step; }
+    if (diff >= step >> 1) { code |= 2; diff -= step >> 1; vd += step >> 1; }
+    if (diff >= step >> 2) { code |= 1; vd += step >> 2; }
+    pred = code & 8 ? pred - vd : pred + vd;
+    if (pred > 32767) pred = 32767; else if (pred < -32768) pred = -32768;
+    idx += IMA_IDX[code & 7];
+    if (idx < 0) idx = 0; else if (idx > 88) idx = 88;
+    out[n >> 1] |= n & 1 ? code << 4 : code;
+  }
+  return out;
+}
+
+// the reverse, for drawing a slot read back from the FM-1: nibbles -> int16, from predictor 0 / index 0
+function imaDecode(b, n) {
+  let pred = 0, idx = 0;
+  const out = new Int16Array(n);
+  for (let i = 0; i < n; i++) {
+    const code = (b[i >> 1] >> (i & 1 ? 4 : 0)) & 15, step = IMA_STEP[idx];
+    let vd = step >> 3;
+    if (code & 4) vd += step;
+    if (code & 2) vd += step >> 1;
+    if (code & 1) vd += step >> 2;
+    pred = code & 8 ? pred - vd : pred + vd;
+    if (pred > 32767) pred = 32767; else if (pred < -32768) pred = -32768;
+    idx += IMA_IDX[code & 7];
+    if (idx < 0) idx = 0; else if (idx > 88) idx = 88;
+    out[i] = pred;
+  }
+  return out;
+}
+
+// a slot header (userSlot's layout) -> {nz, name, dataLen, zones: [{off, n}]}, or null if not a slot
+function parseSlot(hdr) {
+  const v = new DataView(hdr.buffer || hdr, hdr.byteOffset || 0, hdr.byteLength);
+  if (hdr.byteLength < SLOT_HDR_LEN || v.getUint32(0, true) !== 0x504D5346) return null;
+  const nz = hdr[6], zones = [];
+  let name = "";
+  for (let i = 8; i < 16 && hdr[i]; i++) name += String.fromCharCode(hdr[i]);
+  for (let i = 0; i < nz && i < SLOT_ZONES; i++)
+    zones.push({ off: v.getUint32(32 + i * 28, true), n: v.getUint32(32 + i * 28 + 4, true) });
+  return { nz, name, dataLen: v.getUint32(16, true), zones };
+}
+
+let CRC_T = null;
+function crc32(b) {                    // zlib.crc32
+  if (!CRC_T) {
+    CRC_T = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+      CRC_T[n] = c >>> 0;
+    }
+  }
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < b.length; i++) c = CRC_T[(c ^ b[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+function keySplit(roots) {
+  const n = roots.length;
+  return roots.map((r, j) => [j === 0 ? 0 : ((roots[j - 1] + r) >> 1) + 1, j === n - 1 ? 127 : (r + roots[j + 1]) >> 1]);
+}
+
+// sampleio.user_slot for loops (each its own zone, roots ROOT_BASE + i): -> {hdr, data}
+function userSlot(name, loops) {
+  return userSlotRaw(name, loops.map((s) => ({ adpcm: imaEncode(s), n: s.length })));
+}
+
+// the same from loops already encoded ({adpcm, n}: the break page keeps a loop read back as it is)
+function userSlotRaw(name, parts) {
+  const total = parts.reduce((a, p) => a + p.adpcm.length, 0);
+  if (total > SLOT_MAX_DATA) throw new Error(`too long: ${total} B of ADPCM, a slot holds ${SLOT_MAX_DATA} B`);
+  if (parts.length < 1 || parts.length > SLOT_ZONES) throw new Error(`1..${SLOT_ZONES} loops per slot`);
+  const data = new Uint8Array(total);
+  const zs = [];
+  let off = 0;
+  parts.forEach((p, i) => {
+    data.set(p.adpcm, off);
+    zs.push({ off, n: p.n, root: ROOT_BASE + i });
+    off += p.adpcm.length;
+  });
+  const split = keySplit(zs.map((z) => z.root));
+  const rate = Math.round(SLOT_RATE / 44100 * 65536);
+  const hdr = new Uint8Array(SLOT_HDR_LEN), v = new DataView(hdr.buffer);
+  v.setUint32(0, 0x504D5346, true);
+  v.setUint16(4, 1, true);
+  hdr[6] = zs.length;
+  const nm = name.toUpperCase().replace(/[^\x20-\x7E]/g, "").slice(0, 8);
+  for (let i = 0; i < nm.length; i++) hdr[8 + i] = nm.charCodeAt(i);
+  v.setUint32(16, data.length, true);
+  v.setUint32(20, crc32(data), true);
+  zs.forEach((z, i) => {
+    const o = 32 + i * 28;
+    v.setUint32(o, z.off, true);
+    v.setUint32(o + 4, z.n, true);
+    v.setUint32(o + 8, 0, true);               // loop start
+    v.setUint32(o + 12, z.n - 1, true);        // loop end
+    v.setUint32(o + 16, rate, true);
+    v.setInt16(o + 20, z.root * 16, true);
+    v.setInt16(o + 22, 0, true);               // predictor and index at the loop start: from 0
+    hdr[o + 24] = 0;
+    hdr[o + 25] = split[i][0];
+    hdr[o + 26] = split[i][1];
+  });
+  return { hdr, data };
+}
+
+// upload_breaks.pack: loops [{label, s}] in order into at most nslots slots; -> {slots, skipped}
+function pack(loops, nslots) {
+  const slots = [], skipped = [];
+  let cur = [], used = 0;
+  for (const l of loops) {
+    const need = (l.s.length + 1) >> 1;
+    if (need > SLOT_MAX_DATA) { skipped.push(l.label); continue; }
+    if (used + need > SLOT_MAX_DATA || cur.length >= SLOT_ZONES) {
+      if (cur.length) slots.push(cur);
+      cur = []; used = 0;
+    }
+    if (slots.length >= nslots) { skipped.push(l.label); continue; }
+    cur.push(l);
+    used += need;
+  }
+  if (cur.length) slots.push(cur);
+  return { slots, skipped };
+}
+
+// fm1_sample_upload.pack7: groups of up to 7 bytes, each preceded by their top bits
+function pack7(b) {
+  const out = [];
+  for (let i = 0; i < b.length; i += 7) {
+    const g = b.slice(i, i + 7);
+    let m = 0;
+    g.forEach((x, j) => { m |= ((x >> 7) & 1) << j; });
+    out.push(m);
+    for (const x of g) out.push(x & 0x7F);
+  }
+  return out;
+}
+
+// a 16-bit / 24-bit / float WAV -> {rate, x: mono floats} (sampleio.read_any_wav; the page decodes
+// other formats with the browser's decoder)
+function readWav(buf) {
+  const d = new DataView(buf.buffer || buf, buf.byteOffset || 0, buf.byteLength);
+  const tag4 = (o) => String.fromCharCode(d.getUint8(o), d.getUint8(o + 1), d.getUint8(o + 2), d.getUint8(o + 3));
+  if (d.byteLength < 12 || tag4(0) !== "RIFF" || tag4(8) !== "WAVE") throw new Error("not a WAV file");
+  const ch = {};
+  for (let i = 12; i + 8 <= d.byteLength;) {
+    const id = tag4(i), n = d.getUint32(i + 4, true);
+    if (!(id in ch)) ch[id] = [i + 8, n];
+    i += 8 + n + (n & 1);
+  }
+  if (!ch["fmt "]) throw new Error("WAV without a fmt chunk");
+  const fo = ch["fmt "][0];
+  let tag = d.getUint16(fo, true);
+  const nch = d.getUint16(fo + 2, true), sr = d.getUint32(fo + 4, true), bits = d.getUint16(fo + 14, true);
+  if (tag === 0xFFFE) tag = d.getUint16(fo + 24, true);
+  const bps = bits >> 3;
+  if ((tag !== 1 && tag !== 3) || !bps || !nch) throw new Error(`unsupported WAV (tag ${tag}, ${bits} bit)`);
+  const [o, n] = ch.data || [0, 0];
+  const frame = bps * nch, nfr = Math.floor(Math.min(n, d.byteLength - o) / frame);
+  const val = (p) => {
+    if (tag === 3) return bps === 4 ? d.getFloat32(p, true) : d.getFloat64(p, true);
+    if (bps === 2) return d.getInt16(p, true) / 32768;
+    if (bps === 3) return ((d.getUint8(p) << 8 | d.getUint8(p + 1) << 16 | d.getUint8(p + 2) << 24) >> 0) / 2147483648;
+    if (bps === 4) return d.getInt32(p, true) / 2147483648;
+    return (d.getUint8(p) - 128) / 128;
+  };
+  const x = new Array(nfr);
+  for (let f = 0; f < nfr; f++) {
+    const p = o + f * frame;
+    if (nch === 1) x[f] = val(p);
+    else if (nch === 2) x[f] = (val(p) + val(p + bps)) / 2;
+    else { let acc = 0.0; for (let c = 0; c < nch; c++) acc += val(p + c * bps); x[f] = acc / nch; }
+  }
+  return { rate: sr, x };
+}
+
+const $ = (id) => document.getElementById(id);
+const HDR = [0x7D, 0x46, 0x4C];
+const NSLOT = 3;
+const CAP = NSLOT * SLOT_MAX_DATA;
+const KB = (b) => `${(b / 1024).toFixed(0)} KB`;
+let link = null, busy = false, readOk = false;
+
+// the loops in order, as the FM-1 numbers them: {adpcm, n, s, file, isNew} (adpcm, n: as stored, adpcm null for a
+// new one until it's encoded; s: the samples, for the picture), and the slots as read ({hdr, data} or null)
+let loops = [], dev = [null, null, null], replaceAt = -1;
+
+function say(t) { $("status").textContent = t; }
+const bytesOf = (l) => (l.n + 1) >> 1;
+
+// ---- the list ----------------------------------------------------------------
+function render() {
+  const list = $("list");
+  list.textContent = "";
+  if (!readOk)
+    list.innerHTML = `<div class="empty">${link ? "Reading…" : "Connect to see the loops on the FM-1."}</div>`;
+  else if (!loops.length)
+    list.innerHTML = '<div class="empty">No loops yet. Add some below.</div>';
+  loops.forEach((l, i) => {
+    const r = document.createElement("div");
+    r.className = l.isNew ? "loop new" : "loop";
+    r.innerHTML = `<div class="name">BR${i + 1}<small>${(l.n / SLOT_RATE).toFixed(1)} s${l.isNew ? " · new" : ""}</small></div>
+      <canvas width="900" height="80"></canvas>
+      <div class="acts"><button class="link rep">Replace</button><button class="link del">Remove</button></div>`;
+    if (l.file) r.title = l.file;
+    r.querySelector(".rep").onclick = () => { replaceAt = i; $("files").multiple = false; $("files").click(); };
+    r.querySelector(".del").onclick = () => { loops.splice(i, 1); render(); };
+    r.querySelector(".rep").disabled = r.querySelector(".del").disabled = busy;
+    r.ondragover = (ev) => { ev.preventDefault(); ev.stopPropagation(); r.classList.add("over"); };
+    r.ondragleave = () => r.classList.remove("over");
+    r.ondrop = (ev) => { ev.preventDefault(); ev.stopPropagation(); r.classList.remove("over"); addFiles([...ev.dataTransfer.files], i); };
+    list.appendChild(r);
+    wave(r.querySelector("canvas"), l.s, l.isNew ? "--accent" : "--wave");
+  });
+  const used = loops.reduce((a, l) => a + bytesOf(l), 0), plan = packLoops();
+  $("fill").style.width = `${Math.min(100, used / CAP * 100)}%`;
+  $("room").className = plan ? "" : "bad";
+  $("room").textContent = !readOk ? "" : plan ? `${loops.length} loop${loops.length === 1 ? "" : "s"}, ${KB(used)} of ${KB(CAP)}.`
+    : `Too much: ${KB(used)} of ${KB(CAP)}. Remove a loop, or use shorter ones.`;
+  const changed = readOk && plan && changedSlots(plan).length > 0;
+  $("send").disabled = busy || !changed;
+  $("discard").hidden = !changed;
+  $("discard").disabled = busy;
+  $("add").disabled = busy || !readOk;
+  $("connect").disabled = busy;
+}
+
+// one loop's waveform: its peak in each pixel column
+function wave(cv, s, colour) {
+  const g = cv.getContext("2d"), W = cv.width, H = cv.height, css = getComputedStyle(document.documentElement);
+  g.clearRect(0, 0, W, H);
+  g.fillStyle = css.getPropertyValue(colour);
+  for (let x = 0; x < W; x++) {
+    let pk = 0;
+    for (let i = Math.floor(x * s.length / W), e = Math.floor((x + 1) * s.length / W); i < e; i++) {
+      const v = Math.abs(s[i]);
+      if (v > pk) pk = v;
+    }
+    const h = Math.max(1, pk / 32768 * H);
+    g.fillRect(x, (H - h) / 2, 1, h);
+  }
+}
+
+// ---- the list -> the three slots ---------------------------------------------------
+// in order, a slot filled before the next (16 loops or 80 KB a slot); null if it doesn't all fit
+function packLoops() {
+  const slots = [[]];
+  let used = 0;
+  for (const l of loops) {
+    const b = bytesOf(l);
+    if (used + b > SLOT_MAX_DATA || slots[slots.length - 1].length >= SLOT_ZONES) {
+      slots.push([]);
+      used = 0;
+    }
+    if (slots.length > NSLOT || b > SLOT_MAX_DATA) return null;
+    slots[slots.length - 1].push(l);
+    used += b;
+  }
+  while (slots.length < NSLOT) slots.push([]);
+  return slots;
+}
+
+function image(k, ls) {
+  if (!ls.length) return null;
+  for (const l of ls) if (!l.adpcm) l.adpcm = imaEncode(l.s);
+  return userSlotRaw(`BR${k + 1}`, ls.map((l) => ({ adpcm: l.adpcm, n: l.n })));
+}
+
+function same(a, b) {
+  if (!a || !b) return !a && !b;
+  if (a.data.length !== b.data.length) return false;
+  for (let i = 0; i < a.hdr.length; i++) if (a.hdr[i] !== b.hdr[i]) return false;
+  for (let i = 0; i < a.data.length; i++) if (a.data[i] !== b.data[i]) return false;
+  return true;
+}
+
+function changedSlots(plan) {
+  const out = [];
+  plan.forEach((ls, k) => { const im = image(k, ls); if (!same(im, dev[k])) out.push({ k, im }); });
+  return out;
+}
+
+// ---- files -> loops ------------------------------------------------------------
+async function decode(file) {
+  const buf = new Uint8Array(await file.arrayBuffer());
+  try { return readWav(buf); } catch (_) { /* not a WAV the reader takes: the browser's decoder */ }
+  const ctx = new OfflineAudioContext(1, 1, 44100);
+  const ab = await ctx.decodeAudioData(buf.buffer.slice(0));
+  const n = ab.length, x = new Array(n), chs = [];
+  for (let c = 0; c < ab.numberOfChannels; c++) chs.push(ab.getChannelData(c));
+  for (let i = 0; i < n; i++) { let acc = 0.0; for (const ch of chs) acc += ch[i]; x[i] = acc / chs.length; }
+  return { rate: ab.sampleRate, x };
+}
+
+async function addFiles(list, at = -1) {
+  if (busy || !readOk || !list.length) return;
+  const got = [], bad = [];
+  for (const f of at >= 0 ? list.slice(0, 1) : list) {
+    try {
+      const { rate, x } = await decode(f);
+      if (!x.length) throw new Error("no audio");
+      const s = cut(x, rate, $("bars").checked);
+      got.push({ adpcm: null, n: s.length, s, file: f.name, isNew: true, rate, x });
+    } catch (_) { bad.push(f.name); }
+  }
+  say(bad.length ? `Couldn't read ${bad.join(", ")}.` : "");
+  if (at >= 0 && got.length) loops[at] = got[0];
+  else loops.push(...got);
+  render();
+}
+
+// ---- the FM-1 ------------------------------------------------------------------
+class Link {
+  constructor(input, output) {
+    this.input = input; this.output = output; this.wait = null;
+    input.onmidimessage = (ev) => {
+      const d = ev.data;
+      if (d[0] !== 0xF0 || d[1] !== HDR[0] || d[2] !== HDR[1] || d[3] !== HDR[2] || !this.wait || d[4] !== this.wait.cmd) return;
+      const w = this.wait;
+      this.wait = null;
+      clearTimeout(w.timer);
+      w.resolve([...d.slice(5, d.length - 1)]);
+    };
+  }
+  req(cmd, args, ms = 3000) {
+    return new Promise((resolve, reject) => {
+      this.wait = { cmd, resolve, timer: setTimeout(() => { this.wait = null; reject(new Error("The FM-1 stopped answering.")); }, ms) };
+      this.output.send([0xF0, ...HDR, cmd, ...args, 0xF7]);
+    });
+  }
+  async retry(cmd, args, ms, tries = 3) {
+    for (let k = 1; ; k++) { try { return await this.req(cmd, args, ms); } catch (e) { if (k >= tries) throw e; } }
+  }
+}
+
+async function connect() {
+  if (!navigator.requestMIDIAccess) throw new Error("This browser can't talk to MIDI devices. Use Chrome or Edge.");
+  const midi = await navigator.requestMIDIAccess({ sysex: true });
+  const outs = [...midi.outputs.values()];
+  for (const input of midi.inputs.values()) {
+    if (input.state === "disconnected" || !/x0x|felucca/i.test(input.name || "")) continue;
+    const output = outs.find((o) => o.name === input.name);
+    if (!output) continue;
+    await input.open();
+    await output.open();
+    const l = new Link(input, output);
+    try { await l.retry(1, [], 1000); return l; } catch (_) { /* not answering: the next */ }
+  }
+  throw new Error("No FM-1 running X0X found. Connect it by USB, and close other apps that use its MIDI port.");
+}
+
+function unpack7(a) {
+  const out = [];
+  for (let i = 0; i < a.length;) {
+    const m = a[i++];
+    for (let j = 0; j < 7 && i < a.length; j++) out.push(a[i++] | ((m >> j) & 1) << 7);
+  }
+  return new Uint8Array(out);
+}
+
+// a slot's bytes from `off` (SMP_READ: up to 224 a request, asked for in pairs)
+async function readBytes(k, off, n, onPart) {
+  const out = new Uint8Array(n);
+  for (let at = 0; at < n;) {
+    const want = Math.min(224, n - at), adr = off + at;
+    const r = await link.retry(16, [k, adr & 0x7F, (adr >> 7) & 0x7F, (adr >> 14) & 0x7F, (want + 1) >> 1], 3000);
+    const b = unpack7(r.slice(4));
+    if (!b.length) throw new Error("no data");
+    out.set(b.subarray(0, Math.min(b.length, n - at)), at);
+    at += Math.min(b.length, n - at);
+    if (onPart) onPart(at / n);
+  }
+  return out;
+}
+
+async function readAll() {
+  const info = await link.req(15, []), nz = [];
+  for (let k = 0, i = 2; k < info[0]; k++) { nz.push(info[i]); i = info.indexOf(0, i + 1) + 2; }
+  const bar = $("progress");
+  bar.hidden = false;
+  loops = [];
+  dev = [null, null, null];
+  try {
+    for (let k = 0; k < NSLOT; k++) {
+      if (!nz[k]) continue;
+      const hdr = await readBytes(k, 0, SLOT_HDR_LEN), h = parseSlot(hdr);
+      if (!h) continue;
+      const data = await readBytes(k, SLOT_DATA_OFF, h.dataLen, (f) => { bar.value = (k + f) / NSLOT * 100; });
+      dev[k] = { hdr, data };
+      for (const z of h.zones) {
+        const adpcm = data.slice(z.off, z.off + ((z.n + 1) >> 1));
+        loops.push({ adpcm, n: z.n, s: imaDecode(adpcm, z.n), isNew: false });
+      }
+    }
+  } catch (_) {
+    bar.hidden = true;
+    throw new Error("This X0X can't send its loops back to the page. Update X0X, then connect again.");
+  }
+  bar.hidden = true;
+  readOk = true;
+}
+
+async function run(fn) {
+  busy = true;
+  render();
+  try { await fn(); } catch (e) { say(e.message || String(e)); }
+  busy = false;
+  render();
+}
+
+async function readFromDevice() {
+  say("Connecting…");
+  readOk = false;
+  link = await connect();
+  render();
+  say("Reading the loops…");
+  await readAll();
+  $("connect").textContent = "Read again";
+  say("");
+}
+
+$("connect").onclick = () => run(readFromDevice);
+$("discard").onclick = () => run(readFromDevice);
+
+$("send").onclick = () => run(async () => {
+  const todo = changedSlots(packLoops()), bar = $("progress");
+  const total = todo.reduce((a, t) => a + (t.im ? t.im.data.length : 1), 0);
+  let sent = 0;
+  bar.hidden = false;
+  bar.value = 0;
+  for (const { k, im } of todo) {
+    if (!im) {                                       // nothing left in this slot: clear it
+      say("Clearing…");
+      const r = await link.req(14, [k], 30000);
+      if (r[1]) throw new Error("The FM-1 couldn't clear its memory.");
+      sent += 1;
+      continue;
+    }
+    say("Erasing…");
+    const b = await link.req(11, [k], 10000);
+    if (b[1]) throw new Error("The FM-1 couldn't erase its memory.");
+    say("Sending…");
+    for (let off = 0; off < im.data.length; off += 256) {
+      const adr = SLOT_DATA_OFF + off;
+      const r = await link.retry(12, [k, adr & 0x7F, (adr >> 7) & 0x7F, (adr >> 14) & 0x7F, ...pack7(im.data.subarray(off, off + 256))], 3000);
+      if (r[4]) throw new Error("Writing to the FM-1 failed.");
+      sent += Math.min(256, im.data.length - off);
+      bar.value = sent / total * 100;
+    }
+    const e = await link.req(13, [k, ...pack7(im.hdr)], 5000);
+    if (e[1]) throw new Error("The FM-1 didn't accept the loops.");
+  }
+  bar.hidden = true;
+  say("Reading back…");
+  await readAll();
+  say("Done. On the FM-1: BREAK, then EDIT, then LOOP A or LOOP B.");
+});
+
+$("add").onclick = () => { replaceAt = -1; $("files").multiple = true; $("files").click(); };
+$("files").onchange = (ev) => { addFiles([...ev.target.files], replaceAt); ev.target.value = ""; replaceAt = -1; };
+document.body.ondragover = (ev) => { if (readOk) { ev.preventDefault(); $("list").classList.add("over"); } };
+document.body.ondragleave = (ev) => { if (!ev.relatedTarget) $("list").classList.remove("over"); };
+document.body.ondrop = (ev) => { ev.preventDefault(); $("list").classList.remove("over"); addFiles([...ev.dataTransfer.files]); };
+$("bars").onchange = () => {                         // the new loops, cut again
+  for (const l of loops) if (l.isNew) { l.s = cut(l.x, l.rate, $("bars").checked); l.n = l.s.length; l.adpcm = null; }
+  render();
+};
+render();
+</script>
+</body>
+</html>
