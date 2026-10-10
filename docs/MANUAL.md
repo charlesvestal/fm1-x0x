@@ -100,6 +100,39 @@ arrange them into a song.
 
 ![The FM-1 (a drawing), running X0X](img/fm1-panel.svg)
 
+### At a glance
+
+Left side, top to bottom:
+
+| Control | Does |
+|---|---|
+| MASTER | Volume |
+| SELECT | Scroll through a screen's knob pages (in a list: move up and down) |
+| PRESETS | Choose the pattern |
+| ALGORITHM | Choose the part: 909, 808, 303A, 303B, BREAK |
+| OCT-, OCT+ | The next or previous 16 steps (HOME: patterns 1–16 or 17–32) |
+
+Right side:
+
+| Control | Does |
+|---|---|
+| KNOB 1–4 | The four values at the bottom of the screen |
+| FX | Reverb and delay |
+| SEL | A list of every setting on this screen, including the ones on no page |
+| ENV | Hold: accent. On its own: nothing |
+| LFO | The mixer and the master |
+| EDIT | The selected part's sound |
+| GLO | Settings |
+| HOME | The pattern; again: the song |
+| SAVE | Save. Hold: copy the pattern (then a white key pastes it) |
+| ARP | TB-3PO, the 303 line generator |
+| SEQ | The sequencer for the selected part |
+| PLAY / STOP | Start and stop |
+| REC | Record |
+
+Keys: white keys are steps (on HOME, patterns); black keys are drum tracks or break slices (on
+HOME, part mutes).
+
 ![What the keys do](img/fm1-keys.svg)
 
 ### The screens
