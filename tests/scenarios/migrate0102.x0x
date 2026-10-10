@@ -1,0 +1,48 @@
+# A project saved by 0.10.2-beta (tests/fixtures/v0102_store.bin, made in its simulator: drums, motion, a 303 line, a song, and a value in every sound place that has moved since) loads as it was, and saves again in today's format.
+wait 100
+storeload tests/fixtures/v0102_store.bin
+wait 300
+# the patterns and the song
+expect hit0.0.0 1
+expect hit0.0.4 1
+expect hit0.0.12 1
+expect hit0.1.4 1
+expect hit0.1.12 1
+expect hit0.1.0 0
+expect songlen 2
+expect tempo 120
+expect lanes 1
+# the 909 kick: its pan 8 -> 10, the sends at none
+expect sound0.0.10 30
+expect sound0.0.8 0
+expect sound0.0.9 0
+# the 909 snare: DECAY in at 3 (its default), the rest up one
+expect sound0.1.4 70
+expect sound0.1.7 50
+expect sound0.1.9 90
+expect sound0.1.3 41
+# the 808 kick: its pan 7 -> 9, the sends at none
+expect sound1.0.0 100
+expect sound1.0.9 20
+expect sound1.0.7 0
+expect sound1.0.8 0
+# the master: COMP and FILTER from the details (ratio on: COMP > 0; low-pass: FILTER < 60)
+expect sound6.0.0 40
+expect sound6.0.12 >0
+expect sound6.0.13 <60
+# the delay's TAPE from its type and wear
+expect sound4.1.0 >16
+# it plays, and saves again in the new format
+tap PLAY
+wait 2000
+tap PLAY
+tap SAVE
+wait 300
+reboot
+wait 300
+expect sound0.0.10 30
+expect sound0.1.4 70
+expect sound1.0.9 20
+expect songlen 2
+expect lanes 1
+expect hit0.1.12 1
