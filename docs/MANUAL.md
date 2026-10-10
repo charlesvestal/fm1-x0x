@@ -98,80 +98,39 @@ arrange them into a song.
 
 ## 3. Controls
 
-![The FM-1 (a drawing), running X0X](img/fm1-panel.svg)
+![The FM-1 (a drawing), running X0X: under each button that opens a screen, which screen](img/fm1-panel.svg)
 
-### At a glance
-
-Left side, top to bottom:
-
-| Control | Does |
-|---|---|
-| MASTER | Volume |
-| SELECT | Scroll through a screen's knob pages (in a list: move up and down) |
-| PRESETS | Choose the pattern |
-| ALGORITHM | Choose the part: 909, 808, 303A, 303B, BREAK |
-| OCT-, OCT+ | The next or previous 16 steps (HOME: patterns 1–16 or 17–32) |
-
-Right side:
-
-| Control | Does |
-|---|---|
-| KNOB 1–4 | The four values at the bottom of the screen |
-| FX | Reverb and delay |
-| SEL | A list of every setting on this screen, including the ones on no page |
-| ENV | Hold: accent. On its own: nothing |
-| LFO | The mixer and the master |
-| EDIT | The selected part's sound |
-| GLO | Settings |
-| HOME | The pattern; again: the song |
-| SAVE | Save. Hold: copy the pattern (then a white key pastes it) |
-| ARP | TB-3PO, the 303 line generator |
-| SEQ | The sequencer for the selected part |
-| PLAY / STOP | Start and stop |
-| REC | Record |
-
-Keys: white keys are steps (on HOME, patterns); black keys are drum tracks or break slices (on
-HOME, part mutes).
-
-![What the keys do](img/fm1-keys.svg)
-
-### The screens
-
-Each of these buttons opens one screen, always the same one. Press it again to go to that
-screen's next page.
-
-| Button | Opens |
-|---|---|
-| HOME | The pattern: all five parts, which pattern they play, mutes. Press it again for the song, and again to come back. |
-| SEQ | The selected part's steps, with its LENGTH and RATE (and on a 303, DIRECTION and TRANSPOSE). |
-| EDIT | The selected part's sound. The keys still write its steps. |
-| ARP | TB-3PO, the 303 line generator (on a 303). |
-| LFO | The mixer and the master. |
-| FX | The reverb and the delay. |
-| GLO | The settings. Press it again to close them. |
-
-SEQ, EDIT and ARP show the part you pick with **ALGORITHM**: 909, 808, 303A, 303B or BREAK.
-
-### Everything else
+A button that opens a screen (labelled on the drawing) always opens the same one; press it again
+for that screen's next page. SEQ, EDIT and ARP show the part you choose with ALGORITHM.
 
 | Control | What it does |
 |---|---|
-| KNOB 1–4 | The four values at the bottom of the screen. Each click is one step, however quickly you turn a few; spin and they speed up. |
-| SELECT | The previous or next page. Hold HOME and turn it for the tempo. Hold a step and turn it for the step's chance (section 11). |
+| MASTER | Volume. |
+| SELECT | The previous or next page. In a list, up and down. Hold a step and turn it for the step's chance (section 11). |
 | PRESETS | The next pattern: on a part's screen for that part only, on HOME for all five. |
-| SEL | The whole screen as a list (see Lists, below). In a question, SEL means yes. |
+| ALGORITHM | The part: 909, 808, 303A, 303B or BREAK. In a list, it changes the value. |
+| OCT-, OCT+ | The steps, 16 at a time (1–16 … 49–64). On HOME and SONG, patterns 1–16 or 17–32. On the 303 keyboard, the octave. On TB-3PO, mutate the line or write a new one. |
+| KNOB 1–4 | The four values at the bottom of the screen. Each click is one step, however quickly you turn a few; spin and they speed up. |
+| FX | The reverb and the delay. |
+| SEL | Everything on this screen as a list, including the settings on no page (see Lists). In a question, yes. |
+| ENV | Hold while pressing keys: an accent. |
+| LFO | The mixer and the master. Hold while pressing keys: a slide. |
+| EDIT | The selected part's sound. The keys still write its steps. |
+| GLO | The settings. Press again to close. |
+| HOME | The pattern: all five parts, which pattern they play, mutes. Again: the song, and again back. In a list, back; in a question, no. |
+| SAVE | Save everything (while playing: when you stop). Hold it to copy the pattern; then a white key pastes it. |
+| ARP | TB-3PO, the 303 line generator (on a 303). |
+| SEQ | The selected part's steps, with its LENGTH and RATE (on a 303 also DIRECTION and TRANSPOSE). |
 | PLAY | Start and stop. |
 | REC | Record on and off: drum hits, 303 notes, knob moves, and in SONG mode the song. On a 303 the keys become a keyboard while it's on. |
-| SAVE | Save everything. Pressed while playing, it saves when you stop. |
-| ENV, LFO | Hold while pressing keys: ENV for an accent, LFO for a slide. |
-| OCT-, OCT+ | The steps, 16 at a time (1–16 … 49–64). On HOME and SONG, patterns 1–16 or 17–32. On the 303 keyboard, the octave. On TB-3PO, mutate or write a new line. |
 | White keys | Steps. On HOME, patterns. On MASTER and FX they do nothing. |
 | Black keys | Drum tracks, or the break's slices. On HOME they mute parts; on the mixer they pick a channel. |
-| MASTER | Volume. |
 
 **Hold HOME** for these: + REC undoes, + PLAY redoes, + SELECT sets the tempo, + a white key picks
 a pattern from any screen, and + a black key mutes a drum track (on the 909 or 808 screen) or a
 channel (on the mixer).
+
+![What the keys do](img/fm1-keys.svg)
 
 (The SEL button is labelled SCL in Felucca.)
 

@@ -41,12 +41,20 @@ def png_data_uri(path, scale=1):
     return "data:image/png;base64," + base64.b64encode(b.getvalue()).decode()
 
 
-def knob(x, y, r, label, above=True):
-    ly = y - r - 12 if above else y + r + 20
+def knob(x, y, r, label, what=None):
+    """a knob: its name above, what it does in X0X below (the manual's map)"""
     return (f'<g><circle cx="{x}" cy="{y}" r="{r + 5}" fill="{TRAY}"/>'
             f'<circle cx="{x}" cy="{y}" r="{r}" fill="{KNOB}" stroke="#44474c" stroke-width="2"/>'
             f'<line x1="{x}" y1="{y - r + 5}" x2="{x}" y2="{y - r + 15}" stroke="{LABEL}" stroke-width="3" stroke-linecap="round"/>'
-            f'<text x="{x}" y="{ly}" text-anchor="middle" class="lbl">{label}</text></g>')
+            f'<text x="{x}" y="{y - r - 12}" text-anchor="middle" class="lbl">{label}</text>'
+            + (f'<text x="{x}" y="{y + r + 22}" text-anchor="middle" class="what">{what}</text>' if what else "") + '</g>')
+
+
+def what(x, y, t):
+    """what a button does, under it (one or two lines, split at |)"""
+    a, _, b = t.partition("|")
+    return (f'<text x="{x}" y="{y}" text-anchor="middle" class="what">{a}</text>' +
+            (f'<text x="{x}" y="{y + 14}" text-anchor="middle" class="what">{b}</text>' if b else ""))
 
 
 def button(x, y, w, h, label, two=None):
@@ -81,31 +89,40 @@ def keybed(x0, y0, w, white_label=None, black_label=None, black_sub=None, white_
 STYLE = (f"<style>.lbl{{font:600 17px {FONT};fill:{LABEL};letter-spacing:.06em}}"
          f".btn{{font:600 15px {FONT};fill:{LABEL};letter-spacing:.05em}}.btn.small{{font-size:12px}}"
          f".key{{font:700 17px {FONT};fill:#2a2c30}}.keysub{{font:600 12px {FONT};fill:#4d5056}}"
-         f".cap{{font:600 15px {FONT};fill:#9aa0a8;letter-spacing:.04em}}</style>")
+         f".cap{{font:600 15px {FONT};fill:#9aa0a8;letter-spacing:.04em}}"
+         f".what{{font:500 13px {FONT};fill:#f0a043}}</style>")
 
 
 def panel(screen_png):
-    W, H = 1000, 640
+    """the FM-1's front panel, with the firmware's screen in it: under the knobs what they choose, under each
+    button that opens a screen which screen"""
+    W, H = 1000, 720
     s = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" role="img" '
-         f'aria-label="The FM-1 front panel: knobs and octave buttons on the left, the screen in the middle, '
-         f'four knobs and twelve buttons on the right, 11 black and 16 white keys below">', STYLE,
+         f'aria-label="The FM-1 front panel, each button that opens a screen labelled with the screen">', STYLE,
          f'<rect x="4" y="4" width="{W - 8}" height="{H - 8}" rx="44" fill="{BODY}"/>',
-         knob(105, 100, 24, "MASTER"), knob(215, 100, 24, "SELECT"),
-         knob(105, 205, 24, "PRESETS"), knob(215, 205, 24, "ALGORITHM"),
-         f'<rect x="58" y="258" width="210" height="58" rx="14" fill="{TRAY}"/>',
-         button(72, 268, 82, 38, "OCT-"), button(170, 268, 82, 38, "OCT+"),
+         knob(105, 92, 24, "MASTER", "Volume"), knob(215, 92, 24, "SELECT", "Page"),
+         knob(105, 210, 24, "PRESETS", "Pattern"), knob(215, 210, 24, "ALGORITHM", "Part"),
+         f'<rect x="58" y="284" width="210" height="58" rx="14" fill="{TRAY}"/>',
+         button(72, 294, 82, 38, "OCT-"), button(170, 294, 82, 38, "OCT+"),
          f'<rect x="300" y="44" width="236" height="236" rx="26" fill="#111214"/>',
          f'<image x="318" y="62" width="200" height="200" href="{png_data_uri(screen_png)}" style="image-rendering:pixelated"/>']
     for i in range(4):
-        s.append(knob(610 + i * 104, 100, 22, f"KNOB{i + 1}"))
-    s.append(f'<rect x="568" y="160" width="400" height="140" rx="18" fill="{TRAY}"/>')
-    top = ["FX", "SEL", "ENV", "LFO", "EDIT", "GLO"]
-    bot = ["HOME", "SAVE", "ARP", "SEQ", ("PLAY", "STOP"), "REC"]
+        s.append(knob(610 + i * 104, 92, 22, f"KNOB{i + 1}"))
+    s.append(what(766, 136, "The page's four values"))
+    s.append(f'<rect x="568" y="146" width="400" height="236" rx="18" fill="{TRAY}"/>')
+    # the buttons that open a screen: which one (the others: the manual's table)
+    top = [("FX", "Effects"), ("SEL", "List all"), ("ENV", ""), ("LFO", "Mixer"), ("EDIT", "Sound"), ("GLO", "Settings")]
+    bot = [("HOME", "Pattern,|song"), ("SAVE", ""), ("ARP", "TB-3PO"), ("SEQ", "Steps"), (("PLAY", "STOP"), ""), ("REC", "")]
     for i in range(6):
-        s.append(button(582 + i * 63, 174, 54, 48, top[i]))
-        b = bot[i]
-        s.append(button(582 + i * 63, 236, 54, 48, b[0], b[1]) if isinstance(b, tuple) else button(582 + i * 63, 236, 54, 48, b))
-    s.append(keybed(36, 340, W - 72, h=270))
+        x = 582 + i * 63
+        s.append(button(x, 158, 54, 48, top[i][0]))
+        if top[i][1]:
+            s.append(what(x + 27, 224, top[i][1]))
+        b = bot[i][0]
+        s.append(button(x, 264, 54, 48, b[0], b[1]) if isinstance(b, tuple) else button(x, 264, 54, 48, b))
+        if bot[i][1]:
+            s.append(what(x + 27, 330, bot[i][1]))
+    s.append(keybed(36, 400, W - 72, h=270))
     s.append("</svg>")
     return "".join(s)
 
