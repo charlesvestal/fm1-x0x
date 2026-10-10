@@ -3,6 +3,12 @@
 The newest version first. Install it with the [web installer](../install/); the
 [manual](../manual/) covers everything in detail.
 
+## 1.0.5 · 10 October 2026
+
+- A sharper check on the second processor core: on an FM-1 whose second core misreads, X0X now also
+  catches the one misread 1.0.4 could miss, and carries on with one core. Nothing changes on an FM-1
+  whose cores both work.
+
 ## 1.0.4 · 10 October 2026
 
 - On FM-1s whose second processor core doesn't work reliably, X0X notices and carries on with one core,
