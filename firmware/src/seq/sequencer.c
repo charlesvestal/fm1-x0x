@@ -317,6 +317,8 @@ static uint32_t fire_step(seq_t *s, int t, const seq_sink_t *o)
         auto_mutate(s, t - TRK_BASS0);
     if (wrapped && (t == TRK_BRK || is_drum(t)))   /* (the 303s count theirs in auto_mutate) */
         tr->bars++;
+    if (changed & 1u)                                /* the 909's new pattern: its passes from 1 again, as */
+        tr->bars = 0;                                /* restart() does for the others (probability cycles) */
     tr->pos = (uint8_t)p;
     if (o->step)                                     /* first: the step's motion and p-locks, which the hit */
         o->step(o->ctx, t, p);                       /* below must hear (a drum takes its tune as it fires) */

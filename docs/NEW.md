@@ -3,6 +3,11 @@
 The newest version first. Install it with the [web installer](../install/); the
 [manual](../manual/) covers everything in detail.
 
+## 1.0.2 · 10 October 2026
+
+- Probability cycles count from the first pass again when the 909 changes pattern, as the other parts
+  already did: switch patterns and a 1:4 step plays on the new pattern's first bar.
+
 ## 1.0.1 · 10 October 2026
 
 - Probability cycles: hold a step and turn SELECT down past 5% for 1:2, 2:2, 1:3 … 8:8. A step at 1:4

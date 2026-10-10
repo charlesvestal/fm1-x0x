@@ -1,0 +1,26 @@
+# Probability cycles count from 1 again when a part changes pattern, the 909 too: a 909 kick on step 1 at
+# 1:4 in pattern 1, copied to pattern 2; six bars of P1 (kicks on bars 1 and 5), then P2 from bar 7: its
+# first pass, so a kick there. Through bar 8: 3 kicks (the 909 kept counting before: 2).
+wait 300
+tapkey b0
+tapkey w0
+key w0 down
+turn SELECT -25
+key w0 up
+expect laneval7.0.0.0 106
+press SAVE
+tapkey w1
+release SAVE
+tap GLO
+turn SELECT 1
+turn ALGO 1
+tap HOME
+tap HOME
+expect view 0
+tap PLAY
+wait 10000
+tapkey w1
+wait 5000
+tap PLAY
+expect ppat0 2
+expect noteons 3
