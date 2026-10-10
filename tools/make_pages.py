@@ -56,6 +56,10 @@ h1 { font: 700 2.6rem/1.1 "Barlow Semi Condensed", "Barlow", sans-serif; margin:
 .ways a { display: block; text-decoration: none; color: var(--ink); background: var(--card); border: 1px solid var(--rule);
           border-radius: 10px; padding: 14px 18px; }
 .ways a:hover, .ways a:focus-visible { border-color: var(--accent); outline: none; }
+.ways .card { background: var(--card); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 18px; }
+.ways .card a { color: var(--accent); text-decoration: none; border: 0; padding: 0; background: none; display: inline; }
+.ways .card a:hover, .ways .card a:focus-visible { text-decoration: underline; }
+.ways .card a.new { font: 400 .95rem "Barlow", sans-serif; margin-left: .5rem; }
 .ways strong { font: 600 1.25rem "Barlow Semi Condensed", "Barlow", sans-serif; color: var(--accent); display: block; }
 .ways span { color: var(--muted); font-size: .95rem; }
 p.small { color: var(--muted); font-size: .9rem; }
@@ -72,14 +76,12 @@ line generator, and a breakbeat player, all running at once, with patterns, a so
 recorded knob moves.</p>
 <div class="video"><iframe src="https://www.youtube-nocookie.com/embed/cZLYrZaLDUk" title="X0X running on the FM-1"
   allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div>
-<div class="status"><strong>Version __VERSION__.</strong> <a href="new/">What's new</a>. X0X installs and
-uninstalls the way Felucca does, and the installer can put M-VAVE's own firmware back. Installing is
+<div class="status">X0X installs and uninstalls the way Felucca does, and the installer can put M-VAVE's own firmware back. Installing is
 at your own risk.</div>
 <nav class="ways" aria-label="Get X0X">
   <a href="emu/"><strong>Try it in the browser</strong><span>The same code the FM-1 runs, with sound. Mouse, touch or keyboard; no FM-1 needed.</span></a>
-  <a href="install/"><strong>Install</strong><span>From Chrome or Edge, with the FM-1 connected by USB. Nothing to install on the computer.</span></a>
+  <div class="card"><strong><a href="install/">Install v__VERSION__</a> <a class="new" href="new/">What's new?</a></strong><span>From Chrome or Edge, with the FM-1 connected by USB. Nothing to install on the computer.</span></div>
   <a href="manual/"><strong>Manual</strong><span>Getting started in ten steps, then everything else.</span></a>
-  <a href="new/"><strong>What's new</strong><span>Each version's changes, newest first, with pictures.</span></a>
   <a href="breaks/"><strong>Your own breaks</strong><span>Drop in loops and send them to the BREAK part, from Chrome or Edge.</span></a>
   <a href="firmware/__PKG__"><strong>Download __PKG__</strong><span>For the command-line installer: <code>python3 tools/fm1_install.py __PKG__</code></span></a>
   <a href="__REPO__"><strong>Source</strong><span>GitHub, GPL-3.0. Built on Felucca by Hügelton Instruments.</span></a>
