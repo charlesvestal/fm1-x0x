@@ -13,9 +13,12 @@
  *
  * Units that cannot run it (fm1-x0x#10, measured by Jangada, github.com/zednaked/jangada): on some
  * FM-1s core 1 reads words that are not in RAM (0x00200000 where core 0 reads 0), idle now and then,
- * often under load. So core 1 runs only the next job, with a function; anything else it counts
- * (mb.bad) and skips, and core 0 holds it at the first one (fm1_cpu1_wait): one core from then on.
- * The mailbox keeps each core's writes on cache lines of their own (Jangada's layout).
+ * often under load. So core 1 runs only the next job, and only when its check word (the function,
+ * the argument and the job's number, written before the job) matches; the jobs it finished stay in a
+ * register (Melodee's, keremimo/melodee#21: a stale function read as the next job fails the check).
+ * Anything else it counts (mb.bad) and leaves, and core 0 holds it at the first one (fm1_cpu1_wait):
+ * one core from then on. The mailbox keeps each core's writes on cache lines of their own
+ * (Jangada's layout).
  *
  * Flash: the waiting loop is in RAM (.c1_text), so an idle core 1 never fetches from the flash;
  * it works only for the audio interrupt, which waits for it before it returns, and core 0 turns
@@ -35,7 +38,8 @@ extern uint32_t _c1_ustack[], _c1_sstack_top[];
 typedef struct {
     volatile uint32_t job, arg;                 /* core 0: job + 1 hands fn(arg) over */
     void (*volatile fn)(uint32_t);
-    uint32_t pad0[13];
+    volatile uint32_t check;                    /* FM1_C1_CHECK of fn, arg and job */
+    uint32_t pad0[12];
     volatile uint32_t alive, done;              /* core 1: started; the last job it finished */
     volatile uint32_t bad, bad_job, bad_done, bad_fn;   /* jobs it would not run: how many, the last one */
     uint32_t pad1[10];
@@ -43,6 +47,7 @@ typedef struct {
 static fm1_c1_mb_t fm1_c1_mb __attribute__((aligned(64)));
 volatile uint32_t fm1_c1_trace;                 /* breadcrumbs (fm1_cpu1.S, fm1_c1_main) */
 static uint8_t fm1_c1_on;                       /* started and answering: core 0 may hand it work */
+#define FM1_C1_CHECK(fn, arg, job) ((uint32_t)(uintptr_t)(fn) ^ (arg) ^ (job) * 0x9E3779B1u)
 static uint8_t fm1_c1_gave_up;                  /* 1 = it read a wrong job, 2 = it did not finish one */
 
 void fm1_c1_main(void);
@@ -52,31 +57,40 @@ void __attribute__((section(".c1_text"), noreturn, used)) fm1_c1_main(void)
      * (core 0's is at 0x1EEF0D0) over both its stacks less the lowest 256 bytes, and EMU_CON bit 2
      * and bits 16..20 off, bit 3 (the stack limit) on */
     uint32_t lo = (uint32_t)(uintptr_t)_c1_ustack + 256u, hi = (uint32_t)(uintptr_t)_c1_sstack_top - 1u;
+    uint32_t done, last_bad = 0xFFFFFFFFu;
     *(volatile uint32_t *)0x1EEF2D8u = hi;
     *(volatile uint32_t *)0x1EEF2DCu = lo;
     *(volatile uint32_t *)0x1EEF2E0u = hi;
     *(volatile uint32_t *)0x1EEF2E4u = lo;
     *(volatile uint32_t *)0x1EEF2D0u = (*(volatile uint32_t *)0x1EEF2D0u & ~((1u << 2) | (0x1Fu << 16))) | (1u << 3);
     fm1_c1_trace = 0xC1000002;
+    done = fm1_c1_mb.done;
     fm1_c1_mb.alive = 1;
     FM1_C1_SYNC();
     for (;;) {
-        uint32_t j = fm1_c1_mb.job, d;
+        uint32_t j = fm1_c1_mb.job;
         FM1_C1_SYNC();
-        d = fm1_c1_mb.done;
-        if (j != d) {
+        if (j == done)
+            continue;
+        if (j == done + 1u) {
             void (*fn)(uint32_t) = fm1_c1_mb.fn;
-            if (fn && j == d + 1u) {
-                fn(fm1_c1_mb.arg);              /* the work itself runs from the flash */
-            } else {
-                fm1_c1_mb.bad_job = j;
-                fm1_c1_mb.bad_done = d;
-                fm1_c1_mb.bad_fn = (uint32_t)(uintptr_t)fn;
+            uint32_t arg = fm1_c1_mb.arg;
+            if (fn && fm1_c1_mb.check == FM1_C1_CHECK(fn, arg, j)) {
+                fn(arg);                        /* the work itself runs from the flash */
+                done = j;
                 FM1_C1_SYNC();
-                fm1_c1_mb.bad++;
+                fm1_c1_mb.done = j;
+                FM1_C1_SYNC();
+                continue;
             }
+            fm1_c1_mb.bad_fn = (uint32_t)(uintptr_t)fn;
+        }
+        if (j != last_bad) {                    /* each wrong value once (it stays until core 0 holds it) */
+            last_bad = j;
+            fm1_c1_mb.bad_job = j;
+            fm1_c1_mb.bad_done = done;
             FM1_C1_SYNC();
-            fm1_c1_mb.done = j;
+            fm1_c1_mb.bad++;
             FM1_C1_SYNC();
         }
     }
@@ -135,12 +149,15 @@ static int fm1_cpu1_start(void)
 /* hand core 1 a job: 1 = it took it (fm1_cpu1_wait before touching what it works on) */
 static inline int fm1_cpu1_run(void (*fn)(uint32_t), uint32_t arg)
 {
+    uint32_t job;
     if (!fm1_c1_on)
         return 0;
+    job = fm1_c1_mb.job + 1u;
     fm1_c1_mb.fn = fn;
     fm1_c1_mb.arg = arg;
+    fm1_c1_mb.check = FM1_C1_CHECK(fn, arg, job);
     FM1_C1_SYNC();
-    fm1_c1_mb.job = fm1_c1_mb.job + 1u;
+    fm1_c1_mb.job = job;
     FM1_C1_SYNC();
     return 1;
 }
