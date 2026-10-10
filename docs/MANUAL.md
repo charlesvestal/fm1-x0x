@@ -643,6 +643,10 @@ share on the performance page is the time the first core waits for them, and the
 one FM-1 the test's three patterns went from 43%, 83% and 115% on one core to 39%, 54% and 68%,
 and the busiest moment of the worst case from over the limit to 84%.
 
+The top right of the performance page says 2 CORES. On some FM-1s the second core reads its work
+wrongly; X0X notices the first time and carries on with one core, and the page says 1 CORE: BAD
+READS in red. Everything still works, but the busiest patterns may drop out.
+
 When the FM-1 gets close to its limit, X0X lightens the load by itself instead of dropping out:
 the 303s stop oversampling (bright, resonant notes get a touch grittier) and the 808's sounds end
 a little sooner as they fade. While this is happening, GUARD lights up in amber next to the audio

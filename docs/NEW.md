@@ -3,6 +3,13 @@
 The newest version first. Install it with the [web installer](../install/); the
 [manual](../manual/) covers everything in detail.
 
+## 1.0.4 · 10 October 2026
+
+- On FM-1s whose second processor core doesn't work reliably, X0X notices and carries on with one core,
+  instead of clicking or stopping in the middle of an update. GLO > PERFORMANCE says 2 CORES, or
+  1 CORE: BAD READS on such a unit. Thanks to Jangada's maintainer for the measurements and the fixes.
+- A crash on the second core no longer freezes the FM-1.
+
 ## 1.0.3 · 10 October 2026
 
 - GLO > BATTERY shows the battery's charge: FULL, 2/3, 1/3 or EMPTY, or USB POWER while a computer powers
