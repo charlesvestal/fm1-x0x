@@ -43,6 +43,15 @@ turn ALGO 1
 tapkey b7
 shot t03_808.png
 turn ALGO 1
+# two ties by hand (TB-3PO writes none): on SEQ, hold a step, KNOB 2 to TIE; the manual's picture shows them
+tap SEQ
+key w5 down
+turn K2 1
+key w5 up
+key w6 down
+turn K2 1
+key w6 up
+tap EDIT
 wait 300
 shot t04_303a.png
 key w2 down
