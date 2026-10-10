@@ -473,6 +473,10 @@ Hold a step (on SEQ or EDIT) and turn SELECT to set the chance it plays, from 10
 in steps of 5; the top line shows it (STEP 5: 50%). The dice are rolled every time the step comes
 round, so 50% plays about every other pass.
 
+Keep turning past 5% for **cycles**: 1:2, 2:2, 1:3 and so on up to 8:8. A step at 1:4 plays on the
+first of every four times round its part's pattern, 2:4 on the second; nothing random about it.
+Each part counts its own passes from when you press PLAY.
+
 - On the 909 and 808 the chance belongs to the selected track's step, so the kick and the hats
   on one step can each have their own.
 - On a 303 a skipped step is a rest; on the break, a skipped step doesn't fire.

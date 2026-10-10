@@ -14,7 +14,7 @@ expect hit0.0.0 1
 expect lanes 1
 expect laneval7.0.0.0 50
 key w1 down
-turn SELECT -30
+turn SELECT -19
 key w1 up
 expect laneval7.0.0.1 5
 # back to 100 %: the lane's step is empty again (the lane stays for step 2)

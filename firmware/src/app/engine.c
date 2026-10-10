@@ -304,6 +304,11 @@ static uint32_t prob_rng = 0x2545F491u;
 static int prob_skip(int part, int v)                 /* ISR: 1 = this hit does not play */
 {
     uint32_t p = prob[part][v];
+    if (p > 100u && p < PROB_COND + PROB_NCOND) {      /* A:B: the A-th of every B passes (seq_track_t.bars) */
+        int a, b;
+        prob_cond((int)p - PROB_COND, &a, &b);
+        return (int)(seq.t[part].bars % (uint32_t)b) != a - 1;
+    }
     if (p >= 100u)
         return 0;
     prob_rng ^= prob_rng << 13;

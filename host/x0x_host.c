@@ -102,10 +102,12 @@ int plat_midi_in(uint32_t *pkt)
     *pkt = min_q[mi_r++ % MQ];
     return 1;
 }
-static uint32_t midi_out_count, clock_out_count;
+static uint32_t midi_out_count, clock_out_count, note_ons;
 void plat_midi_out(uint32_t pkt)
 {
     midi_out_count++;
+    if ((((pkt >> 8) & 0xF0) == 0x90) && ((pkt >> 24) & 0x7F))
+        note_ons++;                                  /* the notes the sequence sent (expect noteons) */
     if (((pkt >> 8) & 0xFF) == 0xF8)
         clock_out_count++;
     else if (midi_log)
@@ -684,6 +686,8 @@ static int expect(const char *what, const char *val)
         got = (int)(seq.bpm + 0.5f);
     else if (!strcmp(what, "clocks_out"))
         got = (int)clock_out_count;
+    else if (!strcmp(what, "noteons"))
+        got = (int)note_ons;
     else if (!strcmp(what, "store_writes"))
         got = (int)store_writes;
     else if (!strcmp(what, "peak_db_max")) {

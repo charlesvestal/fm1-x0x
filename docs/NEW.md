@@ -3,6 +3,13 @@
 The newest version first. Install it with the [web installer](../install/); the
 [manual](../manual/) covers everything in detail.
 
+## 1.0.1 · 10 October 2026
+
+- Probability cycles: hold a step and turn SELECT down past 5% for 1:2, 2:2, 1:3 … 8:8. A step at 1:4
+  plays on the first of every four passes of its pattern, 2:4 on the second.
+
+![STEP 15: 1:4, the open hat on the first of every four passes](img/new/1.0.1-cycle.png)
+
 ## 1.0 · 10 October 2026
 
 ### Highlights

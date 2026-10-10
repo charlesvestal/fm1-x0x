@@ -1761,29 +1761,40 @@ static int held_any_step(void)
 static void prob_turn(int e)
 {
     int s = held_any_step(), part = ui.part, v = part << 4 | (is_drum() ? ui.sel[part] : 0), k, nv, j, any = 0;
-    char t[24];
+    char t[24], *q;
     lane_t *l;
     if (is_303())
         ui.step_edited = 1;
     else
         ui.hold_used = 1;
     k = motion_find(proj.arr.lane, seq.ppat[part], part, T_PROB, v, 0);
-    nv = (k >= 0 && proj.arr.lane[k].val[s] != MOT_NONE ? proj.arr.lane[k].val[s] : 100) + (e > 0 ? 5 : -5);
-    nv = nv < 5 ? 5 : nv > 100 ? 100 : nv;
-    if (nv < 100 && k < 0 && (k = motion_alloc(proj.arr.lane, seq.ppat[part], part, T_PROB, v, 0)) < 0) {
+    nv = k >= 0 && proj.arr.lane[k].val[s] != MOT_NONE ? proj.arr.lane[k].val[s] : 100;
+    {   /* one line, turned down from 100 %: 95 .. 5 %, then 1:2 2:2 1:3 .. 8:8 */
+        int pos = nv > 100 ? 20 + nv - PROB_COND : (100 - nv) / 5;
+        pos += e > 0 ? -1 : 1;
+        pos = pos < 0 ? 0 : pos > 19 + PROB_NCOND ? 19 + PROB_NCOND : pos;
+        nv = pos < 20 ? 100 - 5 * pos : PROB_COND + pos - 20;
+    }
+    if (nv != 100 && k < 0 && (k = motion_alloc(proj.arr.lane, seq.ppat[part], part, T_PROB, v, 0)) < 0) {
         say("MOTION FULL", 0);
         return;
     }
     if (k >= 0) {
         l = &proj.arr.lane[k];
-        l->val[s] = (uint8_t)(nv < 100 ? nv : MOT_NONE);
+        l->val[s] = (uint8_t)(nv != 100 ? nv : MOT_NONE);
         for (j = 0; j < NSTEPS; j++)
             any |= l->val[j] != MOT_NONE;
         if (!any)
             motion_clear(proj.arr.lane, k);
     }
     mark_dirty();
-    put_s(put_i(put_s(put_i(put_s(t, "STEP "), s + 1), ": "), nv), "%");
+    q = put_s(put_i(put_s(t, "STEP "), s + 1), ": ");
+    if (nv > 100) {
+        int a, b;
+        prob_cond(nv - PROB_COND, &a, &b);
+        put_i(put_s(put_i(q, a), ":"), b);
+    } else
+        put_s(put_i(q, nv), "%");
     say(t, 0);
 }
 

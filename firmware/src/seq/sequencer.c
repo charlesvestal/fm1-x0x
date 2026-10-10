@@ -315,7 +315,7 @@ static uint32_t fire_step(seq_t *s, int t, const seq_sink_t *o)
     }
     if (wrapped && bass)
         auto_mutate(s, t - TRK_BASS0);
-    if (wrapped && t == TRK_BRK)
+    if (wrapped && (t == TRK_BRK || is_drum(t)))   /* (the 303s count theirs in auto_mutate) */
         tr->bars++;
     tr->pos = (uint8_t)p;
     if (o->step)                                     /* first: the step's motion and p-locks, which the hit */

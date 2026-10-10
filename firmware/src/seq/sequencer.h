@@ -51,6 +51,20 @@ static inline uint32_t seq_part_mask(int p)
 
 #define NSONG 192
 #define SEQ_CH_OFF 0xFFu
+/* a step's chance (the T_PROB lanes): 1-100 = that percentage, PROB_COND + k = the cycle k in the order
+ * 1:2 2:2 1:3 2:3 3:3 1:4 ... 8:8 (A:B: on the A-th of every B passes of the part's pattern) */
+#define PROB_COND 101
+#define PROB_NCOND 35                    /* 2 + 3 + ... + 8 */
+static inline void prob_cond(int k, int *a, int *b)
+{
+    int n = 2;
+    while (k >= n) {
+        k -= n;
+        n++;
+    }
+    *a = k + 1;
+    *b = n;
+}
 #define SONG_REP(b) (((b)->mute >> 5) + 1)    /* a bar plays 1-8 times: mute's bits 5-7 (the parts use 0-4) */
 typedef struct {
     uint8_t pat[NTRACKS];             /* each part's pattern */
