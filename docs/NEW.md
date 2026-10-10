@@ -3,6 +3,11 @@
 The newest version first. Install it with the [web installer](../install/); the
 [manual](../manual/) covers everything in detail.
 
+## 1.0.3 · 10 October 2026
+
+- GLO > BATTERY shows the battery's charge: FULL, 2/3, 1/3 or EMPTY, or USB POWER while a computer powers
+  the FM-1.
+
 ## 1.0.2 · 10 October 2026
 
 - Probability cycles count from the first pass again when the 909 changes pattern, as the other parts
