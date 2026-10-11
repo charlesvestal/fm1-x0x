@@ -449,6 +449,9 @@ static void fm1_main(void)
     palette_set(1);
     draw_text_box(0, 96, 240, &FONT_M, "X0X", C_HI, 1);
     draw_text_box(0, 134, 240, &FONT_S, "909 808 303 303 BREAK", C_GRAY, 1);
+#if BOARD_SMK37
+    draw_text_box(0, 222, 240, &FONT_XS, "SMK-37 port by genkigenki", C_DIM, 1);   /* the port credit, small and dim */
+#endif
     if (x0x_dbg.magic != DBG_MAGIC) {
         memset(&x0x_dbg, 0, sizeof x0x_dbg);
         x0x_dbg.magic = DBG_MAGIC;
