@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
 # Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
-"""Install a Felucca package (.fwsc) on an FM-1 over USB-MIDI.
+"""Install a Felucca package (.fwsc) on an FM-1 (or an M-Vave SMK-37 Pro) over USB-MIDI.
 
 The same update as the web installer (web/fm1ota.js): step 1, the
 running firmware reads parts of the package and starts the update loader;
@@ -18,6 +18,10 @@ install finishes the write. Needs mido with python-rtmidi.
 Exit codes: 0 done, 1 cancelled or other error, 2 bad arguments or package,
 3 FM-1 not found, 4 connection lost or the device stopped, 5 timeout (no
 loader / no restart), 6 wrong model, or another identity after the install.
+
+Packages: 20 interleave blocks (FM-1, X0X, an SMK-37 Pro build of X0X) or more (the stock SMK-37 Pro
+v016 has 36: the extra markers are 0x7D); the count is detected and checked with the files' CRCs.
+The model is checked: an FM-1 package never goes to an SMK-37 Pro, nor the other way round.
 """
 import argparse
 import queue
@@ -29,9 +33,10 @@ HS_QUERY = bytes([0xF0, 0x00, 0x32, 0x45, 0x00, 0x00, 0x00, 0x40, 0x7F, 0xF7])
 UPGRADE = bytes([0xF0, 0x22, 0x24, 0x35, 0x7F, 0xF7])
 FINISH_CHECK, FINISH_WRITE = 0xE0000000, 0xF0000000
 MAXDATA = 512
-BLOCKS, BLK, KEEP = 20, 0x30, 0x2F
+BLOCKS, BLK, KEEP = 20, 0x30, 0x2F         # BLOCKS: the identity blocks (more may follow, see block_count)
+MAX_BLOCKS = 64
 LOADER_MARK = b"FELUCCA-LOADER-1"
-PORT_RE = re.compile(r"fm-1|felucca|ota|composite|sinco|usb-midi", re.I)   # never probe other gear
+PORT_RE = re.compile(r"fm-1|smk|felucca|ota|composite|sinco|usb-midi", re.I)   # never probe other gear
 
 # seconds; the tests shorten them
 DELAY = {"open": 0.3, "start": 2.0, "reply": 0.01, "loader": 3.0, "reboot": 3.0, "retry": 1.0,
@@ -117,18 +122,85 @@ def parse_identity(pkt):
 # --------------------------------------------------------------- package ---
 
 def product_of(raw):
-    """the package identity ("FM-1_906"): one marker byte after each of the first 20 blocks"""
+    """the package identity ("FM-1_906", "SMK-37 Pro_900"): one marker byte after each of the first 20 blocks"""
     if len(raw) < BLOCKS * BLK:
         raise InstallError("badpkg", "not an FM-1 package (too short)")
     return "".join(chr((m - i - 1) & 0xFF) for i in range(BLOCKS) if (m := raw[i * BLK + KEEP]) != 0x7D)
 
 
-def logical_image(raw):
-    """the image the device reads during an update: the package without the 20 marker bytes"""
+def block_count(raw):
+    """interleave blocks: 20, then more while the marker is the unused 0x7D (SMK-37 Pro v016: 36).
+    A 20-block package can have 0x7D there by chance: deinterleave checks the CRCs and falls back."""
+    n = BLOCKS
+    while n < MAX_BLOCKS and (n + 1) * BLK <= len(raw) and raw[n * BLK + KEEP] == 0x7D:
+        n += 1
+    return n
+
+
+def logical_image(raw, blocks=BLOCKS):
+    """the image the device reads during an update: the package without the marker bytes"""
     out = bytearray()
-    for i in range(BLOCKS):
+    for i in range(blocks):
         out += raw[i * BLK:i * BLK + KEEP]
-    return bytes(out + raw[BLOCKS * BLK:])
+    return bytes(out + raw[blocks * BLK:])
+
+
+def deinterleave(raw):
+    """-> (logical image, block count): the detected count when the files' CRCs agree, else 20"""
+    n = block_count(raw)
+    image = logical_image(raw, n)
+    if n != BLOCKS and package_damage(image):
+        alt = logical_image(raw, BLOCKS)
+        if not package_damage(alt):
+            return alt, BLOCKS
+    return image, n
+
+
+def _crc16(data, crc=0):
+    """CRC-16/XMODEM, as the package and the device use"""
+    for b in data:
+        crc ^= b << 8
+        for _ in range(8):
+            crc = ((crc << 1) ^ 0x1021) & 0xFFFF if crc & 0x8000 else (crc << 1) & 0xFFFF
+    return crc
+
+
+def _dec(b):
+    """JieLi ENC stream cipher (its own inverse)"""
+    out, key = bytearray(b), 0xFFFF
+    for i in range(len(out)):
+        out[i] ^= key & 0xFF
+        key = ((key << 1) ^ (0x1021 if key & 0x8000 else 0)) & 0xFFFF
+    return bytes(out)
+
+
+def package_damage(image):
+    """what is wrong with the update image (header, file list, each file's CRC), or None"""
+    if len(image) < 0x40:
+        return "too short"
+    hdr = _dec(image[0:0x40])
+    if _crc16(hdr[2:0x40]) != int.from_bytes(hdr[0:2], "little"):
+        return "header CRC"
+    count = int.from_bytes(hdr[8:10], "little")
+    if not 1 <= count <= 8 or len(image) < 0x40 + 0x50 * count:
+        return "file list"
+    lst = image[0x40:0x40 + 0x50 * count]
+    if _crc16(lst) != int.from_bytes(hdr[2:4], "little"):
+        return "file list CRC"
+    for i in range(count):
+        e = _dec(lst[i * 0x50:(i + 1) * 0x50])
+        dcrc = int.from_bytes(e[4:6], "little")
+        off = int.from_bytes(e[8:12], "little")
+        size = int.from_bytes(e[12:16], "little")
+        name = e[0x40:0x50].split(b"\0")[0].decode("ascii", "replace")
+        if off + size > len(image):
+            return f"{name}: cut short"
+        typ = int.from_bytes(e[0:2], "little")
+        # flash.bin (0) and ota.bin (100), what the device installs, carry the CRC of their bytes as
+        # served. The stock packer's other entries store a CRC of something else: bounds only.
+        if typ in (0, 100) and _crc16(image[off:off + size]) != dcrc:
+            return f"{name}: CRC"
+    return None
 
 
 def model_of(text):
@@ -372,7 +444,7 @@ def load_package(path, force):
     if LOADER_MARK not in raw and not force:
         raise InstallError("badpkg", f"{path}: no Felucca update loader in this package; "
                                      "only Felucca's own packages are installed (--force overrides)")
-    return product, logical_image(raw)
+    return product, deinterleave(raw)[0]
 
 
 def not_found(up):

@@ -65,6 +65,22 @@ if [ -f build/x0x.fwsc ]; then
 else
     echo "  skip update-path tests (no build/x0x.fwsc: run ./build.sh)"
 fi
+# SMK-37 Pro (BOARD_SMK37): the flash map and the store, the package layout, the update path on SMK-layout
+# packages (made from the FM-1 app: only the layout matters), and the SMK build's own package if there is one
+run smk-flash sh -c "$CC -O2 -Wall -Wno-unused-function -DBOARD_SMK37=1 -Ifirmware/hal -o $OUT/smk_flash_test \
+    tests/smk_flash_test.c && $OUT/smk_flash_test"
+run smk-storage sh -c "$CC -O2 -DBOARD_SMK37=1 -o $OUT/storage_test_smk tests/storage_test.c && $OUT/storage_test_smk"
+if [ -f build/x0x.fwsc ] && [ -n "${AC79_SDK:-}" ]; then
+    run smk-package sh -c "python3 tools/fm1pkg_make.py --board smk37 build/x0x.bin build/loader/ota.bin $OUT/smk_new.fwsc >/dev/null && \
+        python3 tests/smk_pkg_test.py $OUT/smk_new.fwsc"
+    run smk-ota-entry sh -c "$CC -DBOARD_SMK37=1 -o $OUT/ota_test_smk tests/ota_test.c && $OUT/ota_test_smk $OUT/smk_new.fwsc"
+    run smk-update-loader sh -c "head -c 200000 build/x0x.bin > $OUT/old_app.bin && \
+        python3 tools/fm1pkg_make.py --board smk37 $OUT/old_app.bin build/loader/ota.bin $OUT/smk_old.fwsc >/dev/null && \
+        $CC -DBOARD_SMK37=1 -o $OUT/ldr_test_smk tests/ldr_test.c && $OUT/ldr_test_smk $OUT/smk_old.fwsc $OUT/smk_new.fwsc"
+else
+    echo "  skip SMK-37 Pro package tests (needs build/x0x.fwsc and AC79_SDK)"
+fi
+[ -f build/x0x-smk37.fwsc ] && run smk-build-package python3 tests/smk_pkg_test.py build/x0x-smk37.fwsc
 run upload-images sh -c "python3 tests/host/make_test_loops.py build/test_loops && \
     python3 tools/upload_breaks.py --dry-run build/test_upload build/test_loops/loop*.wav"
 command -v node >/dev/null 2>&1 && run breaks-web node web/test_breaks.mjs   # the browser uploader: upload_breaks.py's bytes

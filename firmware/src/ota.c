@@ -6,8 +6,8 @@
  *   cmd 0x11  handshake -> we answer our package identity (FELUCCA_ID)
  *   F0 22 24 35 7F F7  upgrade -> ota_session(): pull parts of the package
  *     with cmd 0x30 read requests, check them, stage the package's update
- *     loader at 0xE0000 (outside Felucca's store), ask 0xE0000000 ("success"),
- *     then write the UPDATA_PARM record (flash 0xE4F00 + RAM 0x01C7FD88) and
+ *     loader at 0xE0000 (outside Felucca's store; SMK: 0xBB000), ask 0xE0000000 ("success"),
+ *     then write the UPDATA_PARM record (flash 0xE4F00, SMK 0xBFF00, + RAM 0x01C7FD88) and
  *     reset. The SPL runs the loader, which installs the package.
  * Nothing is committed before the host's "success"; any failure erases the
  * staging area and Felucca carries on.
@@ -21,9 +21,20 @@
  *   ota_show(step, code)       progress / result for the screen
  *   ota_commit(parm)           write RAM record + reset (never returns on hardware)
  */
+#if BOARD_SMK37
+/* SMK-37 Pro: the last 5 sectors of the stock VM (0xBB000..0xBFFFF, FL_OTA in fm1_flash.h), below BTIF /
+ * USRTRIM 0xC0000..0xC1FFF; the update loader may drop records only below 0xC0000 (ldr_core.c) */
+#define OTA_AREA 0x000BB000u                     /* staged loader, 5 x 4 KiB */
+#define OTA_AREA_LEN 0x5000u
+#define OTA_RES (OTA_AREA + OTA_AREA_LEN - 0x100u)  /* 0xBFF00 = 4K boundary - 256: SPL scan */
+#define OTA_PARM_ID "ota-SMK-37 Pro_016"          /* the stock app's parm identity (18 B) */
+_Static_assert(OTA_AREA + OTA_AREA_LEN <= 0xC0000u && OTA_AREA >= 0x9D000u, "SMK: OTA area outside the VM");
+#else
 #define OTA_AREA 0x000E0000u                     /* staged loader, 5 x 4 KiB */
 #define OTA_AREA_LEN 0x5000u
 #define OTA_RES (OTA_AREA + OTA_AREA_LEN - 0x100u)  /* 0xE4F00 = 4K boundary - 256: SPL scan */
+#define OTA_PARM_ID "ota-FM-1_015"
+#endif
 #define OTA_LDR_HCRC 0xEBAAu                     /* official update loader (usb_hid_ota.bin) */
 #define OTA_LDR_DCRC 0x5881u
 #define OTA_LDR_LEN 0x4DE1u
@@ -354,8 +365,8 @@ static int ota_session(void)
     ota_wr16(parm + 2, 0x5A0Du);
     ota_wr16(parm + 4, 0x5A01u);
     ota_wr16(parm + 6, 0x5441u);
-    for (i = 0; i < 12u; i++)
-        parm[8 + i] = (uint8_t)"ota-FM-1_015"[i];    /* the loader's own USB identity */
+    for (i = 0; i < sizeof OTA_PARM_ID - 1u; i++)    /* FM-1 12 B, SMK 18 B; zero up to +0x27 */
+        parm[8 + i] = (uint8_t)OTA_PARM_ID[i];    /* the loader's own USB identity */
     ota_wr32(parm + 72, OTA_AREA);
     ota_wr16(parm, ota_crc16(parm + 2, 78, 0));
 #if FELUCCA_OTA_DRYRUN

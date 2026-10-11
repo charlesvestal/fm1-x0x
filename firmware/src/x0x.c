@@ -38,11 +38,23 @@ static inline int32_t clamp(int32_t v, int32_t lo, int32_t hi) { return v < lo ?
 #endif
 #define FELUCCA_UAC X0X_UAC
 #ifndef FELUCCA_ID
+#if BOARD_SMK37
+#define FELUCCA_ID "SMK-37 Pro_900"   /* package identity (tools/build.py) */
+#else
 #define FELUCCA_ID "FM-1_900"     /* package identity (tools/build.py) */
+#endif
 #endif
 #include "usb.c"
 #ifndef X0X_TRS
+#if BOARD_SMK37
+#define X0X_TRS 0                 /* SMK-37 Pro: no MIDI IN (its jack is MIDI OUT, UART1 TX on PC7); PH8 is a
+                                   * key-matrix row there and must never become UART RX */
+#else
 #define X0X_TRS 1                 /* MIDI IN on the TRS jack */
+#endif
+#endif
+#if BOARD_SMK37 && X0X_TRS
+#error "BOARD_SMK37: midi_uart.c is the FM-1 MIDI IN driver (RX on PH8, a key-matrix row on the SMK)"
 #endif
 #if X0X_TRS
 #include "midi_uart.c"
@@ -79,6 +91,7 @@ static int st_prog(uint32_t off, const void *src, uint32_t n)
         return -8;
     return fl_write(off, src, n);
 }
+#define ST_IDLE() fm1_wdt_feed()   /* (storage.c, SMK store owner check: between sector erases) */
 #include "storage.c"
 
 struct bootguard_s { uint32_t magic, failed, pending; };

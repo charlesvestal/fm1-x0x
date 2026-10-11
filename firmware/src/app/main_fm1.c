@@ -275,10 +275,13 @@ static void fm1_main(void)
     uint8_t last_pat = 0xFF;
     {
         uint32_t f = irq_save();
-        flash_ok = FL_FAR(fl_jedec_ram)() == 0x856014u;   /* the expected 1 MiB part, else RAM only */
+        flash_ok = FL_JEDEC_OK(FL_FAR(fl_jedec_ram)());   /* the expected 1 MiB part, else RAM only */
         irq_restore(f);
         if (flash_ok) {
             fl_plain_window_init();                 /* user sample slots read as plaintext through XIP */
+#if BOARD_SMK37
+            st_owner_check();                       /* SMK: never parse another ported firmware's store (storage.c) */
+#endif
             for (k = 0; k < SMP_USER_SLOTS; k++)
                 smp_user_scan(k);
             ota_boot_cleanup();
@@ -344,6 +347,10 @@ static void fm1_main(void)
     fm1_delay_ms(300);
     lcd_fill(0, 0, 240, 240, C_BLACK);
     ui_init();
+#if BOARD_SMK37
+    if (st_owner_cleared)
+        ui_say("OLD DATA CLEARED", 0);          /* another firmware's store (storage.c st_owner_check); say() has 27 chars */
+#endif
 
     for (;;) {
         fm1_wdt_feed();

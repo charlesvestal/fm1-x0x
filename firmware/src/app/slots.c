@@ -2,7 +2,7 @@
  * User sample slots: adapted from Felucca's eng_sample.c, Copyright (C) 2026 Leo Kuroshita
  * (@kurogedelic), Hugelton Instruments. */
 /* User sample slots (break loops), uploaded over USB with tools/fm1_sample_upload.py
- * (or the web editor's sample page): 3 slots of 80 KiB at flash 0xA0000.., read in place
+ * (or the web editor's sample page): 3 slots of 80 KiB at flash 0xA0000.. (SMK-37 Pro: 2 at 0xC2000..), read in place
  * through the XIP window. Slot = header (magic, count, name, data length, CRC32) + up to
  * 16 zones + IMA ADPCM data at +512. X0X plays zone 0 of a slot as a loop. */
 typedef struct {
@@ -12,9 +12,17 @@ typedef struct {
     int16_t pred;
     uint8_t idx, lo, hi, looped;
 } smp_zone_t;
+#define SMP_USER_SIZE 0x14000u
+#if BOARD_SMK37
+/* SMK-37 Pro: two slots in USRFLASH 0xC2000..0xE9FFF (FL_SMP, fm1_flash_map.h); the third has no flash there.
+ * The UI keeps PLAT_NSLOTS 3: slot 3 is always empty, and the editor refuses an upload to it. */
+#define SMP_USER_SLOTS 2
+#define SMP_USER_BASE 0xC2000u
+_Static_assert(SMP_USER_BASE + SMP_USER_SLOTS * SMP_USER_SIZE <= 0xEA000u, "SMK: user slots past FL_SMP");
+#else
 #define SMP_USER_SLOTS 3
 #define SMP_USER_BASE 0xA0000u
-#define SMP_USER_SIZE 0x14000u
+#endif
 #define SMP_USER_DATA 512u
 #define SMP_USER_MAGIC 0x504D5346u                  /* "FSMP" */
 typedef struct {

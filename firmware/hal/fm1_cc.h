@@ -8,3 +8,9 @@
 #pragma once
 
 #define FM1_INLINE static inline __attribute__((always_inline))
+
+/* Target board: 0 = M-Vave FM-1 (default), 1 = M-Vave SMK-37 Pro (same AC791N, SPL and
+ * update loader; different panel wiring). build.py sets it from BOARD=smk37. */
+#ifndef BOARD_SMK37
+#define BOARD_SMK37 0
+#endif

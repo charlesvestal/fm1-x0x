@@ -47,6 +47,63 @@ static uint32_t st_crc32(const void *p, uint32_t n)   /* zlib CRC-32, 4 bits per
     return ~c;
 }
 
+#if BOARD_SMK37
+/* SMK-37 Pro (see the fm1-to-smk37 guide): every object in FL_DATA 0x9D000..0xBAFFF (the stock VM), A/B
+ * neighbours in plat.h order: settings 0x9D000, sound 0x9F000, patterns 1-8 0xA1000, patterns 9-16 0xA3000,
+ * panel 0xA5000, song 0xA7000, motion 0xA9000 (..0xAAFFF); 0xAB000..0xBAFFF spare except the store owner
+ * tag at 0xAF000 (st_owner_check). Never near BTIF / USRTRIM (0xC0000..0xC1FFF) or key_mac (0xFF000). */
+#define ST_SMK_BASE 0x9D000u
+_Static_assert(ST_SMK_BASE + 2u * OBJ_NOBJ * ST_SECTOR <= 0xAF000u, "SMK store: objects past the owner tag");
+static uint32_t st_sector(uint32_t obj, uint32_t copy)  /* flash offset of copy A (0) / B (1) */
+{
+    return ST_SMK_BASE + ((obj % OBJ_NOBJ) * 2u + (copy & 1u)) * ST_SECTOR;
+}
+
+/* The owner of the store. Several FM-1 firmwares are ported to the SMK-37 Pro with the same board layer and
+ * this same store area, each with its own object formats: a firmware must never parse another's data. The
+ * sector 0xAF000 holds "SMK37DATA" + the firmware family (FELUCCA_DATA_FAMILY, build.py: X0X). Ours: load as
+ * ever. None (erased): data of unknown origin, kept only if FELUCCA_DATA_UNTAGGED_OK (X0X: 0, cleared).
+ * Another family's: clear the whole store area below the tag (0x9D000..0xAEFFF, the other firmware's objects
+ * included) and take it. Samples (FL_SMP) validate themselves. Calibration, BT pairing and key_mac are outside
+ * FL_DATA: never touched. Called once at boot, before the first store read (app/main_fm1.c). */
+#ifndef FELUCCA_DATA_FAMILY
+#define FELUCCA_DATA_FAMILY "X0X"
+#endif
+#ifndef FELUCCA_DATA_UNTAGGED_OK
+#define FELUCCA_DATA_UNTAGGED_OK 0
+#endif
+#define ST_OWNER_SECTOR 0xAF000u
+#ifndef ST_IDLE
+#define ST_IDLE() ((void)0)                     /* (x0x.c: feed the watchdog between erases) */
+#endif
+_Static_assert(ST_OWNER_SECTOR + ST_SECTOR <= 0xBB000u, "SMK store owner: past FL_DATA");
+static uint8_t st_owner_cleared;                /* (the UI says so at boot) */
+static void st_owner_check(void)
+{
+    static const char FAM[] = FELUCCA_DATA_FAMILY;
+    uint8_t tag[16], want[16];
+    uint32_t i, erased = 1, ours = 1, s;
+    for (i = 0; i < 16u; i++)
+        want[i] = i < 9u ? (uint8_t)"SMK37DATA"[i] : i - 9u < sizeof FAM - 1u ? (uint8_t)FAM[i - 9u] : 0u;
+    if (st_read(ST_OWNER_SECTOR, tag, 16))
+        return;
+    for (i = 0; i < 16u; i++) {
+        erased &= tag[i] == 0xFFu;
+        ours &= tag[i] == want[i];
+    }
+    if (ours)
+        return;
+    if (!erased || !FELUCCA_DATA_UNTAGGED_OK) {     /* another firmware's store (or unknown): clear it */
+        for (s = ST_SMK_BASE; s < ST_OWNER_SECTOR; s += ST_SECTOR) {
+            st_erase(s);
+            ST_IDLE();
+        }
+        st_owner_cleared = 1;
+    }
+    st_erase(ST_OWNER_SECTOR);
+    st_prog(ST_OWNER_SECTOR, want, 16);
+}
+#else
 static uint32_t st_sector(uint32_t obj, uint32_t copy)  /* flash offset of copy A (0) / B (1) */
 {
     if (obj == OBJ_SET)
@@ -59,6 +116,7 @@ static uint32_t st_sector(uint32_t obj, uint32_t copy)  /* flash offset of copy 
         return 0x9D000u + copy * ST_SECTOR;
     return 0x97000u + (obj - OBJ_SOUND) * 2u * ST_SECTOR + copy * ST_SECTOR;   /* SOUND, PAT0, PAT1 */
 }
+#endif
 
 static uint8_t st_buf[ST_PAYLOAD_MAX] __attribute__((aligned(4)));
 

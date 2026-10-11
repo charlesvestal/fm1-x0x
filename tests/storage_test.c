@@ -94,8 +94,12 @@ int main(void)
         uint32_t o, p, ok = 1;
         for (o = 0; o < OBJ_NOBJ; o++) {
             uint32_t a0 = st_sector(o, 0), a1 = st_sector(o, 1) + 4096;
+#if BOARD_SMK37                                    /* (-DBOARD_SMK37=1) the SMK store, below its owner tag 0xAF000 */
+            int in_data = a0 >= 0x9D000 && a1 <= 0xAF000;
+#else
             int in_data = (a0 >= 0x97000 && a1 <= 0xA0000) || (a0 >= 0xDC000 && a1 <= 0xE0000) ||
                           (a0 >= 0xFC000 && a1 <= 0xFF000);
+#endif
             if (!in_data || a1 - a0 != 8192)
                 ok = 0;
             for (p = 0; p < o; p++)

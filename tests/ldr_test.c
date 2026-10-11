@@ -9,7 +9,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+#if BOARD_SMK37                          /* -DBOARD_SMK37=1: SMK-37 Pro packages (fm1pkg_make.py --board smk37) */
+#define FELUCCA_ID "ota-SMK-37 Pro_900"
+#define T_APP_HI 0x9D000u                   /* end of the app area the loader writes */
+#define T_REC 0xBFF00u                      /* the update record (ota.c OTA_RES) */
+#define T_ERASE_HI 0xC0000u                 /* nothing erased at or above (BTIF, USRTRIM, ...) */
+#else
 #define FELUCCA_ID "ota-FM-1_900"
+#define T_APP_HI 0x93000u
+#define T_REC 0xE4F00u
+#define T_ERASE_HI 0xFC000u
+#endif
 #define FELUCCA_OTA_DRYRUN 0
 
 static uint8_t nor[0x100000], *logical;
@@ -80,7 +90,7 @@ static void ota_commit(const uint8_t *parm) { (void)parm; }
 static int ldr_fread(uint32_t off, void *p, uint32_t n) { memcpy(p, nor + off, n); return 0; }
 static int ldr_erase(uint32_t off)
 {
-    if (off < 0x4000u || off >= 0xFC000u || (off & 0xFFFu)) bad_range++;
+    if (off < 0x4000u || off >= T_ERASE_HI || (off & 0xFFFu)) bad_range++;
     if (off < 0x4000u) { printf("ERASE IN THE HEAD %#x\n", off); exit(1); }
     erases++;
     memset(nor + off, 0xFF, 0x1000);
@@ -90,7 +100,7 @@ static int ldr_prog(uint32_t off, const void *p, uint32_t n)
 {
     const uint8_t *s = p;
     uint32_t i;
-    if (off < 0x4000u || off + n > 0x93000u || ((off & 0xFFu) + n) > 256u) bad_range++;
+    if (off < 0x4000u || off + n > T_APP_HI || ((off & 0xFFu) + n) > 256u) bad_range++;
     for (i = 0; i < n; i++) nor[off + i] &= s[i];
     return 0;
 }
@@ -131,6 +141,43 @@ static uint32_t flash_off(const uint8_t *lg)        /* flash.bin offset in the l
 
 static int check(const char *what, int ok) { printf("%-56s %s\n", what, ok ? "ok" : "FAIL"); return ok ? 0 : 1; }
 
+static void put_record_at(uint32_t at)
+{
+    uint8_t r[112] = {0};
+    r[2] = 0x0D; r[3] = 0x5A; r[4] = 0x01; r[5] = 0x5A; r[6] = 0x41; r[7] = 0x54;
+    ota_wr16(r, ota_crc16(r + 2, 78, 0));
+    memcpy(nor + at, r, sizeof r);
+}
+
+#if BOARD_SMK37
+/* the SMK's protected ranges: a pattern, and a valid-looking record in the USRTRIM sector and above it */
+static const uint32_t PROT[][2] = {{0xC0000u, 0xC2000u}, {0xF4000u, 0xFE000u}, {0xFF000u, 0x100000u}};
+static uint8_t prot_img[sizeof nor];
+static void protect_fill(void)
+{
+    uint32_t i, k;
+    for (k = 0; k < sizeof PROT / sizeof PROT[0]; k++)
+        for (i = PROT[k][0]; i < PROT[k][1]; i++)
+            nor[i] = (uint8_t)(i * 13u + 5u);
+    memcpy(nor + 0xC1224u, "trimdat", 8);
+    put_record_at(0xC1F00u);                       /* USRTRIM sector: must never be erased */
+    put_record_at(0xC0F00u);                       /* BTIF */
+    put_record_at(0xF4F00u);                       /* USR */
+    memcpy(prot_img, nor, sizeof nor);
+}
+static int protect_ok(void)
+{
+    uint32_t k;
+    for (k = 0; k < sizeof PROT / sizeof PROT[0]; k++)
+        if (memcmp(nor + PROT[k][0], prot_img + PROT[k][0], PROT[k][1] - PROT[k][0]))
+            return 0;
+    return 1;
+}
+#else
+static void protect_fill(void) {}
+static int protect_ok(void) { return 1; }
+#endif
+
 int main(int argc, char **argv)
 {
     size_t olen;
@@ -142,23 +189,19 @@ int main(int argc, char **argv)
     logical = load_logical(argv[2], &logical_len);
     ofo = flash_off(old);
     nfo = flash_off(logical);
-    /* device: OLD installed, plus a valid update record at 0xE4F00 */
+    /* device: OLD installed, plus a valid update record (FM-1 0xE4F00, SMK 0xBFF00) */
     memset(nor, 0xFF, sizeof nor);
-    memcpy(nor, old + ofo, 0x93000);
+    memcpy(nor, old + ofo, T_APP_HI);
+    protect_fill();
     memcpy(head, nor, sizeof head);
-    {
-        uint8_t r[112] = {0};
-        r[2] = 0x0D; r[3] = 0x5A; r[4] = 0x01; r[5] = 0x5A; r[6] = 0x41; r[7] = 0x54;
-        ota_wr16(r, ota_crc16(r + 2, 78, 0));
-        memcpy(nor + 0xE4F00, r, sizeof r);
-    }
+    put_record_at(T_REC);
     rc = ldr_session();
     printf("  rc %d, %u requests, %u sector erases\n", rc, requests, erases);
     bad += check("install completes", rc == 0);
-    bad += check("app area == the new package's flash.bin", !memcmp(nor + 0x4000, logical + nfo + 0x4000, 0x93000 - 0x4000));
+    bad += check("app area == the new package's flash.bin", !memcmp(nor + 0x4000, logical + nfo + 0x4000, T_APP_HI - 0x4000));
     bad += check("flash head [0, 0x4000) untouched", !memcmp(nor, head, sizeof head));
     bad += check("finish asked (0xF0000000)", f0_asked >= 1);
-    bad += check("update record cleared (RAM + flash)", record_cleared && nor[0xE4F06] == 0xFF);
+    bad += check("update record cleared (RAM + flash)", record_cleared && nor[T_REC + 6u] == 0xFF);
     bad += check("no write outside the allowed windows", bad_range == 0);
     /* same package again: nothing to erase */
     erases = 0; requests = 0;
@@ -168,12 +211,13 @@ int main(int argc, char **argv)
     {
         uint8_t save = logical[nfo + 0x4000 + 5];
         logical[nfo + 0x4000 + 5] ^= 0x5A;           /* app area head no longer decrypts */
-        memcpy(nor, old + ofo, 0x93000);
+        memcpy(nor, old + ofo, T_APP_HI);
         erases = 0;
         rc = ldr_session();
         bad += check("foreign key / damaged app head refused, nothing erased", rc == -6 && erases == 0);
         logical[nfo + 0x4000 + 5] = save;
     }
+    bad += check("protected ranges untouched (SMK: BTIF, USRTRIM, USR, key_mac)", protect_ok());
     printf("%s\n", bad ? "LOADER TEST FAILED" : "loader test passed");
     return bad != 0;
 }
