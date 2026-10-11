@@ -36,7 +36,7 @@ MAXDATA = 512
 BLOCKS, BLK, KEEP = 20, 0x30, 0x2F         # BLOCKS: the identity blocks (more may follow, see block_count)
 MAX_BLOCKS = 64
 LOADER_MARK = b"FELUCCA-LOADER-1"
-PORT_RE = re.compile(r"fm-1|smk|felucca|ota|composite|sinco|usb-midi", re.I)   # never probe other gear
+PORT_RE = re.compile(r"fm-1|smk|felucca|melodee|fomni|x0x|makkuro|ota|composite|sinco|usb-midi", re.I)   # never probe other gear
 
 # seconds; the tests shorten them
 DELAY = {"open": 0.3, "start": 2.0, "reply": 0.01, "loader": 3.0, "reboot": 3.0, "retry": 1.0,
