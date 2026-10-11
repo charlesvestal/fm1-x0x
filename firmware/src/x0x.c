@@ -124,7 +124,11 @@ static int ota_prog(uint32_t off, const void *p, uint32_t n)
 static int ota_fread(uint32_t off, void *p, uint32_t n) { return st_read(off, p, n); }
 static void ota_show(uint32_t step, int32_t code)
 {
+#if BOARD_SMK37   /* step 5 stays on screen while the loader writes the flash: say so */
+    static const char *const STEP[] = {"", "PACKAGE", "CHECK HEAD", "LOADER", "CONFIRM", "UPDATING..."};
+#else
     static const char *const STEP[] = {"", "PACKAGE", "CHECK HEAD", "LOADER", "CONFIRM", "RESTART"};
+#endif
     lcd_fill(0, 0, 240, 240, C_BLACK);
     draw_text_box(0, 92, 240, &FONT_S, "UPDATE", C_WHITE, 1);
     if (step < 9u) {
