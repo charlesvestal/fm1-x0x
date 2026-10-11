@@ -313,12 +313,36 @@ static void smk_wheels(void)
     }
 }
 
+/* < and >: one detent of SELECT back / forward (the page, a list's row: what SELECT does there; not with HOME held,
+ * where SELECT is the tempo), as on the other SMK-37 Pro ports. Not if HARDWARE CALIBRATION gave them an FM-1 label. */
+static void smk_arrows(void)
+{
+    static uint32_t prev;
+    uint32_t now = fm1_in.buttons & (1u << SMK_BTN_LEFT | 1u << SMK_BTN_RIGHT), id, i;
+    uint32_t pressed = now & ~prev;
+    prev = now;
+    if (!pressed || (plat_buttons() & (1u << B_HOME)))
+        return;
+    for (id = SMK_BTN_LEFT; id <= SMK_BTN_RIGHT; id++) {
+        if (!((pressed >> id) & 1u))
+            continue;
+        for (i = 0; i < NB && panel.btn[i] != id; i++)
+            ;
+        if (i == NB) {
+            uint32_t l = fm1__lock();
+            fm1_in.enc_steps[panel.enc[EN_SELECT]] += (int16_t)((id == SMK_BTN_RIGHT ? 1 : -1) * panel.dir[EN_SELECT]);
+            fm1__unlock(l);
+        }
+    }
+}
+
 /* every frame, after ui_frame; the wheels also between frames. The 10 outer keys (C3..E3, G#5..C6) have no
  * X0X role: their events are dropped. */
 static void smk_frame(void)
 {
     while (smk_extkey_take() >= 0)
         ;
+    smk_arrows();
     smk_faders();
     smk_wheels();
     smk_pads();
