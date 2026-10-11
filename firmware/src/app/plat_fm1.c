@@ -37,6 +37,30 @@ int plat_battery(void)
     return batt_raw >= 591 ? 3 : batt_raw >= 561 ? 2 : batt_raw >= 531 ? 1 : 0;
 }
 
+#if BOARD_SMK37
+/* SMK-37 Pro LEDs (smk_input.h, lcd.c): the button LEDs are on / off (no dim layer: no glow); the 16 RGB pads
+ * show the 16 white keys (the steps; HOME: the patterns), lit bright and dim dim in the colour of the part on
+ * screen (app/main_fm1.c smk_pads, after the frame). The keybed has no LEDs: what the FM-1 shows on its black
+ * keys (tracks, slices, part mutes) is on the screen only. */
+static uint8_t smk_fbank;                           /* FADER BANK: 0 = A, 1 = B (main_fm1.c smk_faders); its LED */
+static uint32_t smk_keys_lit, smk_keys_dim;         /* the key picture of the last frame, for the pads */
+static void led_pos_init(void) {}
+void plat_glow(int on) { (void)on; }
+void plat_play_red(int red) { (void)red; }           /* (SEQ PLAY has one LED) */
+void plat_keys_dim(uint32_t keys) { smk_keys_dim = keys; }
+void plat_leds(uint32_t buttons, uint32_t keys)
+{
+    uint8_t nl[SMK_NLED] = {0};
+    uint32_t i;
+    for (i = 0; i < NB; i++)
+        if ((buttons >> i) & 1u)
+            nl[panel.btn[i]] = 1;
+    nl[SMK_BTN_FADER_BANK] = smk_fbank != 0;
+    for (i = 0; i < SMK_NLED; i++)
+        fm1_led[i] = nl[i];
+    smk_keys_lit = keys;
+}
+#else
 /* LEDs: the picture is built off-line and copied one byte per column (Felucca: clearing
  * and relighting would let the 10 kHz scan catch the dark gap and flicker) */
 static uint8_t led_pos[FM1_NKEY];
@@ -84,6 +108,7 @@ void plat_leds(uint32_t buttons, uint32_t keys)
     }
     fm1_led_dim_div = glow_on || keys_dim ? GLOW_DIV : 0u;
 }
+#endif
 
 /* MIDI: Felucca's rings carry 4-byte USB-MIDI event packets, byte 0 = cable / CIN */
 int plat_midi_in(uint32_t *pkt)

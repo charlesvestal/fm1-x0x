@@ -1,17 +1,24 @@
 /* SPDX-License-Identifier: GPL-3.0-only
- * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments */
+ * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
+ * SMK-37 Pro port: Copyright (C) 2026 M. Geisler (makkuro) <mcgeisler@gmail.com> */
 /* ST7789-class 240x240 panel on SPI1: PC9 CLK, PC10 DO, PC7 CS, PC8 D/C,
- * backlight PA2 active low. Polled DMA transfers; every source buffer must be
- * in RAM. A pixel transfer is left running (lcd_busy): the next LCD access, or
+ * backlight PA2 active low (SMK-37 Pro: see hal/fm1_lcd_hw.h; its 16 RGB pad LEDs are at the end).
+ * Polled DMA transfers; every source buffer must be in RAM. A pixel transfer is left running (lcd_busy): the next LCD access, or
  * a write to its source buffer (lcd_sync), waits for it, so the main loop works
  * while the last strip of a frame goes out. */
 /* pins and SPI1: hal/fm1_lcd_hw.h */
 #ifndef LCD_BAUD
+#if BOARD_SMK37
+#define LCD_BAUD 4u                /* SMK-37 Pro: 4 = 12 MHz, the stock firmware's rate on its panel and wiring
+                                    * (the 60 MHz below is measured on the FM-1 only; X0X_SMK_LCD_BAUD tries
+                                    * another) */
+#else
 #define LCD_BAUD 0u                /* lsb/(BAUD+1): 0 = 60 MHz (~44 MHz effective, measured). Felucca's
                                     * 4 (12 MHz) took 23 ms for a 240x72 strip, longer than the panel's
                                     * 16.7 ms refresh: tearing. ST7789: <= ~62 MHz. The FM-1 has no TE
                                     * line; the panel's scanline can be read (RDSCL on the data wire), but
                                     * timing writes to it did not stop the tearing on hardware. */
+#endif
 #endif
 
 static uint8_t lcd_small[64];
@@ -98,6 +105,31 @@ static void lcd_blit(uint32_t x, uint32_t y, uint32_t w, uint32_t h, const uint1
     lcd_data(px, w * h * 2u);
 }
 
+#if BOARD_SMK37
+/* SMK-37 Pro ST7789V 240x240: the stock v016 table with a SWRESET in
+ * front (stock relies on the power-on reset) and NORON instead of its DISPOFF + 50 ms;
+ * lcd_init sends DISPON after the clear. Same format as below. */
+static const uint8_t LCD_SEQ[] = {
+    0x01, 0,                     /* SWRESET */
+    0x00, 1, 150,
+    0x11, 0,                     /* SLPOUT */
+    0x00, 1, 120,
+    0x36, 1, 0x00,               /* MADCTL: top-left origin, RGB order */
+    0x3A, 1, 0x55,               /* COLMOD: RGB565 */
+    0xB2, 5, 0x0C, 0x0C, 0x00, 0x33, 0x33,
+    0xB7, 1, 0x35,
+    0xBB, 1, 0x32,
+    0xC2, 1, 0x01,
+    0xC3, 1, 0x15,
+    0xC4, 1, 0x20,
+    0xC6, 1, 0x0F,
+    0xD0, 2, 0xA4, 0xA1,
+    0xE0, 14, 0xD0, 0x08, 0x0E, 0x09, 0x09, 0x05, 0x31, 0x33, 0x48, 0x17, 0x14, 0x15, 0x31, 0x34,
+    0xE1, 14, 0xD0, 0x08, 0x0E, 0x09, 0x09, 0x05, 0x31, 0x33, 0x48, 0x17, 0x14, 0x15, 0x31, 0x34,
+    0x21, 0,                     /* INVON: IPS panel */
+    0x13, 0,                     /* NORON */
+};
+#else
 /* ST7789V init: reset, then 16-bit colour, scan direction and IPS inversion;
  * voltage and gamma stay at the defaults. Format: cmd, n, n data bytes;
  * cmd 0x00 = wait (data byte: ~ms). */
@@ -111,6 +143,7 @@ static const uint8_t LCD_SEQ[] = {
     0x21, 0,                     /* INVON: IPS panel */
     0x13, 0,                     /* NORON */
 };
+#endif
 
 static void lcd_init(void)
 {
@@ -132,3 +165,44 @@ static void lcd_init(void)
     lcd_fill(0, 0, 240, 240, 0);
     lcd_cmd(0x29);
 }
+
+#if BOARD_SMK37
+/* The 16 RGB pads (SMK-37 Pro): WS2812-class LEDs on SPI1 group B (PC10), one SPI byte per
+ * LED bit (0xF0 = 1, 0xC0 = 0, MSB first, GRB), 36 zero bytes of latch first: 420 bytes, as
+ * the stock firmware sends them. The frame goes out between LCD transfers (LCD CS high),
+ * blocking for ~0.5 ms; padled_flush() only sends when a colour changed. */
+#define PADLED_N 16u
+#define PADLED_LATCH 36u
+static uint8_t padled_buf[PADLED_LATCH + PADLED_N * 24u] SMK_BIG;   /* (zeroed at boot: the latch stays 0) */
+static uint32_t padled_rgb[PADLED_N];
+static uint8_t padled_dirty = 1;
+/* hardware pad (8..15 top row, 0..7 bottom row, left to right; smk_input.h SMK_PAD_OF_WHITE) -> position in
+ * the chain (stock table) */
+static const uint8_t PADLED_SLOT[PADLED_N] = {0, 15, 14, 13, 12, 11, 10, 9, 1, 2, 3, 4, 5, 6, 7, 8};
+
+static void padled_set(uint32_t pad, uint8_t r, uint8_t g, uint8_t b)
+{
+    uint32_t c = (uint32_t)g << 16 | (uint32_t)r << 8 | b;
+    if (pad < PADLED_N && padled_rgb[pad] != c) {
+        padled_rgb[pad] = c;
+        padled_dirty = 1;
+    }
+}
+
+static void padled_flush(void)
+{
+    uint32_t p, i;
+    if (!padled_dirty)
+        return;
+    padled_dirty = 0;
+    for (p = 0; p < PADLED_N; p++) {
+        uint8_t *o = padled_buf + PADLED_LATCH + PADLED_SLOT[p] * 24u;
+        for (i = 0; i < 24u; i++)
+            o[i] = (padled_rgb[p] >> (23u - i)) & 1u ? 0xF0u : 0xC0u;
+    }
+    lcd_sync();
+    fm1_padled_send(padled_buf, sizeof padled_buf);
+    fm1_lcd_wait();
+    fm1_padled_done();
+}
+#endif

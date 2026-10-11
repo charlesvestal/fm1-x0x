@@ -239,6 +239,11 @@ def build_app():
         if untagged not in ("0", "1"):
             raise SystemExit("FELUCCA_DATA_UNTAGGED_OK: 0 or 1")
         flags += [f'-DFELUCCA_DATA_FAMILY="{fam}"', f"-DFELUCCA_DATA_UNTAGGED_OK={untagged}"]
+        baud = os.environ.get("X0X_SMK_LCD_BAUD")   # (bring-up: the LCD's SPI divider, lcd.c LCD_BAUD; default 4)
+        if baud:
+            if not re.fullmatch(r"[0-8]", baud):
+                raise SystemExit("X0X_SMK_LCD_BAUD: 0..8 (SPI clock = 60 MHz / (n + 1))")
+            flags.append(f"-DLCD_BAUD={baud}u")
     if VERSION:
         flags.append(f'-DX0X_VERSION="{VERSION}"')
     o2 = [f if f != "-Os" else "-O2" for f in flags]

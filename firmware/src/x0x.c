@@ -8,10 +8,17 @@
 #include "fm1_sys.h"
 #include "fm1_irq.h"
 #include "fm1_guard.h"
+#if BOARD_SMK37
+#define SMK_BIG __attribute__((section(".pool")))   /* SMK buffers in the pool (zeroed at boot): .data+.bss is full */
+#include "smk_input.h"               /* SMK-37 Pro: keybed, pads, buttons, encoders, faders, wheels (fm1_input.h API) */
+#else
 #include "fm1_input.h"
+#endif
 #include "fm1_timer.h"
 #include "fm1_audio.h"
-#include "fm1_adc.h"
+#if !BOARD_SMK37
+#include "fm1_adc.h"                 /* (SMK: smk_input.h stands in for it) */
+#endif
 #include "fm1_lcd_hw.h"
 #include "fm1_cpu1.h"
 #include "fm1_flash.h"

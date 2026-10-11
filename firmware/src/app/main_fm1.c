@@ -167,6 +167,164 @@ void fm1_timer5_irq(void)
 }
 extern void isr_timer5(void);
 
+#if BOARD_SMK37
+/* ------------------------------------------------------------ SMK-37 Pro --- */
+/* What the SMK-37 Pro has beyond the FM-1's panel (smk_input.h), after the UI (ui.c) in this unity build.
+ * The pads: the 16 white keys' lights (plat_fm1.c plat_leds) in the colour of the part on screen, lit half
+ * bright, dim an eighth, else dark; sent between LCD transfers (lcd.c padled_flush). */
+static void smk_pads(void)
+{
+    uint16_t c = PART_COL[ui.part % NPARTS];
+    uint32_t r = (uint32_t)(c >> 11) * 255u / 31u, g = (uint32_t)((c >> 5) & 63u) * 255u / 63u,
+             b = (uint32_t)(c & 31u) * 255u / 31u, w;
+    for (w = 0; w < SMK_NPAD; w++) {
+        uint32_t k = SMK_WHITE_NOTE[w], pad = SMK_PAD_OF_WHITE(w), sh;
+        sh = (smk_keys_lit >> k) & 1u ? 1u : (smk_keys_dim >> k) & 1u ? 3u : 0u;
+        if (sh)
+            padled_set(pad, (uint8_t)(r >> sh), (uint8_t)(g >> sh), (uint8_t)(b >> sh));
+        else
+            padled_set(pad, 0, 0, 0);
+    }
+    padled_flush();
+}
+
+/* The four faders, by FADER BANK (its LED lit on bank B): A = the levels of 909, 808, 303 A, 303 B; B = the
+ * BREAK level, the reverb and delay returns, the master FILTER (middle off, low-pass left, high-pass right).
+ * They set the same values as the knobs (saved with the project; a knob move while REC runs records motion).
+ * A fader takes over only once it moves (also after a bank change), so nothing jumps. */
+static void smk_faders(void)
+{
+    static const char *const NAME[2][4] = {{"909 LEVEL", "808 LEVEL", "303 A LEVEL", "303 B LEVEL"},
+                                           {"BREAK LEVEL", "REV RETURN", "DLY RETURN", "FILTER"}};
+    static uint8_t last[4] = {0xFF, 0xFF, 0xFF, 0xFF}, held;
+    uint32_t i, down = (fm1_in.buttons >> SMK_BTN_FADER_BANK) & 1u;
+    if (down && !held) {                                /* FADER BANK: the other bank, each fader waits to move */
+        smk_fbank ^= 1u;
+        for (i = 0; i < 4u; i++)
+            last[i] = 0xFF;
+        say(smk_fbank ? "FADERS: BRK REV DLY FILTER" : "FADERS: 909 808 303A 303B", 0);   /* (say: 27 chars) */
+    }
+    held = (uint8_t)down;
+    for (i = 0; i < 4u; i++) {
+        uint32_t v = fm1_in.fader[i];
+        pref_t r;
+        const x0x_param_t *d;
+        char t[28], num[16], unit[8], *q;
+        uint32_t n = 0;
+        if (last[i] == 0xFF || fm1_in.frames < 200u) {   /* (the first readings settle) */
+            last[i] = (uint8_t)v;
+            continue;
+        }
+        if (v == last[i])
+            continue;
+        last[i] = (uint8_t)v;
+        if (!smk_fbank)
+            r = PR(R_ENG, T_MIX, i, MX_LEVEL);
+        else if (i == 0)
+            r = PR(R_ENG, T_MIX, PART_BRK, MX_LEVEL);
+        else if (i == 1)
+            r = PR(R_ENG, T_FX, 0, FX_RV_LEVEL);
+        else if (i == 2)
+            r = PR(R_ENG, T_FX, 0, FX_DL_LEVEL);
+        else
+            r = PR(R_ENG, T_MST, 0, MST_DJF);
+        d = pref_desc(r);
+        if (!d)
+            continue;
+        pref_set(r, (int)((v * d->max + 63u) / 127u));
+        motion_touch(r);
+        ui.act_t = plat_ms();                            /* (the autosave waits for quiet) */
+        pref_value(r, num, unit);
+        q = put_s(put_s(t, NAME[smk_fbank][i]), " ");
+        while (n < 16u && num[n])
+            n++;
+        if (n < 8u)                                      /* NAME (<= 11) + " " + num (< 8) + unit (< 8): fits say() */
+            put_s(put_s(q, num), unit);
+        say(t, 0);
+    }
+}
+
+/* The wheels (mux C address 4 = pitch, 5 = mod), self-calibrating as in the reference port: the pitch wheel's
+ * rest is its centre (taken at power-on, followed slowly while it rests), each wheel's range grows to what it
+ * has reached. On a 303 (the part on screen) they play its sound without changing what is saved: pitch = its
+ * TUNE (about +-1.5 semitones), mod = its CUTOFF opened from the saved value up to the top. Released (or
+ * another part chosen), the saved values sound again. Other parts: the wheels do nothing. */
+static void smk_wheels(void)
+{
+    enum { DEAD = 12, SPAN0 = 80, MOD_LO = 485, MOD_HI = 615 };
+    static int32_t pc, plo, phi, mlo, mhi, rest;
+    static int8_t part = -1;
+    static int16_t tune_now = -1, cut_now = -1;
+    int32_t p = fm1_in.wheel[0], m = fm1_in.wheel[1], d, bend, mw, want;
+    if (fm1_in.frames < 300u)                         /* (the readings settle) */
+        return;
+    if (!pc) {
+        pc = p;
+        plo = p - SPAN0;
+        phi = p + SPAN0;
+        mlo = m < MOD_LO ? m : MOD_LO;
+        mhi = m > MOD_HI ? m : MOD_HI;
+    }
+    if (p < plo)
+        plo = p;
+    if (p > phi)
+        phi = p;
+    if (m < mlo)
+        mlo = m;
+    if (m > mhi)
+        mhi = m;
+    d = p - pc;
+    if (d > -DEAD && d < DEAD) {
+        bend = 0;
+        if (++rest > 200) {                            /* resting: the centre follows a slow drift */
+            pc += d > 0 ? 1 : d < 0 ? -1 : 0;
+            rest = 0;
+        }
+    } else {
+        rest = 0;
+        bend = d > 0 ? (d - DEAD) * 63 / (phi - pc - DEAD > 1 ? phi - pc - DEAD : 1)
+                     : (d + DEAD) * 63 / (pc - plo - DEAD > 1 ? pc - plo - DEAD : 1);
+        bend = clamp(bend, -63, 63);
+    }
+    mw = mhi - m <= DEAD ? 0 : (mhi - m - DEAD) * 127 / (mhi - mlo - DEAD > 1 ? mhi - mlo - DEAD : 1);
+    mw = clamp(mw, 0, 127);
+    if (part != (is_303() ? bidx() : -1)) {          /* another part: the last 303 sounds as saved again */
+        if (part >= 0 && tune_now >= 0)
+            engine_set(T_303, part, BASS303_TUNE, proj.sound.v[T_303][part][BASS303_TUNE]);
+        if (part >= 0 && cut_now >= 0)
+            engine_set(T_303, part, BASS303_CUTOFF, proj.sound.v[T_303][part][BASS303_CUTOFF]);
+        part = (int8_t)(is_303() ? bidx() : -1);
+        tune_now = cut_now = -1;
+    }
+    if (part < 0)
+        return;
+    want = bend ? clamp(proj.sound.v[T_303][part][BASS303_TUNE] + bend, 0, 127) : -1;
+    if (want != tune_now) {
+        engine_set(T_303, part, BASS303_TUNE, want >= 0 ? want : proj.sound.v[T_303][part][BASS303_TUNE]);
+        tune_now = (int16_t)want;
+    }
+    {
+        int32_t base = proj.sound.v[T_303][part][BASS303_CUTOFF];
+        want = mw ? base + (127 - base) * mw / 127 : -1;
+    }
+    if (want != cut_now) {
+        engine_set(T_303, part, BASS303_CUTOFF, want >= 0 ? want : proj.sound.v[T_303][part][BASS303_CUTOFF]);
+        cut_now = (int16_t)want;
+    }
+}
+
+/* every frame, after ui_frame; the wheels also between frames. The 10 outer keys (C3..E3, G#5..C6) have no
+ * X0X role: their events are dropped. */
+static void smk_frame(void)
+{
+    while (smk_extkey_take() >= 0)
+        ;
+    smk_faders();
+    smk_wheels();
+    smk_pads();
+}
+#endif
+
 /* ------------------------------------------------------------- boot --- */
 #define BOOTGUARD_MAGIC 0x42475244u
 struct bootguard_s bootguard __attribute__((section(".noinit")));   /* declared in x0x.c (ota_commit) */
@@ -315,6 +473,10 @@ static void fm1_main(void)
     x0x_dbg.max_us = 0;
     fm1_input_init();
     fm1_adc_init();
+#if BOARD_SMK37
+    if (flash_ok)                                   /* the factory key / pad velocity curves (USRTRIM, read only) */
+        smk_trim_load(fm1_xip_ptr(SMK_TRIM_FLASH));
+#endif
     panel_init();
     led_pos_init();
     plat_perf_init();
@@ -342,8 +504,13 @@ static void fm1_main(void)
     fm1_guard_lock_top();
     fm1_irq_enable_all();
     fm1_delay_ms(30);
+#if BOARD_SMK37
+    if ((fm1_in.buttons & FM1_OCT_BOTH) == FM1_OCT_BOTH)
+        panel_setup();                              /* OCTAVE- + OCTAVE+ held at power-on */
+#else
     if ((fm1_in.buttons & 3u) == 3u)
         panel_setup();                              /* OCT- + OCT+ held at power-on */
+#endif
     fm1_delay_ms(300);
     lcd_fill(0, 0, 240, 240, C_BLACK);
     ui_init();
@@ -415,8 +582,14 @@ static void fm1_main(void)
             last_frame = fm1_ms;
             x0x_dbg.ui_frames++;
             ui_frame();
+#if BOARD_SMK37
+            smk_frame();                            /* faders, wheels, pads */
+#endif
         } else {
             ui_input_only();
+#if BOARD_SMK37
+            smk_wheels();                           /* (the wheels follow the hand, not the screen) */
+#endif
         }
     }
 }
