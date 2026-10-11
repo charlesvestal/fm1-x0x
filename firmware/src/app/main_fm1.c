@@ -338,6 +338,13 @@ static void smk_arrows(void)
 
 /* every frame, after ui_frame; the wheels also between frames. The 10 outer keys (C3..E3, G#5..C6) have no
  * X0X role: their events are dropped. */
+/* pads as a step grid (steps, patterns: 1-8 top row) unless they play notes (a 303's REC keyboard) */
+static void smk_grid(void)
+{
+    smk_pad_grid = (uint8_t)(ui.view == V_HOME || ui.view == V_SONG || (ui.btn & (1u << B_HOME | 1u << B_SAVE)) ||
+                             !(is_303() && ui.rec));
+}
+
 static void smk_frame(void)
 {
     while (smk_extkey_take() >= 0)
@@ -345,6 +352,7 @@ static void smk_frame(void)
     smk_arrows();
     smk_faders();
     smk_wheels();
+    smk_grid();
     smk_pads();
 }
 #endif
@@ -616,6 +624,7 @@ static void fm1_main(void)
             ui_input_only();
 #if BOARD_SMK37
             smk_wheels();                           /* (the wheels follow the hand, not the screen) */
+            smk_grid();
 #endif
         }
     }
