@@ -82,9 +82,11 @@ static const uint8_t SMK_BTNC[FM1_NBTN] = {0x26, 0x76, 0x96, 0x56, 0x66, 0x36, 0
 /* encoder i: A and B matrix codes (stock table; K1..K8 order to confirm) */
 static const uint8_t SMK_ENCC[FM1_NENC][2] = {{0x97, 0xa7}, {0x37, 0x47}, {0x17, 0x27}, {0xb7, 0xc7},
                                                {0x57, 0x67}, {0x77, 0x87}, {0xd7, 0xe7}, {0xf7, 0x07}};
-/* LED i (= button i; 18 = spare): group << 4 | bit in the 595 low half (stock table) */
+/* LED i (= button i): group << 4 | bit in the 595 low half (stock table, its order differs at the end).
+ * SEQ PLAY has a two-colour LED: 16 = its green, 18 = its red (unused); SEQ REC's own red LED is 0x1b
+ * (confirmed on a unit: 0x1e lit PLAY red, 0x1b lit SEQ REC) */
 static const uint8_t SMK_LEDC[SMK_NLED] = {0x0c, 0x12, 0x00, 0x10, 0x0d, 0x1d, 0x02, 0x01, 0x09, 0x08,
-                                           0x0b, 0x0a, 0x11, 0x19, 0x18, 0x1a, 0x1c, 0x1e, 0x1b};
+                                           0x0b, 0x0a, 0x11, 0x19, 0x18, 0x1a, 0x1c, 0x1b, 0x1e};
 /* analog: mux address -> pad on mux A (ch1); mux B (ch8) = the same + 8 (stock table) */
 static const uint8_t SMK_PADMUX[8] = {1, 2, 3, 0, 4, 7, 5, 6};
 /* mux C (ch2): address 0..3 -> fader 1,2,3,0; 4, 5 wheels; 6 pedal; 7 battery */
