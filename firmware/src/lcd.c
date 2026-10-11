@@ -168,11 +168,13 @@ static void lcd_init(void)
 
 #if BOARD_SMK37
 /* The 16 RGB pads (SMK-37 Pro): WS2812-class LEDs on SPI1 group B (PC10), one SPI byte per
- * LED bit (0xF0 = 1, 0xC0 = 0, MSB first, GRB), 36 zero bytes of latch first: 420 bytes, as
- * the stock firmware sends them. The frame goes out between LCD transfers (LCD CS high),
- * blocking for ~0.5 ms; padled_flush() only sends when a colour changed. */
+ * LED bit (0xF0 = 1, 0xC0 = 0, MSB first, GRB), 250 zero bytes of reset first (~300 us; the
+ * stock firmware's 36 bytes = 43 us are too short for newer WS2812 parts: a glitch on PC10 at the
+ * pin switch then counts as a first bit and shifts the chain by one, so a lit pad turns its chain
+ * neighbour green). The frame goes out between LCD transfers (LCD CS high), blocking for ~0.8 ms;
+ * padled_flush() only sends when a colour changed. */
 #define PADLED_N 16u
-#define PADLED_LATCH 36u
+#define PADLED_LATCH 250u
 static uint8_t padled_buf[PADLED_LATCH + PADLED_N * 24u] SMK_BIG;   /* (zeroed at boot: the latch stays 0) */
 static uint32_t padled_rgb[PADLED_N];
 static uint8_t padled_dirty = 1;
