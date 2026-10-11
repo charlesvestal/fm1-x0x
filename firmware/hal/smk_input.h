@@ -93,16 +93,16 @@ static const uint8_t SMK_PADMUX[8] = {1, 2, 3, 0, 4, 7, 5, 6};
 static const uint8_t SMK_FADMUX[4] = {1, 2, 3, 0};
 enum { SMK_ADC_PADA = 1, SMK_ADC_PADB = 8, SMK_ADC_MUXC = 2 };
 /* the pads are the 16 white keys of the FM-1's 27 (F3 G3 A3 B3 C4 D4 E4 F4 G4 A4 B4 C5 D5 E5 F5 G5): the step
- * grid, the drum sounds and every layer's tiles land on them, in reading order: the top row (hardware pads 8..15,
- * mux B; confirmed on a unit) white keys 0..7, the bottom row (pads 0..7, mux A) 8..15 */
+ * grid, the drum sounds and every layer's tiles land on them, low notes at the bottom: the bottom row
+ * (hardware pads 8..15, mux B; padtest on a unit, 2026-10-10) white keys 0..7, the top row (pads 0..7, mux A) 8..15 */
 static const uint8_t SMK_WHITE_NOTE[SMK_NPAD] = {0, 2, 4, 6, 7, 9, 11, 12, 14, 16, 18, 19, 21, 23, 24, 26};
 #define SMK_PAD_OF_WHITE(w) ((w) < 8u ? (w) + 8u : (w) - 8u)   /* white key 0..15 -> hardware pad */
-/* the piano layout (the UI sets smk_pad_piano, e.g. for SCALE): bottom row C4 D4 E4 F4 G4 A4 B4 C5, top row the
+/* the piano layout (the UI sets smk_pad_piano, e.g. for SCALE): top row C4 D4 E4 F4 G4 A4 B4 C5, bottom row the
  * black keys between them (C#4 D#4 - F#4 G#4 A#4 - C#5); note-key index (0 = F3) by hardware pad, -1 = none */
 static const int8_t SMK_PIANO_NOTE[SMK_NPAD] = {7, 9, 11, 12, 14, 16, 18, 19, 8, 10, -1, 13, 15, 17, -1, 20};
 static volatile uint8_t smk_pad_piano;
 static uint8_t smk_pad_note[SMK_NPAD];   /* the note key a pad pressed (+1; 0 = none): its release ends that one */
-#define SMK_WHITE_OF_PAD(p) ((p) < 8u ? (p) + 8u : (p) - 8u)   /* (the same swap both ways) */
+#define SMK_WHITE_OF_PAD(p) ((p) < 8u ? (p) + 8u : (p) - 8u)
 
 #define SMK_TRIM_FLASH 0xC1000u   /* USRTRIM: the factory calibration record ("trimdat"), never written here */
 /* 5-point velocity curves (trimdata, flash 0xC1000: +0x08 16 pads x 5 u16, +0xA8 37 keys x 5 u16) */
