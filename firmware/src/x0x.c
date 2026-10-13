@@ -8,10 +8,17 @@
 #include "fm1_sys.h"
 #include "fm1_irq.h"
 #include "fm1_guard.h"
+#if BOARD_SMK37
+#define SMK_BIG __attribute__((section(".pool")))   /* SMK buffers in the pool (zeroed at boot): .data+.bss is full */
+#include "smk_input.h"               /* SMK-37 Pro: keybed, pads, buttons, encoders, faders, wheels (fm1_input.h API) */
+#else
 #include "fm1_input.h"
+#endif
 #include "fm1_timer.h"
 #include "fm1_audio.h"
-#include "fm1_adc.h"
+#if !BOARD_SMK37
+#include "fm1_adc.h"                 /* (SMK: smk_input.h stands in for it) */
+#endif
 #include "fm1_lcd_hw.h"
 #include "fm1_cpu1.h"
 #include "fm1_flash.h"
@@ -38,11 +45,23 @@ static inline int32_t clamp(int32_t v, int32_t lo, int32_t hi) { return v < lo ?
 #endif
 #define FELUCCA_UAC X0X_UAC
 #ifndef FELUCCA_ID
+#if BOARD_SMK37
+#define FELUCCA_ID "SMK-37 Pro_900"   /* package identity (tools/build.py) */
+#else
 #define FELUCCA_ID "FM-1_900"     /* package identity (tools/build.py) */
+#endif
 #endif
 #include "usb.c"
 #ifndef X0X_TRS
+#if BOARD_SMK37
+#define X0X_TRS 0                 /* SMK-37 Pro: no MIDI IN (its jack is MIDI OUT, UART1 TX on PC7); PH8 is a
+                                   * key-matrix row there and must never become UART RX */
+#else
 #define X0X_TRS 1                 /* MIDI IN on the TRS jack */
+#endif
+#endif
+#if BOARD_SMK37 && X0X_TRS
+#error "BOARD_SMK37: midi_uart.c is the FM-1 MIDI IN driver (RX on PH8, a key-matrix row on the SMK)"
 #endif
 #if X0X_TRS
 #include "midi_uart.c"
@@ -79,6 +98,7 @@ static int st_prog(uint32_t off, const void *src, uint32_t n)
         return -8;
     return fl_write(off, src, n);
 }
+#define ST_IDLE() fm1_wdt_feed()   /* (storage.c, SMK store owner check: between sector erases) */
 #include "storage.c"
 
 struct bootguard_s { uint32_t magic, failed, pending; };
@@ -104,7 +124,11 @@ static int ota_prog(uint32_t off, const void *p, uint32_t n)
 static int ota_fread(uint32_t off, void *p, uint32_t n) { return st_read(off, p, n); }
 static void ota_show(uint32_t step, int32_t code)
 {
+#if BOARD_SMK37   /* step 5 stays on screen while the loader writes the flash: say so */
+    static const char *const STEP[] = {"", "PACKAGE", "CHECK HEAD", "LOADER", "CONFIRM", "UPDATING..."};
+#else
     static const char *const STEP[] = {"", "PACKAGE", "CHECK HEAD", "LOADER", "CONFIRM", "RESTART"};
+#endif
     lcd_fill(0, 0, 240, 240, C_BLACK);
     draw_text_box(0, 92, 240, &FONT_S, "UPDATE", C_WHITE, 1);
     if (step < 9u) {

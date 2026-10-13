@@ -155,7 +155,7 @@ $("go").addEventListener("click", async () => {
     const ota = await up.find((id) => /^ota-/i.test(id.model));
     if (ota) {
       ota.link.close();
-      sayK((await up.resume(image, step)) ? "done" : "stopped");
+      sayK((await up.resume(image, step, meta.product)) ? "done" : "stopped");
     } else {
       await up.install(image, meta.product, step);
     }

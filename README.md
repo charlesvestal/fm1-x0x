@@ -14,6 +14,7 @@ The factory sound is set up for big beat, so it should make noise the moment you
 - **Install it** (Chrome or Edge, with the FM-1 plugged in): <https://charlesvestal.github.io/fm1-x0x/install/>
 - **Read the manual**: <https://charlesvestal.github.io/fm1-x0x/manual/>
 - **Download the firmware file**: [releases](https://github.com/charlesvestal/fm1-x0x/releases)
+- **M-Vave SMK-37:** see [SMK-37 instructions](SMK37.md).
 
 > **X0X is in beta.** It's solid for everyday playing, but a very busy pattern can push the FM-1
 > to its limit. When that happens, X0X trades a little sound quality to keep playing rather than

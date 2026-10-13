@@ -591,7 +591,7 @@ async function updater() {
   const dev2 = new FakeFM1(image, { unplugAfter: 3 });
   dev2.boot("ota-FM-1_900", "Felucca Update");
   const t0 = Date.now();
-  const done = await new Updater(dev2.access).resume(image);
+  const done = await new Updater(dev2.access).resume(image, null, "FM-1_900");
   ok(done === false && Date.now() - t0 < 6000, "fm1ota.js: unplugged during the write -> stops at once");
 
   const dev3 = new FakeFM1(image, { unplugAfter: 2 });
@@ -599,6 +599,19 @@ async function updater() {
   ok(e && e.code === "lost", "fm1ota.js: unplugged in step 1 -> error code 'lost'");
   const e2 = await new Updater({ inputs: new Map(), outputs: new Map() }).install(image, "FM-1_900").then(() => null, (x) => x);
   ok(e2 && e2.code === "notfound", "fm1ota.js: no device -> error code 'notfound'");
+  /* resume() checks the loader's model against the package, as install() checks the running firmware */
+  const smkOta = new FakeFM1(image);
+  smkOta.boot("ota-SMK-37 Pro_900", "Felucca Update");
+  const m1 = await new Updater(smkOta.access).resume(image, null, "FM-1_900").then(() => null, (x) => x);
+  ok(m1 && m1.code === "model" && smkOta.served === 0, "fm1ota.js: an SMK-37 Pro in update mode is never given an FM-1 package ('model')");
+  const noPkg = new FakeFM1(image);
+  noPkg.boot("ota-FM-1_900", "Felucca Update");
+  const m2 = await new Updater(noPkg.access).resume(image).then(() => null, (x) => x);
+  ok(m2 && m2.code === "model" && noPkg.served === 0, "fm1ota.js: resume without the package's identity writes nothing");
+  const elite = new FakeFM1(image);
+  elite.boot("ota-SMK-37 Elite_900", "Felucca Update");
+  const r3 = await new Updater(elite.access).resume(image, null, "SMK-37 Pro_900");
+  ok(r3 === true && elite.served > 0, "fm1ota.js: resume: the SMK models are one keyboard, as for install()");
 }
 
 await editorMock();
