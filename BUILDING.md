@@ -57,7 +57,7 @@ the break bank from one-bar WAVs instead (`tools/import_breaks.py` makes such a 
 BB Gen's samples, in `build/breaks/`); see README.md, Breaks. It fails if a soft-double routine is
 linked (a `double` crept in) and checks the image, RAM and pool sizes.
 
-### M-Vave SMK-37 Pro (X0X37)
+### M-Vave SMK-37 Pro
 
 ```
 BOARD=smk37 ./build.sh          # or: ./build.sh --board smk37  ->  build/x0x-smk37.fwsc
