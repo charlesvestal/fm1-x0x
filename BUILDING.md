@@ -69,7 +69,10 @@ for the app and the update loader). The plain `./build.sh` is unchanged: its `bu
 `build/loader/ota.bin` and `build/x0x.fwsc` stay byte for byte what they were before the SMK port.
 The SMK build keeps its objects, app and loader in `build/smk37/` and writes the package
 `build/x0x-smk37.fwsc` (identity `SMK-37 Pro_900`; `--release X.Y` gives `x0x-smk37-X.Y.fwsc`,
-`SMK-37 Pro_9XXYYZZ`). It differs from the FM-1 build in:
+`SMK-37 Pro_9XXYYZZ`). `MODEL=elite` or `MODEL=mke` builds the same firmware under the SMK-37 Elite's or the
+MKE-P37's model name (identity `SMK-37 Elite_900` / `MKE-P37_900`, objects in `build/smk37-elite/` /
+`build/smk37-mke/`, packages `build/x0x-smk37-elite.fwsc` / `build/x0x-smk37-mke.fwsc`), so M-Vave's updater
+still takes that unit's factory package; the Starrykey 37 Play uses the Pro build. It differs from the FM-1 build in:
 
 - the flash map (`firmware/hal/fm1_flash_map.h`): an explicit allow-list with compile-time checks that no
   window reaches the head (0x0-0x3FFF), BTIF / USRTRIM (0xC0000-0xC1FFF, the factory key and pad

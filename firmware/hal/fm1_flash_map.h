@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
- * SMK-37 Pro port: Copyright (C) 2026 M. Geisler (makkuro) <mcgeisler@gmail.com> */
+ * SMK-37 Pro port: Copyright (C) 2026 M. Geisler (genkigenki/makkuro) <mcgeisler@gmail.com> */
 /* The flash map: which ranges the RAM flash driver (fm1_flash.h) may erase / program, per board
  * (BOARD_SMK37, fm1_cc.h). Macros and compile-time checks only, so host tests can include it. */
 #pragma once

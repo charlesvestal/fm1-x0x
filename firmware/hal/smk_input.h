@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
- * SMK-37 Pro port: Copyright (C) 2026 M. Geisler (makkuro) <mcgeisler@gmail.com> */
+ * SMK-37 Pro port: Copyright (C) 2026 M. Geisler (genkigenki/makkuro) <mcgeisler@gmail.com> */
 /* SMK-37 Pro input HAL: velocity keybed, buttons, encoders, button LEDs, pads, faders, wheels.
  * The FM-1 counterpart is fm1_input.h + fm1_adc.h; this header keeps their API (fm1_in, fm1_input_init,
  * fm1_input_tick, fm1_input_scan, fm1_enc_take, fm1_input_edges, fm1_input_note_edges, fm1_led_key) so
