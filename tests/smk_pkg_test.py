@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-only
-# SMK-37 Pro port: Copyright (C) 2026 M. Geisler (genkigenki/makkuro) <mcgeisler@gmail.com>
+# SMK-37 Pro port: Copyright (C) 2026 M. Geisler (genkigenki/makkuro)
 """An SMK-37 Pro package from fm1pkg_make.py --board smk37: flash.bin is the stock PRCT size (0x9D000) and
 its app area carries the stock v016 region table exactly, so the SDK
 and a later stock rollback see the same VM / BTIF / USRTRIM / USRFLASH / USR regions.

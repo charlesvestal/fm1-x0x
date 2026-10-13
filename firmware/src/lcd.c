@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
- * SMK-37 Pro port: Copyright (C) 2026 M. Geisler (genkigenki/makkuro) <mcgeisler@gmail.com> */
+ * SMK-37 Pro port: Copyright (C) 2026 M. Geisler (genkigenki/makkuro) */
 /* ST7789-class 240x240 panel on SPI1: PC9 CLK, PC10 DO, PC7 CS, PC8 D/C,
  * backlight PA2 active low (SMK-37 Pro: see hal/fm1_lcd_hw.h; its 16 RGB pad LEDs are at the end).
  * Polled DMA transfers; every source buffer must be in RAM. A pixel transfer is left running (lcd_busy): the next LCD access, or
