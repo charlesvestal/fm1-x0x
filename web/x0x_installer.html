@@ -213,7 +213,7 @@ async function run(img, product, isStock) {
     const ota = await up.find((id) => /^ota-/i.test(id.model));
     if (ota) {
       ota.link.close();
-      sayK((await up.resume(img, step)) ? (isStock ? "stockdone" : "done") : "stopped");
+      sayK((await up.resume(img, step, product)) ? (isStock ? "stockdone" : "done") : "stopped");
     } else {
       await up.install(img, product, step);
     }

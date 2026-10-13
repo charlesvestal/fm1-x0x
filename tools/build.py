@@ -3,7 +3,7 @@
 # Copyright (C) 2026 Leo Kuroshita (@kurogedelic), Hügelton Instruments
 """Build X0X (a fork of Felucca): the app, the update loader and an installable .fwsc package.
 
-  tools/build.py [--release X.Y[-suffix]] [--board fm1|smk37]
+  tools/build.py [--release X.Y[-suffix]] [--board fm1|smk37] [--model pro|elite|mke]
 
 Outputs in build/: x0x.bin (app), loader/ota.bin (update loader, Felucca's, unchanged),
 x0x.fwsc (package). See BUILDING.md for the toolchain and the SDK.
@@ -12,6 +12,9 @@ BOARD=smk37 (or --board smk37) builds for the M-Vave SMK-37 Pro: -DBOARD_SMK37=1
 loader, identity SMK-37 Pro_900 (release SMK-37 Pro_9XXYYZZ), the SMK flash layout and app slot
 (fm1pkg_make.py), the store owner family X0X (FELUCCA_DATA_FAMILY, FELUCCA_DATA_UNTAGGED_OK=0), and the
 package build/x0x-smk37.fwsc (x0x-smk37-X.Y.fwsc for a release). The default stays the FM-1, unchanged.
+MODEL=elite / mke (or --model) with smk37: the same build under the SMK-37 Elite's or the MKE-P37's model
+name (identity SMK-37 Elite_900 / MKE-P37_900, the loader's and the update record's name too; -DSMK_MODEL),
+so M-Vave's updater still takes that unit's factory package; build/x0x-smk37-elite.fwsc, -mke.fwsc.
 
 The JieLi toolchain is Linux x86-64 only. JIELI_TOOLCHAIN points at it; on
 macOS (or with JIELI_DOCKER=1) each tool runs in a linux/amd64 container.
@@ -61,6 +64,8 @@ PRODUCT = "FM-1_900"                # package identity; release builds are FM-1_
 BOARD = "fm1"                       # fm1 (default) or smk37: BOARD env or --board
 BOARD_PREFIX = {"fm1": "FM-1_9", "smk37": "SMK-37 Pro_9"}   # identity of a release build: prefix + XXYYZZ
 BOARD_DEFS = {"fm1": [], "smk37": ["-DBOARD_SMK37=1"]}       # the FM-1 build gets no new flag (byte-identical)
+# smk37: the keyboard's model name (MODEL env or --model); one hardware, three names. pro adds no flag
+MODELS = {"pro": "SMK-37 Pro", "elite": "SMK-37 Elite", "mke": "MKE-P37"}
 VERSION = None                      # FELUCCA_VERSION for release builds (default: firmware/src/ui.c)
 
 
@@ -393,11 +398,16 @@ def main():
     ap.add_argument("--release", metavar="X.Y[.Z]", help="release build: identity FM-1_9XXYYZZ, version string X.Y[.Z]")
     ap.add_argument("--board", choices=sorted(BOARD_PREFIX), default=None,
                     help="target board: fm1 (default) or smk37 (default: $BOARD, else fm1)")
+    ap.add_argument("--model", choices=sorted(MODELS), default=None,
+                    help="smk37: the model name, pro (default), elite or mke (default: $MODEL, else pro)")
     ap.add_argument("--sdk", type=Path, help="JieLi AC79 SDK checkout (default: $AC79_SDK)")
     a = ap.parse_args()
     BOARD = (a.board or os.environ.get("BOARD") or "fm1").lower().replace("-", "")
     if BOARD not in BOARD_PREFIX:
         raise SystemExit(f"BOARD={BOARD}: use fm1 or smk37")
+    model = (a.model or (os.environ.get("MODEL") if BOARD == "smk37" else None) or "pro").lower()
+    if model not in MODELS or (model != "pro" and BOARD != "smk37"):
+        raise SystemExit(f"MODEL={model}: pro, elite or mke, with BOARD=smk37")
     fm1pkg_make.set_board(BOARD)
     APP_SLOT = fm1pkg_make.APP_SLOT
     stem = "x0x" if BOARD == "fm1" else "x0x-" + BOARD
@@ -406,6 +416,13 @@ def main():
         OUT = pkg_dir / BOARD
         LDR = OUT / "loader"
     PRODUCT = fm1pkg_make.BOARDS[BOARD][2]
+    if model != "pro":              # another model name: identity, loader and update record (fm1_cc.h SMK_MODEL)
+        BOARD_DEFS[BOARD] = [*BOARD_DEFS[BOARD], f'-DSMK_MODEL="{MODELS[model]}"']
+        PRODUCT = PRODUCT.replace(MODELS["pro"], MODELS[model])
+        BOARD_PREFIX[BOARD] = BOARD_PREFIX[BOARD].replace(MODELS["pro"], MODELS[model])
+        stem += "-" + model
+        OUT = OUT.parent / f"{BOARD}-{model}"     # its own objects: the Pro build's stay as they are
+        LDR = OUT / "loader"
     name = f"{stem}.fwsc"
     if a.release:
         # identity FM-1_9 + major, minor, patch as two digits each (0.10 -> FM-1_9001000). FM-1 is the

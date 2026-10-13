@@ -21,7 +21,8 @@ loader / no restart), 6 wrong model, or another identity after the install.
 
 Packages: 20 interleave blocks (FM-1, X0X, an SMK-37 Pro build of X0X) or more (the stock SMK-37 Pro
 v016 has 36: the extra markers are 0x7D); the count is detected and checked with the files' CRCs.
-The model is checked: an FM-1 package never goes to an SMK-37 Pro, nor the other way round.
+The model is checked: an FM-1 package never goes to an SMK-37 Pro, nor the other way round (the SMK-37
+Pro, Elite and MKE-P37 are one keyboard: their packages install on each other).
 """
 import argparse
 import queue
@@ -36,7 +37,7 @@ MAXDATA = 512
 BLOCKS, BLK, KEEP = 20, 0x30, 0x2F         # BLOCKS: the identity blocks (more may follow, see block_count)
 MAX_BLOCKS = 64
 LOADER_MARK = b"FELUCCA-LOADER-1"
-PORT_RE = re.compile(r"fm-1|smk|felucca|melodee|fomni|x0x|makkuro|ota|composite|sinco|usb-midi", re.I)   # never probe other gear
+PORT_RE = re.compile(r"fm-1|smk|elite|mke-p37|starry|felucca|melodee|fomni|x0x|makkuro|snoop|vector|vox|ota|composite|sinco|usb-midi", re.I)   # never probe other gear
 
 # seconds; the tests shorten them
 DELAY = {"open": 0.3, "start": 2.0, "reply": 0.01, "loader": 3.0, "reboot": 3.0, "retry": 1.0,
@@ -205,6 +206,16 @@ def package_damage(image):
 
 def model_of(text):
     return text.split("_")[0].removeprefix("ota-")
+
+
+# the SMK-37 Pro, SMK-37 Elite, MKE-P37, Starrykey 37 Play and the SMK-37+VA mod: one keyboard under several names
+SMK_FAMILY = re.compile(r"SMK-37[ +].*|MKE-P37|STARRYKEY-37.*", re.I)
+
+
+def same_keyboard(a, b):
+    """the models of identities a and b are the same hardware (never an FM-1 and an SMK)"""
+    ma, mb = model_of(a), model_of(b)
+    return ma == mb or bool(SMK_FAMILY.fullmatch(ma) and SMK_FAMILY.fullmatch(mb))
 
 
 # ------------------------------------------------------------------ MIDI ---
@@ -423,7 +434,7 @@ class Updater:
     def install(self, dev, image, product, step=lambda *a: None):
         """running firmware -> loader -> new firmware; dev from find(). A device already in
         update mode only needs the write."""
-        if model_of(dev.id.text) != model_of(product):
+        if not same_keyboard(dev.id.text, product):
             dev.link.close()
             raise InstallError("model", f"the device is {dev.id.text}, the package is for {product}")
         ota = dev if dev.id.loader else self.check(dev, image, step)

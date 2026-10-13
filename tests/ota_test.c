@@ -13,9 +13,16 @@
 
 #define FELUCCA_OTA_DRYRUN 0
 #if BOARD_SMK37                          /* -DBOARD_SMK37=1: the SMK-37 Pro build of ota.c */
-#define FELUCCA_ID "SMK-37 Pro_900"
+#if T_MODEL == 1                         /* -DT_MODEL=1 / 2: the MODEL=elite / mke build */
+#define SMK_MODEL "SMK-37 Elite"
+#elif T_MODEL == 2
+#define SMK_MODEL "MKE-P37"
+#else
+#define SMK_MODEL "SMK-37 Pro"
+#endif
+#define FELUCCA_ID SMK_MODEL "_900"
 #define T_AREA 0xBB000u
-#define T_PARM_ID "ota-SMK-37 Pro_016"
+#define T_PARM_ID "ota-" SMK_MODEL "_016"
 #else
 #define FELUCCA_ID "FM-1_900"
 #define T_AREA 0xE0000u

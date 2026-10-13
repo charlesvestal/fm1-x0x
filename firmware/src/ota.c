@@ -27,7 +27,10 @@
 #define OTA_AREA 0x000BB000u                     /* staged loader, 5 x 4 KiB */
 #define OTA_AREA_LEN 0x5000u
 #define OTA_RES (OTA_AREA + OTA_AREA_LEN - 0x100u)  /* 0xBFF00 = 4K boundary - 256: SPL scan */
-#define OTA_PARM_ID "ota-SMK-37 Pro_016"          /* the stock app's parm identity (18 B) */
+#ifndef SMK_MODEL
+#define SMK_MODEL "SMK-37 Pro"                   /* (fm1_cc.h) */
+#endif
+#define OTA_PARM_ID "ota-" SMK_MODEL "_016"       /* the stock app's parm identity (Pro 18 B, Elite 20 B) */
 _Static_assert(OTA_AREA + OTA_AREA_LEN <= 0xC0000u && OTA_AREA >= 0x9D000u, "SMK: OTA area outside the VM");
 #else
 #define OTA_AREA 0x000E0000u                     /* staged loader, 5 x 4 KiB */

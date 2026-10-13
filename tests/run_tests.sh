@@ -74,6 +74,10 @@ if [ -f build/x0x.fwsc ] && [ -n "${AC79_SDK:-}" ]; then
     run smk-package sh -c "python3 tools/fm1pkg_make.py --board smk37 build/x0x.bin build/loader/ota.bin $OUT/smk_new.fwsc >/dev/null && \
         python3 tests/smk_pkg_test.py $OUT/smk_new.fwsc"
     run smk-ota-entry sh -c "$CC -DBOARD_SMK37=1 -o $OUT/ota_test_smk tests/ota_test.c && $OUT/ota_test_smk $OUT/smk_new.fwsc"
+    for m in 1 2; do                     # the MODEL=elite / mke builds of ota.c
+        run smk-ota-entry-model$m sh -c "$CC -DBOARD_SMK37=1 -DT_MODEL=$m -o $OUT/ota_test_smk_m$m tests/ota_test.c && \
+            $OUT/ota_test_smk_m$m $OUT/smk_new.fwsc"
+    done
     run smk-update-loader sh -c "head -c 200000 build/x0x.bin > $OUT/old_app.bin && \
         python3 tools/fm1pkg_make.py --board smk37 $OUT/old_app.bin build/loader/ota.bin $OUT/smk_old.fwsc >/dev/null && \
         $CC -DBOARD_SMK37=1 -o $OUT/ldr_test_smk tests/ldr_test.c && $OUT/ldr_test_smk $OUT/smk_old.fwsc $OUT/smk_new.fwsc"
@@ -81,6 +85,8 @@ else
     echo "  skip SMK-37 Pro package tests (needs build/x0x.fwsc and AC79_SDK)"
 fi
 [ -f build/x0x-smk37.fwsc ] && run smk-build-package python3 tests/smk_pkg_test.py build/x0x-smk37.fwsc
+[ -f build/x0x-smk37-elite.fwsc ] && run smk-build-package-elite python3 tests/smk_pkg_test.py build/x0x-smk37-elite.fwsc "SMK-37 Elite_900"
+[ -f build/x0x-smk37-mke.fwsc ] && run smk-build-package-mke python3 tests/smk_pkg_test.py build/x0x-smk37-mke.fwsc "MKE-P37_900"
 run upload-images sh -c "python3 tests/host/make_test_loops.py build/test_loops && \
     python3 tools/upload_breaks.py --dry-run build/test_upload build/test_loops/loop*.wav"
 command -v node >/dev/null 2>&1 && run breaks-web node web/test_breaks.mjs   # the browser uploader: upload_breaks.py's bytes
