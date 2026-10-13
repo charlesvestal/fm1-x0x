@@ -25,7 +25,7 @@
 #define LDR_APP_LO 0x4000u
 #if BOARD_SMK37
 /* SMK-37 Pro: app area up to the stock PRCT end; records only in the VM, so ldr_records_drop can never
- * erase BTIF / USRTRIM (0xC0000..0xC1FFF, the key calibration) or anything above (see the fm1-to-smk37 guide) */
+ * erase BTIF / USRTRIM (0xC0000..0xC1FFF, the key calibration) or anything above */
 #define LDR_APP_HI 0x9D000u
 #define LDR_REC_LO 0x9D000u
 #define LDR_REC_HI 0xC0000u

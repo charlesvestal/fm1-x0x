@@ -48,7 +48,7 @@ static uint32_t st_crc32(const void *p, uint32_t n)   /* zlib CRC-32, 4 bits per
 }
 
 #if BOARD_SMK37
-/* SMK-37 Pro (see the fm1-to-smk37 guide): every object in FL_DATA 0x9D000..0xBAFFF (the stock VM), A/B
+/* SMK-37 Pro: every object in FL_DATA 0x9D000..0xBAFFF (the stock VM), A/B
  * neighbours in plat.h order: settings 0x9D000, sound 0x9F000, patterns 1-8 0xA1000, patterns 9-16 0xA3000,
  * panel 0xA5000, song 0xA7000, motion 0xA9000 (..0xAAFFF); 0xAB000..0xBAFFF spare except the store owner
  * tag at 0xAF000 (st_owner_check). Never near BTIF / USRTRIM (0xC0000..0xC1FFF) or key_mac (0xFF000). */

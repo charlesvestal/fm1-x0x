@@ -5,7 +5,7 @@
  * The FM-1 counterpart is fm1_input.h + fm1_adc.h; this header keeps their API (fm1_in, fm1_input_init,
  * fm1_input_tick, fm1_input_scan, fm1_enc_take, fm1_input_edges, fm1_input_note_edges, fm1_led_key) so
  * the UI code compiles unchanged, and adds the SMK's extras (velocity, pads, faders, wheels).
- * Hardware (stock v016; see the fm1-to-smk37 guide):
+ * Hardware (stock v016; hardware notes: https://github.com/genkigenki/fm1-to-smk37):
  *
  *  - 4 x 74HC595 (32 bits) shifted by SPI2 group C (PA3 CLK, PA4 DO; IOMAP_CON1 bit17), latched by
  *    PA1, PA0 low (/OE). Word bits 31..16: column select, active-low one-hot (col 0..7 = bits 31..24,
