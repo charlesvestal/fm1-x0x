@@ -158,11 +158,12 @@ static double rms(const float *x, int n)
     return sqrt(s / n);
 }
 
+#define LAG_MAX 48
 static int best_lag(const float *a, const float *b, int n)    /* b[i + lag] ~ a[i] */
 {
     int lag, i, best = 0;
     double bc = -1e300;
-    for (lag = -48; lag <= 48; lag++) {
+    for (lag = -LAG_MAX; lag <= LAG_MAX; lag++) {
         double c = 0;
         for (i = 64; i < n - 64; i++)
             c += (double)a[i] * (double)b[i + lag];
@@ -258,6 +259,13 @@ static int cmp_d(const void *a, const void *b)
 {
     double x = *(const double *)a, y = *(const double *)b;
     return x < y ? -1 : x > y;
+}
+
+/* a buffer compare() may read LAG_MAX samples beyond, either end (its second: shifted by the lag) */
+static float *lag_buf(int len)
+{
+    float *m = calloc((size_t)(len + 2 * LAG_MAX), sizeof(float));
+    return m ? m + LAG_MAX : 0;
 }
 
 /* glide time from 10 % to 80 % of the (log-frequency) way from note a to note b */
@@ -457,7 +465,7 @@ int main(int argc, char **argv)
     static bass303_t port, pa, pb, pa2, pb2;
     const char *wavdir = 0, *dumpdir = 0;
     int nev, len = step_t(NSTEP, 0) + TAIL, s, fails = 0, i, verbose = 0, info = 0;
-    float *ref_out = malloc(sizeof(float) * (size_t)len), *port_out = malloc(sizeof(float) * (size_t)len);
+    float *ref_out = malloc(sizeof(float) * (size_t)len), *port_out = lag_buf(len);
     float *demo = 0, *demo_ref = 0;
     int demo_len = 0;
 
@@ -586,7 +594,7 @@ int main(int argc, char **argv)
     {
         static ev_t ev2[4 * NSTEP];
         int off2 = step_t(NSTEP, 0) + FS, len2 = off2 + step_t(NSTEP, 0) + TAIL, n2;
-        float *r2 = malloc(sizeof(float) * (size_t)len2), *p2 = malloc(sizeof(float) * (size_t)len2);
+        float *r2 = malloc(sizeof(float) * (size_t)len2), *p2 = lag_buf(len2);
         n2 = build_events(ev2, 0, 0);
         n2 += build_events(ev2 + n2, off2, 0);
         printf("  after 1 s of silence (second pass; its first note starts from idle):\n");
@@ -607,7 +615,7 @@ int main(int argc, char **argv)
             ref_destroy(ref);
         }
         free(r2);
-        free(p2);
+        free(p2 - LAG_MAX);
     }
 
     /* two instances interleaved block by block == each alone */
