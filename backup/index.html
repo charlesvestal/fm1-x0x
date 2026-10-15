@@ -1,0 +1,470 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-only
+     X0X's backup in the browser: tools/x0x_backup.py's backup and restore over Web MIDI (SysEx), on the protocol of
+     firmware/src/backup.c (after Polly's backup page). The part between the "backup protocol" markers is what
+     tests/host/backup_page_test.mjs runs against a simulated X0X and against a transcript of tools/x0x_backup.py. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Back up · X0X</title>
+<meta name="description" content="Save the project on an FM-1 running X0X to a file, and load it back later. It works in Chrome or Edge.">
+<style>
+  :root { --bg: #fff; --fg: #000; --dim: #6b6b6b; --rule: #ddd; --accent: #a35a08; --bad: #d33; color-scheme: light; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #000; --fg: #fff; --dim: #888; --rule: #333; --accent: #f0a043; --bad: #f55; color-scheme: dark; }
+  }
+  :root[data-theme="dark"] { --bg: #000; --fg: #fff; --dim: #888; --rule: #333; --accent: #f0a043; --bad: #f55; color-scheme: dark; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding-inline: 16px; padding-block: 48px; }
+  h1 { font-size: 24px; font-weight: 600; margin: 0 0 16px; }
+  h2 { font-size: 18px; font-weight: 600; margin: 0 0 8px; }
+  p { margin: 0 0 16px; }
+  .small { color: var(--dim); font-size: 13px; }
+  button, label.pick { font: inherit; font-size: 14px; background: var(--fg); color: var(--bg); border: 0; padding: 6px 16px;
+                       cursor: pointer; display: inline-block; line-height: 1.6; }
+  label.pick { background: none; color: var(--fg); border: 1px solid var(--rule); padding: 5px 15px; }
+  label.pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+  label.pick input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  button:disabled { opacity: .3; cursor: default; }
+  section { border-top: 1px solid var(--rule); padding: 20px 0 4px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 0 0 16px; }
+  #statusBox { border-left: 3px solid var(--rule); padding: 4px 0 4px 12px; margin: 0 0 20px; min-height: 2.2em; font-size: 15px; }
+  #statusBox.ask { border-left-color: var(--accent); }
+  #statusBox.err { border-left-color: var(--bad); }
+  #statusBox p { margin: 0; }
+  progress { width: 100%; height: 4px; margin: 0 0 20px; display: block; }
+  progress[hidden] { display: none; }
+  ul.small { padding-left: 18px; margin: 24px 0 0; }
+  ul.small li { margin: 0 0 6px; }
+  kbd { font: inherit; font-weight: 600; font-size: .9em; border: 1px solid var(--rule); border-bottom-width: 2px; padding: 0 4px; }
+  .home { display: inline-block; font-weight: 700; letter-spacing: .03em; color: var(--dim); text-decoration: none; margin: 0 0 12px; }
+  .home:hover, .home:focus-visible { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
+  label.pick { position: relative; }
+  a { color: inherit; }
+</style>
+</head>
+<body>
+<main>
+  <a class="home" href="../">X0X</a>
+  <h1>Back up your project</h1>
+  <p>Save the project on your FM-1 to a file on this computer, and load it back later. Keep as many projects as you
+    like this way, and keep your songs safe while you try other firmware.</p>
+  <p class="small">Connect the FM-1 by USB with X0X running, and use Chrome or Edge. There is nothing to install.</p>
+
+  <div id="statusBox"><p id="status" role="status">Plug in the FM-1 running X0X.</p><p id="alert" role="alert"></p></div>
+  <progress id="bar" max="100" value="0" hidden aria-label="Progress"></progress>
+
+  <section aria-labelledby="bh">
+    <h2 id="bh">Back up</h2>
+    <p>This saves the project to an <b>.x0b</b> file: the sounds, all 32 patterns, the song, the knob motion, the tempo
+      and the settings. X0X can keep playing. If you have changes that aren't saved yet, stop X0X first so they go in
+      the file too.</p>
+    <div class="bar"><button id="backup" type="button">Back up</button></div>
+  </section>
+
+  <section aria-labelledby="rh">
+    <h2 id="rh">Restore</h2>
+    <p>This puts a backup back on X0X, and it <b>replaces the project</b> there. Stop X0X first. X0X checks the whole
+      file before anything changes. Then its screen asks <b>RESTORE FROM USB?</b> Press <kbd>SEL</kbd> on the FM-1 to
+      restore, or <kbd>HOME</kbd> to keep what you have.</p>
+    <div class="bar">
+      <label class="pick">Choose a backup&hellip;<input type="file" id="file" accept=".x0b"></label>
+      <button id="restore" type="button" disabled>Restore</button>
+    </div>
+    <p id="fileInfo" hidden></p>
+  </section>
+
+  <ul class="small">
+    <li>A backup doesn't hold your break loops. Keep their WAV files, and load them again on the
+      <a href="../breaks/">break loops page</a>.</li>
+    <li>A cut cable or a damaged file changes nothing. Even a power cut while X0X writes leaves either the old project
+      or the new one, never a mix.</li>
+    <li>A backup made with an earlier version of X0X restores in a later one.</li>
+    <li>The browser asks once for permission to use MIDI with SysEx. Allow it, and close other apps that use the
+      FM-1's MIDI first.</li>
+    <li>You can also back up from a terminal. Run <code>python3 tools/x0x_backup.py</code> in X0X's repository. It does
+      the same, and makes the same files.</li>
+  </ul>
+  <p class="small" style="margin-top:32px">X0X is GPL-3.0, built on Felucca by Hügelton Instruments.
+    <a href="https://github.com/charlesvestal/fm1-x0x">github.com/charlesvestal/fm1-x0x</a></p>
+</main>
+<script>
+"use strict";
+// --- backup protocol: begin (tools/x0x_backup.py, firmware/src/backup.c; tested by tests/host/backup_page_test.mjs)
+const PB = (() => {
+  const HS_QUERY = [0xF0, 0x00, 0x32, 0x45, 0x00, 0x00, 0x00, 0x40, 0x7F, 0xF7];   // fm1_install.py / fm1ota.js
+  const RS_REQ = 0x41, BU_REQ = 0x42, BU_END = 0x43;
+  const OK_ADDR = 0xC0000000, ASK_ADDR = 0xC1000000, FAIL_ADDR = 0xCF000000;
+  const MAGIC = [0x58, 0x30, 0x58, 0x42], VERSION = 1, NOBJ = 6, HEAD = 16, REC = 8, PAYLOAD_MAX = 3840, MAXDATA = 512;   // "X0XB"
+  const OBJ_IDS = [0, 1, 2, 3, 5, 6];       // OBJ_SET, OBJ_SOUND, OBJ_PAT0, OBJ_PAT1, OBJ_SONG, OBJ_MOTION (not OBJ_PANEL)
+  const PLAYING = 10, DECLINED = 11;
+  const X0X = "FM-1_9";                                            // X0X's package identity
+  const DELAY = { poll: 500, idle: 10000, ask: 75000, first: 3000, hs: 1000 };   // ms, as x0x_backup.py
+  const ERRORS = {
+    1: "the file's size", 2: "the transfer (a piece of the file did not arrive)", 3: "the file's head",
+    4: "a part's header", 5: "a part's check (a byte changed on the way)", 6: "the whole file's check",
+    7: "erasing the FM-1's memory", 8: "writing the FM-1's memory", 9: "reading back what was written",
+    10: "X0X is playing", 11: "HOME was pressed on the FM-1",
+    12: "writing the last step (X0X finishes it when it's switched on again)",
+  };
+
+  function fail(code, msg) { const e = new Error(msg); e.code = code; return e; }
+
+  function pack7(data) {
+    const out = []; let acc = 0, nb = 0;
+    for (const b of data) { acc |= b << nb; nb += 8; while (nb >= 7) { out.push(acc & 0x7F); acc >>>= 7; nb -= 7; } }
+    if (nb) out.push(acc & 0x7F);
+    return out;
+  }
+  function unpack7(s) {
+    const out = []; let acc = 0, nb = 0;
+    for (const b of s) { acc |= (b & 0x7F) << nb; nb += 7; while (nb >= 8) { out.push(acc & 0xFF); acc >>>= 8; nb -= 8; } }
+    return out;
+  }
+  const CRC_T = (() => {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
+    return t;
+  })();
+  function crc32(bytes, start = 0, end = bytes.length) {          // zlib's
+    let c = 0xFFFFFFFF;
+    for (let i = start; i < end; i++) c = CRC_T[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+  const u16 = (b, o) => b[o] | b[o + 1] << 8;
+  const u32 = (b, o) => (b[o] | b[o + 1] << 8 | b[o + 2] << 16 | b[o + 3] << 24) >>> 0;
+  const le32 = (v) => [v & 0xFF, (v >>> 8) & 0xFF, (v >>> 16) & 0xFF, (v >>> 24) & 0xFF];
+
+  // a host message in the update's framing (ota.c ota_take)
+  function frame(cmd, body) {
+    const n = body.length; let s = 0;
+    for (const b of body) s += b;
+    return [0xF0, ...pack7([0x00, 0x59, cmd, n & 0xFF, (n >> 8) & 0xFF, 0, ...body, ~s & 0xFF]), 0xF7];
+  }
+  // a device message -> {cmd, body} or null
+  function parseFrame(pkt) {
+    if (pkt.length < 2 || pkt[0] !== 0xF0 || pkt[pkt.length - 1] !== 0xF7) return null;
+    const u = unpack7(pkt.slice(1, -1));
+    if (u.length < 7 || u[0] !== 0 || u[1] !== 0x59) return null;
+    const n = u[3] | u[4] << 8 | u[5] << 16;
+    if (n + 7 !== u.length) return null;
+    let s = 0;
+    for (let i = 6; i < 6 + n; i++) s += u[i];
+    if ((~s & 0xFF) !== u[6 + n]) return null;
+    return { cmd: u[2], body: u.slice(6, 6 + n) };
+  }
+  // the answer to a read request (fm1_install.py response)
+  function response(addr, data, fl = 0) {
+    const n = data.length;
+    const body = [0x00, 0x59, 0x30, (n + 8) & 0xFF, ((n + 8) >> 8) & 0xFF, 0, fl, ...le32(addr), n & 0xFF, (n >> 8) & 0xFF, 0, ...data];
+    let s = 0;
+    for (let i = 6; i < body.length; i++) s += body[i];
+    body.push(~s & 0xFF);
+    return [0xF0, ...pack7(body), 0xF7];
+  }
+  function parseRequest(pkt) {
+    if (pkt.length < 2 || pkt[0] !== 0xF0 || pkt[pkt.length - 1] !== 0xF7) return null;
+    const u = unpack7(pkt.slice(1, -1));
+    if (u.length !== 15 || u[0] !== 0 || u[1] !== 0x59 || u[2] !== 0x30) return null;
+    let s = 0;
+    for (let i = 6; i < 14; i++) s += u[i];
+    if ((~s & 0xFF) !== u[14]) return null;
+    return { fl: u[6], addr: u32(u, 7), len: u[11] | u[12] << 8 | u[13] << 16 };
+  }
+  function parseIdentity(pkt) {
+    if (pkt.length < 2 || pkt[0] !== 0xF0 || pkt[pkt.length - 1] !== 0xF7) return null;
+    const d = unpack7(pkt.slice(1, -1));
+    if (d.length !== 34 || d[0] !== 0 || d[1] !== 0x59 || d[2] !== 0x11) return null;
+    const txt = String.fromCharCode(...d.slice(6, 33)).replace(/\0+$/, "");
+    return /^[^_]+_\d+$/.test(txt) ? txt : null;
+  }
+
+  // a backup file checked whole -> {flags, objs: [{obj, data}]}; throws (code "file") with what is wrong in plain words
+  function parse(image) {
+    const bad = (m) => fail("file", m);
+    if (image.length >= 4 && [0x50, 0x4C, 0x59, 0x42].every((b, i) => image[i] === b)) throw bad("This is a Polly backup, not an X0X one.");
+    if (image.length < HEAD + NOBJ * REC + 4) throw bad("This file is too short to be an X0X backup.");
+    if (MAGIC.some((b, i) => image[i] !== b)) throw bad("This file is not an X0X backup.");
+    const ver = u16(image, 4), n = u16(image, 6), flags = u32(image, 8);
+    if (ver !== VERSION || n !== NOBJ) {
+      throw bad(`This is a backup from another version of X0X (version ${ver}). This X0X can't restore it.` +
+                (ver > VERSION ? " Update X0X first." : ""));
+    }
+    if (u32(image, 12) !== crc32(image, 0, 12)) throw bad("This backup is damaged (its head).");
+    const objs = []; let pos = HEAD;
+    for (const want of OBJ_IDS) {
+      if (pos + REC > image.length) throw bad("This backup is cut short.");
+      const obj = u16(image, pos), ln = u16(image, pos + 2), crc = u32(image, pos + 4);
+      pos += REC;
+      if (obj !== want || ln > PAYLOAD_MAX || pos + ln + 4 > image.length) throw bad(`This backup is damaged (${nameOf(want)}).`);
+      if (crc32(image, pos, pos + ln) !== crc) throw bad(`This backup is damaged (${nameOf(want)}: a byte changed).`);
+      objs.push({ obj, data: image.subarray(pos, pos + ln) });
+      pos += ln;
+    }
+    if (pos + 4 !== image.length || u32(image, pos) !== crc32(image, 0, pos)) throw bad("This backup is damaged (the whole file's check).");
+    return { flags, objs };
+  }
+  function nameOf(obj) { return ["the settings", "the sound", "patterns 1", "patterns 2", "", "the song", "the motion"][obj] || `part ${obj}`; }
+  function summary(objs) {
+    const has = (o) => objs.some((x) => x.obj === o && x.data.length);
+    const total = objs.reduce((a, o) => a + o.data.length, 0);
+    const parts = [has(0) && "the settings", has(1) && "the sound", has(2) && "the patterns, song and knob motion"].filter(Boolean);
+    return `${parts.length ? parts.join(", ") : "an empty project"} (${total.toLocaleString("en")} bytes)`;
+  }
+
+  async function handshake(link, tries = 2) {
+    link.drain();
+    for (let t = 0; t < tries; t++) {
+      if (!link.send(HS_QUERY)) return null;
+      const end = Date.now() + DELAY.hs;
+      while (Date.now() < end) {
+        const p = await link.read(end - Date.now());
+        if (!p) break;
+        const id = parseIdentity(p);
+        if (id) return id;
+      }
+    }
+    return null;
+  }
+
+  // the first MIDI port pair that answers as an FM-1 (ports named X0X first); a Link from makeLink(input, output)
+  async function find(access, makeLink) {
+    const ins = [...access.inputs.values()].filter((p) => p.state !== "disconnected" &&
+      /x0x|fm-1|felucca|composite|sinco|usb-midi/i.test(p.name || ""));             // never probe other gear
+    ins.sort((a, b) => /x0x/i.test(b.name) - /x0x/i.test(a.name));
+    const outs = [...access.outputs.values()];
+    const base = (s) => (s || "").replace(/\s+\d+$/, "");
+    let other = null;
+    for (const input of ins) {
+      const same = outs.filter((o) => base(o.name) === base(input.name));
+      const output = outs.find((o) => o.name === input.name) || (same.length === 1 ? same[0] : null) || (outs.length === 1 ? outs[0] : null);
+      if (!output) continue;
+      try { await input.open(); await output.open(); } catch (_) { continue; }
+      const link = makeLink(input, output);
+      const id = await handshake(link);
+      if (id && id.startsWith(X0X)) return { link, id, name: input.name };
+      if (id) other = other || id;
+      link.close();
+    }
+    if (other) throw fail("model", `The FM-1 runs other firmware (${other}), not X0X. Install X0X first.`);
+    throw fail("notfound", "X0X not found. Plug the FM-1 in with a USB data cable, close other apps that use its MIDI, and try again.");
+  }
+
+  // the device's backup frames until its end frame -> {image, flags} (checked)
+  async function backup(link, onProgress = () => {}) {
+    link.drain();
+    link.send(frame(BU_REQ, MAGIC));
+    const got = []; let last = Date.now(), first = true;
+    for (;;) {
+      const pkt = await link.read(DELAY.poll);
+      if (!pkt) {
+        if (link.lost) throw fail("lost", "The FM-1 was disconnected. Plug it in and press Back up again.");
+        if (Date.now() - last > (first ? DELAY.first : DELAY.idle)) {
+          throw fail("stopped", first ? "X0X didn't answer. If it's an older X0X without backup, update it on the Install page."
+                                      : "X0X stopped sending. Press Back up again.");
+        }
+        continue;
+      }
+      const f = parseFrame(pkt);
+      if (!f) continue;
+      last = Date.now();
+      if (f.cmd === BU_REQ && f.body.length >= 4) {
+        first = false;
+        if (u32(f.body, 0) !== got.length) throw fail("lost", "A piece of the backup went missing on the way. Press Back up again.");
+        for (let i = 4; i < f.body.length; i++) got.push(f.body[i]);
+        onProgress(got.length);
+      } else if (f.cmd === BU_END && f.body.length >= 10) {
+        const n = u32(f.body, 0), crc = u32(f.body, 4), status = f.body[8], flags = f.body[9];
+        if (status) throw fail("flash", `X0X could not read its memory (status ${status}). Try again.`);
+        const image = Uint8Array.from(got);
+        if (n !== image.length || crc !== crc32(image)) throw fail("lost", "The backup arrived damaged. Press Back up again.");
+        try { parse(image); } catch (e) { throw fail("lost", `The backup arrived damaged (${e.message}). Press Back up again.`); }
+        return { image, flags };
+      }
+    }
+  }
+
+  // send a checked backup image: answer X0X's reads until it reports -> 0 restored, else its code (PLAYING, DECLINED, ...)
+  async function restore(link, image, onEvent = () => {}) {
+    parse(image);                                                  // (the page checked it already: never send a bad one)
+    link.drain();
+    link.send(frame(RS_REQ, [...le32(image.length), ...le32(crc32(image))]));
+    let last = Date.now(), idle = DELAY.first, asked = 0;
+    for (;;) {
+      const pkt = await link.read(DELAY.poll);
+      if (!pkt) {
+        if (link.lost) throw fail("lost", "The FM-1 was disconnected. Nothing changed, unless X0X said RESTORED FROM USB.");
+        if (Date.now() - last > idle) {
+          throw fail("stopped", asked ? "X0X stopped asking for the file. Nothing changed."
+                                      : "X0X didn't answer. If it's an older X0X without restore, update it on the Install page.");
+        }
+        continue;
+      }
+      const r = parseRequest(pkt);
+      if (!r) continue;
+      last = Date.now(); idle = DELAY.idle; asked++;
+      const top = (r.addr & 0xFF000000) >>> 0;
+      if (top === OK_ADDR || top === FAIL_ADDR || top === ASK_ADDR) {
+        link.send(response(r.addr, [0x73, 0x75, 0x63, 0x63, 0x65, 0x73, 0x73, 0], r.fl));   // "success\0"
+        if (r.addr === ASK_ADDR) { idle = DELAY.ask; onEvent("ask"); continue; }
+        return r.addr === OK_ADDR ? 0 : (r.addr & 0xFFFF) || 99;
+      }
+      if (r.len > MAXDATA || r.addr >= image.length) throw fail("badreq", `X0X asked for a part outside the file (${r.addr.toString(16)}+${r.len}). Nothing changed.`);
+      const data = Array.from(image.subarray(r.addr, r.addr + r.len));
+      while (data.length < r.len) data.push(0);
+      if (!link.send(response(r.addr, data, r.fl))) throw fail("lost", "The FM-1 was disconnected. Nothing changed.");
+      onEvent("progress", Math.min(r.addr + r.len, image.length) * 100 / image.length);
+    }
+  }
+
+  return { HS_QUERY, RS_REQ, BU_REQ, BU_END, OK_ADDR, ASK_ADDR, FAIL_ADDR, MAGIC, VERSION, NOBJ, PLAYING, DECLINED, X0X, DELAY, ERRORS,
+           pack7, unpack7, crc32, frame, parseFrame, response, parseRequest, parseIdentity, parse, summary, find, backup, restore };
+})();
+// --- backup protocol: end
+
+// one MIDI in/out pair with a SysEx queue (as fm1ota.js)
+class Link {
+  constructor(input, output) {
+    this.input = input; this.output = output; this.q = []; this.waiter = null;
+    input.onmidimessage = (ev) => {
+      if (ev.data[0] !== 0xF0) return;
+      this.q.push(Array.from(ev.data));
+      if (this.waiter) { const w = this.waiter; this.waiter = null; w(); }
+    };
+  }
+  get lost() { return this.input.state === "disconnected" || this.output.state === "disconnected"; }
+  send(bytes) { try { this.output.send(bytes); return true; } catch (_) { return false; } }
+  drain() { this.q.length = 0; }
+  async read(ms) {
+    if (!this.q.length) {
+      let tm;
+      await Promise.race([new Promise((r) => { this.waiter = r; }), new Promise((r) => { tm = setTimeout(r, Math.max(ms, 0)); })]);
+      clearTimeout(tm);
+      this.waiter = null;
+    }
+    return this.q.shift() || null;
+  }
+  close() { this.input.onmidimessage = null; }
+}
+
+const $ = (id) => document.getElementById(id);
+const bar = $("bar");
+let busy = false, picked = null;
+// the step in a status region (polite), a failure in an alert; progress at most every 2 s or 10 percent
+let shown = { key: "", at: 0, pct: -100 };
+function say(html, kind = "") {
+  $(kind === "err" ? "status" : "alert").innerHTML = "";
+  $(kind === "err" ? "alert" : "status").innerHTML = html;
+  $("statusBox").className = "status" + (kind ? " " + kind : "");
+  shown = { key: "", at: performance.now(), pct: -100 };
+}
+function sayPct(key, html, pct) {
+  const now = performance.now();
+  if (shown.key === key && now - shown.at < 2000 && pct - shown.pct < 10) return;
+  say(html);
+  shown = { key, at: now, pct };
+}
+function progress(v) { bar.hidden = v == null; if (v != null) bar.value = v; }
+function setBusy(on) {
+  busy = on;
+  $("backup").disabled = on;
+  $("restore").disabled = on || !picked;
+  $("file").disabled = on;
+}
+window.addEventListener("beforeunload", (e) => { if (busy) { e.preventDefault(); e.returnValue = ""; } });
+
+let access = null;
+async function connect() {
+  if (!navigator.requestMIDIAccess) throw Object.assign(new Error("This browser has no Web MIDI. Open this page in Chrome or Edge."), { code: "nomidi" });
+  if (!access) {
+    try { access = await navigator.requestMIDIAccess({ sysex: true }); }
+    catch (_) { throw Object.assign(new Error("MIDI with SysEx was not allowed. Allow MIDI in the site settings (the address bar), then try again."), { code: "denied" }); }
+  }
+  say("Looking for X0X&hellip;");
+  return PB.find(access, (i, o) => new Link(i, o));
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+$("backup").addEventListener("click", async () => {
+  if (busy) return;
+  setBusy(true);
+  let dev = null;
+  try {
+    dev = await connect();
+    say("Receiving the backup from X0X&hellip;");
+    progress(0);
+    const { image, flags } = await PB.backup(dev.link, (n) => { sayPct("recv", `Receiving the backup: ${n.toLocaleString("en")} bytes`, 0); bar.removeAttribute("value"); });
+    const d = new Date(), pad = (v) => String(v).padStart(2, "0");
+    const name = `x0x-backup-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}.x0b`;
+    const url = URL.createObjectURL(new Blob([image], { type: "application/octet-stream" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = name;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    progress(null);
+    say(`Done. <b>${esc(name)}</b> is in your downloads. It holds ${esc(PB.summary(PB.parse(image).objs))}.` +
+        (flags & 1 ? "<br>X0X was playing, so changes it hadn't saved yet aren't in it. To include them, stop X0X and back up again." : ""));
+  } catch (e) {
+    progress(null);
+    say(esc(e.message), "err");
+  } finally {
+    if (dev) dev.link.close();
+    setBusy(false);
+  }
+});
+
+$("file").addEventListener("change", async (e) => {
+  picked = null;
+  const f = e.target.files && e.target.files[0];
+  const info = $("fileInfo");
+  info.hidden = true;
+  if (f) {
+    try {
+      const image = new Uint8Array(await f.arrayBuffer());
+      const { flags, objs } = PB.parse(image);
+      picked = { image, name: f.name };
+      info.innerHTML = `<b>${esc(f.name)}</b>: ${esc(PB.summary(objs))}${flags & 1 ? ", taken while X0X was playing" : ""}.`;
+      info.hidden = false;
+      say("Ready to restore. Stop X0X first, then press Restore.");
+    } catch (err) {
+      say(`${esc(f.name)}: ${esc(err.message)}`, "err");
+    }
+  }
+  setBusy(false);
+});
+
+$("restore").addEventListener("click", async () => {
+  if (busy || !picked) return;
+  if (!confirm(`Replace the project on X0X with ${picked.name}?\n\nX0X asks too, on its screen.`)) return;
+  setBusy(true);
+  let dev = null;
+  try {
+    dev = await connect();
+    say("Sending the backup to X0X&hellip;");
+    progress(0);
+    const code = await PB.restore(dev.link, picked.image, (what, pct) => {
+      if (what === "progress") { sayPct("send", `Sending the backup: ${Math.floor(pct)} percent`, pct); progress(pct); }
+      if (what === "ask") {
+        progress(100);
+        say("Sent and checked. X0X now asks <b>RESTORE FROM USB?</b> on the FM-1. Press <kbd>SEL</kbd> to restore, or <kbd>HOME</kbd> to keep what you have.", "ask");
+      }
+    });
+    progress(null);
+    if (code === 0) say("Done. X0X restored the backup and loaded the project.");
+    else if (code === PB.PLAYING) say("<b>STOP FIRST.</b> X0X is playing. Press <kbd>PLAY</kbd> on the FM-1 to stop it, then press Restore again. Nothing changed.", "err");
+    else if (code === PB.DECLINED) say("Not restored. Someone pressed <kbd>HOME</kbd> on the FM-1, or nobody answered within a minute. Nothing changed.", "err");
+    else say(`Not restored. There was a problem with ${esc(PB.ERRORS[code] || "code " + code)}.` + (code === 12 ? "" : " Nothing changed. Try again."), "err");
+  } catch (e) {
+    progress(null);
+    say(esc(e.message), "err");
+  } finally {
+    if (dev) dev.link.close();
+    setBusy(false);
+  }
+});
+</script>
+</body>
+</html>
