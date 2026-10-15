@@ -113,6 +113,27 @@ static int next_pos(seq_t *s, int t, int p, int commit)
     }
 }
 
+/* Return how long after its grid slot the step after p plays, Q8: the swing's delay (swing_q8) if it
+ * is an odd step, else 0.
+ *
+ * Odd counts in the order track t plays its steps (sequencer.h's Swing paragraph explains why). */
+static uint32_t next_swing_delay(seq_t *s, int t, int p, int rate, uint32_t L)
+{
+    int odd;
+    switch (is_bass(t) ? bpart(s, t - TRK_BASS0)->dir & 3 : DIR_FWD) {
+    case DIR_REV:                                    /* by position, from where it starts: its last step */
+        odd = (seq_part_len(s, t) - 1 - next_pos(s, t, p, 0)) & 1;
+        break;
+    case DIR_RANDOM:                                 /* by the steps played since the start */
+        odd = !s->t[t].odd;
+        break;
+    default:                                         /* forward and ping-pong: by position */
+        odd = next_pos(s, t, p, 0) & 1;
+        break;
+    }
+    return odd ? swing_q8(s, rate, L) : 0;
+}
+
 static void midi(const seq_sink_t *o, uint8_t st, uint8_t d1, uint8_t d2)
 {
     if (o->midi)
@@ -303,8 +324,10 @@ static uint32_t fire_step(seq_t *s, int t, const seq_sink_t *o)
     if (!tr->started) {
         p = (bass && bpart(s, t - TRK_BASS0)->dir == DIR_REV) ? seq_part_len(s, t) - 1 : 0;
         tr->started = 1;
+        tr->odd = 0;
         wrapped = 0;
     } else {
+        tr->odd ^= 1u;
         p = next_pos(s, t, tr->pos, 1);
         wrapped = !bass ? p == 0 : p == 0 || (bpart(s, t - TRK_BASS0)->dir == DIR_REV && p == seq_part_len(s, t) - 1);
     }
@@ -333,12 +356,14 @@ static uint32_t fire_step(seq_t *s, int t, const seq_sink_t *o)
     if (s->ext) {
         tr->to_next = NEVER;                         /* the clock arms the next one */
     } else {
-        /* the step that follows p: swung if it is an odd one */
-        int np = next_pos(s, t, p, 0);
-        uint32_t sw = swing_q8(s, rate, L);
-        tr->to_next = carry + ((np & 1) ? L + sw : L - sw);
-        if (!(np & 1) && (p & 1) == 0)               /* even -> even (odd lengths, wraps): no swing */
-            tr->to_next = carry + L;
+        /* Schedule the next step from this step's grid slot, not from when this step played, so that
+         * this step's lateness can't carry over (sequencer.h's Swing paragraph explains why). This step
+         * played swing_delay after its slot, so the next slot is L - swing_delay from now, and the next
+         * step plays its own swing_delay after that slot. If the tempo more than doubled within the
+         * step, that slot is already past: play now, and the grid shifts once by the shortfall. */
+        uint32_t slot = L > tr->swing_delay ? L - tr->swing_delay : 0;
+        tr->swing_delay = next_swing_delay(s, t, p, rate, L);
+        tr->to_next = carry + slot + tr->swing_delay;
     }
     return changed;
 }
@@ -351,6 +376,7 @@ static void restart(seq_t *s, uint32_t parts)  /* parts whose pattern switched: 
             continue;
         s->t[t].started = 0;
         s->t[t].to_next = s->ext ? NEVER : 0;
+        s->t[t].swing_delay = 0;
         s->t[t].ext_ticks = (uint8_t)(TICKS_PER_STEP[part_rate(s, t)] - 1);
         s->t[t].bars = 0;
         s->t[t].pp_dir = 1;
@@ -364,14 +390,18 @@ static void do_start(seq_t *s, int from_top, const seq_sink_t *o)
         bar_end(s, 1);                                /* cues, or the song's start bar */
     for (t = 0; t < NTRACKS; t++) {
         seq_track_t *tr = &s->t[t];
+        int rate = part_rate(s, t);
         if (from_top) {
             tr->started = 0;
             tr->bars = 0;
             tr->pp_dir = 1;
         }
         tr->to_off = 0;
-        tr->to_next = s->ext ? NEVER : 0;
-        tr->ext_ticks = (uint8_t)(TICKS_PER_STEP[part_rate(s, t)] - 1);   /* the first clock is the downbeat */
+        /* Continue on the internal clock as an external clock's first tick would (ext_ticks): treat now
+         * as the coming step's grid slot, so that an odd step still plays late by the swing. */
+        tr->swing_delay = !s->ext && tr->started ? next_swing_delay(s, t, tr->pos, rate, seq_step_q8(s, rate)) : 0;
+        tr->to_next = s->ext ? NEVER : tr->swing_delay;
+        tr->ext_ticks = (uint8_t)(TICKS_PER_STEP[rate] - 1);   /* the first clock is the downbeat */
     }
     s->clk_to_next = 0;
     s->playing = 1;
@@ -415,9 +445,12 @@ static void ext_ticks(seq_t *s)
                 continue;
             tr->ext_ticks = 0;
             {
-                int np = tr->started ? next_pos(s, t, tr->pos, 0) : 0;
+                /* Arm the coming step. This tick marks the step's grid slot, so the step plays
+                 * swing_delay after the tick. Set swing_delay as the internal clock does, so that a step
+                 * still pending when the clock is lost is undone correctly. */
                 uint32_t L = s->ext_period ? s->ext_period * (uint32_t)tps : seq_step_q8(s, rate);
-                tr->to_next = (np & 1) ? swing_q8(s, rate, L) : 0;
+                tr->swing_delay = tr->started ? next_swing_delay(s, t, tr->pos, rate, L) : 0;
+                tr->to_next = tr->swing_delay;
             }
         }
     }
@@ -450,8 +483,10 @@ void seq_advance(seq_t *s, uint32_t k, const seq_sink_t *o)
     else if (s->ext && s->ext_since > FS / 2u) {    /* clock gone for 0.5 s: back to internal */
         s->ext = 0;
         for (t = 0; t < NTRACKS; t++)
-            if (s->playing && s->t[t].to_next == NEVER)
+            if (s->playing && s->t[t].to_next == NEVER) {
                 s->t[t].to_next = 0;
+                s->t[t].swing_delay = 0;
+            }
     }
     if (s->req_stop) {
         s->req_stop = 0;
