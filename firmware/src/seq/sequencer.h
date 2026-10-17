@@ -20,7 +20,22 @@
  * loops); song_on + song_rec writes the live state (cues, mutes) into it from song_start on.
  *
  * Clock: internal (BPM) or external (24 ppqn MIDI clock, fed with seq_ext_clock()).
+ *
  * Swing delays every second 16th (909 shuffle: 0 = straight, 100 = 75 %).
+ *
+ * Swing must never move a part off the beat, however it is turned while playing. So each step has a
+ * grid slot, where it falls with no swing; an odd step plays late by the swing, an even one on its
+ * slot; and the next step is always scheduled from this step's slot, never from when this step
+ * played. A step's lateness then can't carry over to the step after: neither a swing changed between
+ * two steps nor two odd steps in a row (a random 303) can leave a part off its grid. To get back to
+ * the grid, each part remembers the offset it gave its pending step (swing_delay) and undoes exactly
+ * that, rather than working it out again from the current swing, which goes wrong whenever the swing
+ * has changed since.
+ *
+ * Which steps are odd follows the order a part plays them: forward and ping-pong count by position
+ * (an odd-length pattern keeps the same groove on every pass), reverse from the step it starts on,
+ * random by the steps played since the start. The internal and the external clock use the same
+ * rule, so the two agree.
  *
  * 303 semantics (as the TB-303 and Open303's sequencer):
  *   NOTE  plays; the gate falls at half the step, unless the step slides (BS_SLIDE)
@@ -93,7 +108,11 @@ typedef struct {                      /* one part's runtime */
     uint8_t started;                  /* the first step has fired since start */
     uint8_t sounding;                 /* 303: a note is held */
     uint8_t held_note;
+    uint8_t odd;                      /* the last step fired was odd, counted from the start (kept for
+                                       * every part; only a random 303 reads it, as its positions don't
+                                       * tell its order) */
     uint32_t to_next;                 /* samples to the next step (Q8 fraction) */
+    uint32_t swing_delay;             /* how long after its grid slot the next step plays, Q8 (see Swing) */
     uint32_t to_off;                  /* 303: samples to the gate falling, Q8; 0 = none */
     uint32_t rng;                     /* DIR_RANDOM and auto-mutate */
     uint16_t bars;                    /* wraps since the pattern started (auto-mutate) */
