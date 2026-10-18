@@ -166,11 +166,6 @@ void fxbus_init(fxbus_t *f, int16_t *dly_buf, int dly_len, fx_rv_buf_t *rv_buf)
     f->dlen = dly_len;
     fx_rv_clear(rv_buf);
     f->rv_buf = rv_buf;
-    /* CLASSIC reaches its lines through these pointers; ROOM reads the same buffer as its own layout,
-     * fx_room_t (fx_rm) */
-    f->ap = rv_buf->classic.ap;
-    f->apr = rv_buf->classic.apr;
-    f->comb = rv_buf->classic.comb;
     f->rv_type = FX_RV_CLASSIC;
 
     f->rv_decay = 0.62f; f->rv_tone = 0.45f; f->rv_level = 0.8f;
@@ -216,13 +211,14 @@ static void fx_reverb(fxbus_t *f, const float *in, float *out, float *out_r, int
     const float damp = 0.75f - f->rv_tone * 0.55f;
     const float fb = f->rv_decay;
     const float lvl = f->rv_level;
+    float *const ap = f->rv_buf->classic.ap, *const apr = f->rv_buf->classic.apr;
     int16_t *cb[4];
-    cb[0] = f->comb;
+    cb[0] = f->rv_buf->classic.comb;
     cb[1] = cb[0] + fx_cl[0];
     cb[2] = cb[1] + fx_cl[1];
     cb[3] = cb[2] + fx_cl[2];
-    float *ab0 = f->ap, *ab1 = f->ap + fx_al[0];
-    float *ar0 = f->apr, *ar1 = f->apr + fx_alr[0];
+    float *ab0 = ap, *ab1 = ap + fx_al[0];
+    float *ar0 = apr, *ar1 = apr + fx_alr[0];
     int32_t quiet = f->rv_quiet;
     for (int i = 0; i < n; ++i) {
         const float x = d9_biquad_tick(&f->rv_hp, in[i]);
