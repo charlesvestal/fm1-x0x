@@ -44,6 +44,7 @@ static const char *g_dir;
 static drum909_t D;
 static fxbus_t F;
 static int16_t DLY[DLY_LEN];
+static fx_rv_buf_t RV;
 static float bufp[NLEN * 2], bufr[NLEN * 2], bufd[NLEN * 2];
 static int fails;
 
@@ -144,7 +145,7 @@ static double run_case(const char *label, const int *trig, int ntrig, int vel, c
     void *ref = ref_new(g_dir), *refd = refd_new(g_dir);
     (void)kind;
     drum909_init(&D);
-    fxbus_init(&F, DLY, DLY_LEN);
+    fxbus_init(&F, DLY, DLY_LEN, &RV);
     for (int i = 0; i < ns; ++i) {
         const char *key = s[i].fx ? fkeys[s[i].idx] : dkeys[s[i].voice][s[i].idx];
         if (s[i].fx)
@@ -335,7 +336,7 @@ static void check_tables(void)
         double worst = 0;
         void *ref = ref_new(0);
         drum909_init(&D);
-        fxbus_init(&F, DLY, DLY_LEN);
+        fxbus_init(&F, DLY, DLY_LEN, &RV);
         for (int v = 0; v <= DR_KIT; ++v)
             for (int i = 0; i < drum909_nparams(v); ++i) {
                 float pv;
@@ -386,7 +387,7 @@ static void tape_checks(void)
     static const int wears[3] = { 0, 64, 127 };
     for (int k = 0; k < 3; ++k) {
         drum909_init(&D);
-        fxbus_init(&F, DLY, DLY_LEN);
+        fxbus_init(&F, DLY, DLY_LEN, &RV);
         fxbus_set(&F, FX_DL_TYPE, 1);
         fxbus_set(&F, FX_DL_WEAR, wears[k]);
         fxbus_set(&F, FX_DL_FDBK, 127);
@@ -426,7 +427,7 @@ static int demo(const char *path)
     float *rmono = (float *)calloc((size_t)total, sizeof(float));
     void *ref = ref_new(g_dir);
     drum909_init(&D);
-    fxbus_init(&F, DLY, DLY_LEN);
+    fxbus_init(&F, DLY, DLY_LEN, &RV);
     fxbus_set_bpm(&F, bpm);
     ref_set_raw(ref, "dly_bpm", bpm);
     /* a little reverb on the clap (and snare fills), delay on the rim, a touch

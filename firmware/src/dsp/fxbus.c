@@ -138,7 +138,15 @@ void fxbus_set_bpm(fxbus_t *f, float bpm)
     }
 }
 
-void fxbus_init(fxbus_t *f, int16_t *dly_buf, int dly_len)
+/* Clear the reverb's buffer. */
+static void fx_rv_clear(fx_rv_buf_t *b)
+{
+    uint8_t *p = (uint8_t *)b;
+    for (unsigned i = 0; i < sizeof *b; ++i)
+        p[i] = 0;
+}
+
+void fxbus_init(fxbus_t *f, int16_t *dly_buf, int dly_len, fx_rv_buf_t *rv_buf)
 {
     uint8_t *p = (uint8_t *)f;
     for (unsigned i = 0; i < sizeof(*f); ++i)
@@ -147,6 +155,10 @@ void fxbus_init(fxbus_t *f, int16_t *dly_buf, int dly_len)
         dly_buf[i] = 0;
     f->dbuf = dly_buf;
     f->dlen = dly_len;
+    fx_rv_clear(rv_buf);
+    f->ap = rv_buf->classic.ap;
+    f->apr = rv_buf->classic.apr;
+    f->comb = rv_buf->classic.comb;
 
     f->rv_decay = 0.62f; f->rv_tone = 0.45f; f->rv_level = 0.8f;
     d9_biquad_set(&f->rv_hp, D9_HP, 150.0f, 0.7071f);
