@@ -117,14 +117,11 @@ struct fxbus {
     /* reverb */
     float rv_decay, rv_tone, rv_level;
     d9_biquad_t rv_hp;
-    int16_t *comb;                    /* CLASSIC's lines in rv_buf (fxbus_init). Kept as pointers: read */
-    float *ap;                        /* through rv_buf, fx_reverb compiles to a longer loop */
     int32_t cpos[4], apos[2];
     float cdmp[4];
     int32_t rv_quiet;
-    float *apr;                       /* X0X stereo: the right side reads the combs with alternating
+    int32_t aposr[2];                 /* X0X stereo: the right side reads the combs with alternating
                                        * signs through its own allpasses (the left is 9W9's) */
-    int32_t aposr[2];
     int32_t rv_type;                  /* FX_RV_CLASSIC / FX_RV_ROOM */
     fx_rv_buf_t *rv_buf;              /* the reverb's buffer: CLASSIC's lines, or ROOM's */
     float rm_out;                     /* ROOM: output gain (the energy match to CLASSIC) */
