@@ -16,10 +16,9 @@
  *    compressor (hard bypass at 0), then volume.
  *
  * The delay line is int16 (9W9 writes it at 12 bits, so nothing is lost; values
- * past +-16 full scale saturate) and is passed in by the caller (.pool). The
- * reverb lines are int16 combs (also 12-bit in 9W9) and float allpasses, inside
- * the struct. Both effects go idle (no per-sample work) once their input and
- * their lines are silent. */
+ * past +-16 full scale saturate) and is passed in by the caller (.pool), as are the
+ * reverb's lines (fx_rv_buf_t). Both effects go idle (no per-sample work) once their
+ * input and their lines are silent. */
 #pragma once
 #include <stdint.h>
 #include "x0x_param.h"
@@ -28,6 +27,15 @@
 #define FX_RV_COMB_TOTAL (1116 + 1188 + 1277 + 1356)
 #define FX_RV_AP_TOTAL (556 + 441)
 #define FX_RV_APR_TOTAL (579 + 457)   /* X0X: the right side's allpasses */
+/* The reverb's buffer (the caller's: fxbus_init): CLASSIC's lines, as one member of a union, so that
+ * another type's lines can share the buffer. */
+typedef union {
+    struct {
+        float ap[FX_RV_AP_TOTAL];     /* the left's allpasses (9W9's) */
+        float apr[FX_RV_APR_TOTAL];   /* the right's */
+        int16_t comb[FX_RV_COMB_TOTAL];
+    } classic;
+} fx_rv_buf_t;
 
 /* FX parameters. A sound keeps 16 a voice, so the engine stores parameter k at FX's voice k / 16,
  * index k % 16 (engine.h). */
@@ -41,12 +49,12 @@ struct fxbus {
     /* reverb */
     float rv_decay, rv_tone, rv_level;
     d9_biquad_t rv_hp;
-    int16_t comb[FX_RV_COMB_TOTAL];
-    float ap[FX_RV_AP_TOTAL];
+    int16_t *comb;                    /* in the caller's buffer (fxbus_init) */
+    float *ap;
     int32_t cpos[4], apos[2];
     float cdmp[4];
     int32_t rv_quiet;
-    float apr[FX_RV_APR_TOTAL];       /* X0X stereo: the right side reads the combs with alternating
+    float *apr;                       /* X0X stereo: the right side reads the combs with alternating
                                        * signs through its own allpasses (the left is 9W9's) */
     int32_t aposr[2];
     /* delay */
@@ -70,7 +78,7 @@ struct fxbus {
 };
 typedef struct fxbus fxbus_t;
 
-void fxbus_init(fxbus_t *f, int16_t *dly_buf, int dly_len);
+void fxbus_init(fxbus_t *f, int16_t *dly_buf, int dly_len, fx_rv_buf_t *rv_buf);
 void fxbus_set_bpm(fxbus_t *f, float bpm);
 void fxbus_process(fxbus_t *f, const float *dry, const float *rev, const float *dly, float *out, int n);
 /* X0X stereo: dry in L / R, the sends mono; with everything centred and no reverb, out_l and out_r

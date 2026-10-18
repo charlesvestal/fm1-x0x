@@ -34,6 +34,7 @@ static fxbus_t fx POOL;
 static master_t mst;
 #define DLY_LEN 88200
 static int16_t dly_buf[DLY_LEN] POOL;
+static fx_rv_buf_t rv_buf POOL;
 static volatile uint8_t brk_hold;      /* main loop is rewriting the break loops: ISR leaves it alone */
 static motion_t mot;
 static const sound_t *mot_base_snd;    /* the knobs' own values (the project's mirror) */
@@ -957,7 +958,7 @@ void engine_init(pattern_t *patterns, song_t *song, lane_t *lanes, const sound_t
     bass303_init(&b303[0]);
     bass303_init(&b303[1]);
     breaks_init(&brk);
-    fxbus_init(&fx, dly_buf, DLY_LEN);
+    fxbus_init(&fx, dly_buf, DLY_LEN, &rv_buf);
     master_init(&mst);
     seq_init(&seq, patterns);
     seq.song = song;
