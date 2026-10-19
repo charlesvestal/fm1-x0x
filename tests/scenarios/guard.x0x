@@ -1,5 +1,7 @@
 # The overload guard (engine.c): past the CPU it lightens the 303s and the 808's tails, shows GUARD,
 # and lets go after 3 s back under 65%. "load N" stands in for the FM-1's measured load.
+# Start below the threshold too, independently of the build machine's speed or load.
+load 0
 wait 300
 # 909 kick on the quarters, 808 too, 303 A on a TB-3PO line
 tapkey b0

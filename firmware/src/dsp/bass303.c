@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
+/* Portions Copyright (C) 2026 Kerem Kilic (Ellic Studio) */
 /* X0X TB-303 bass engine - see bass303.h for what is ported and what is not.
  *
  * Reference: schwung-303 src/dsp/open303/rosic_Open303.{h,cpp} (getSample, triggerNote,
@@ -639,7 +640,14 @@ static void run(bass303_t *b, float *out, int n)
 #elif BASS303_OS == 2
             s = lite ? os[0] : decim_hb1(b->hb1, os[0], os[1]);
 #else
-            s = lite ? os[0] : decim_hb1(b->hb1, decim_hb2(b->hb2, os[0], os[1]), decim_hb2(b->hb2, os[2], os[3]));
+            if (lite) {
+                s = os[0];
+            } else {
+                /* Both calls advance hb2: sequence older samples first on every compiler. */
+                float older = decim_hb2(b->hb2, os[0], os[1]);
+                float newer = decim_hb2(b->hb2, os[2], os[3]);
+                s = decim_hb1(b->hb1, older, newer);
+            }
 #endif
 
             /* allpass 14 Hz, highpass 24 Hz, notch 7.5 Hz at the base rate */
