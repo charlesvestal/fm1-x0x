@@ -1,0 +1,121 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 Kerem Kilic (Ellic Studio)
+# Shared-builder integration follows keremimo/melodee commit 4f5fb6d.
+name: Build and attest firmware
+
+on:
+  push:
+    tags: ['v[0-9]*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: x0x-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Prepare a draft without replacing a public release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" != refs/tags/* ]]; then exit 0; fi
+          version=${GITHUB_REF_NAME#v}
+          # Match the version syntax accepted by tools/build.py.
+          [[ "$version" =~ ^[0-9]{1,2}\.[0-9]{1,2}(\.[0-9]{1,2})?(-[A-Za-z0-9]+)?$ ]]
+          flags=(--prerelease=false)
+          if [[ "$version" == *-* ]]; then flags=(--prerelease --latest=false); fi
+          if draft=$(gh release view "$GITHUB_REF_NAME" --json isDraft --jq .isDraft); then
+            [[ "$draft" == true ]] || { echo 'Refusing to rebuild a public release'; exit 1; }
+          else
+            gh release create "$GITHUB_REF_NAME" --verify-tag --draft \
+              --title "X0X $version" --generate-notes "${flags[@]}"
+          fi
+
+  firmware:
+    needs: prepare
+    # The Firmware Hub recognises attestations from this reviewed builder tag.
+    uses: zvenson/fm1-build/.github/workflows/build.yml@v1
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    with:
+      sdk: true
+      tests-block: true
+      build: |
+        set -euo pipefail
+        export X0X_JOBS=2
+        test "$(git -C "$AC79_SDK" rev-parse HEAD)" = d179b4484759423312073f5fbb232501aa491047
+        mkdir -p build/release-assets
+        if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+          version=${GITHUB_REF_NAME#v}
+          ./build.sh --release "$version"
+          cp "build/x0x-$version.fwsc" build/x0x.fwsc
+          cp "build/x0x-$version.fwsc" build/release-assets/
+          cp build/x0x.bin "build/release-assets/x0x-$version-app.bin"
+        else
+          ./build.sh
+          cp build/x0x.fwsc build/release-assets/
+          cp build/x0x.bin build/release-assets/x0x-app.bin
+        fi
+      test: |
+        set -euo pipefail
+        # The engine comparison tests need the original sources. Pin them so a
+        # later upstream change cannot silently change a release's test inputs.
+        fetch_ref() {
+          git init "build/refs/$2"
+          git -C "build/refs/$2" fetch --depth 1 "https://github.com/$1.git" "$3"
+          git -C "build/refs/$2" checkout --detach FETCH_HEAD
+        }
+        # Use the versions before the er99/sc808 filenames changed: the X0X
+        # comparison harnesses include those original headers and source files.
+        fetch_ref athousanddetails/schwung-9W9 schwung-9W9 10cbe5c1e1c9e65b0818bb34644ab1a13092082c
+        fetch_ref athousanddetails/schwung-8W8 schwung-8W8 94aa2716d4c2e5851fc7c5dbb4c17adfd133c997
+        fetch_ref charlesvestal/schwung-303 schwung-303 7680578cdecd91e512cfddb9c9eb07b287fb64f4
+        fetch_ref charlesvestal/schwung-tb3po schwung-tb3po f49d81d05d1e29ae37728a08e30f193892be3bc9
+        export NINEW9_DIR="$PWD/build/refs/schwung-9W9"
+        export EIGHTW8_DIR="$PWD/build/refs/schwung-8W8"
+        export SCHWUNG303="$PWD/build/refs/schwung-303"
+        export TB3PO_REF="$PWD/build/refs/schwung-tb3po/src/dsp/tb3po.c"
+        test -f "$TB3PO_REF"
+        tests/run_tests.sh
+      packages: build/release-assets/*
+
+  verify:
+    needs: firmware
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      attestations: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: build/attested
+      - name: Verify checksums and signed source provenance
+        working-directory: build/attested
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sha256sum --check SHA256SUMS
+          for package in build/release-assets/*.fwsc build/release-assets/*-app.bin; do
+            gh attestation verify "$package" --repo "$GITHUB_REPOSITORY" \
+              --signer-workflow zvenson/fm1-build/.github/workflows/build.yml \
+              --source-ref "$GITHUB_REF" --source-digest "$GITHUB_SHA"
+          done
+      - name: Publish the verified draft
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false

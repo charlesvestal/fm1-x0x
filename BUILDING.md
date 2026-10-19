@@ -102,9 +102,37 @@ Troubleshooting); otherwise recovery needs [FM-1-transporter](https://github.com
 
 ## Publishing a release
 
-1. `./build.sh --release X.Y-beta` (the identity, FM-1_9XY, is what the installers check).
-2. `tools/publish_pages.sh X.Y-beta`: builds the site (landing page, web installer, manual,
-   firmware) with `tools/make_pages.py` and pushes it to the `gh-pages` branch, which GitHub
-   Pages serves at <https://charlesvestal.github.io/fm1-x0x/>.
-3. `gh release create vX.Y-beta build/x0x-X.Y-beta.fwsc --prerelease` for the command-line
-   download.
+Push a version tag (for example `v1.1.1`) to run `.github/workflows/release.yml`. It calls
+[`zvenson/fm1-build` at `v1`](https://github.com/zvenson/fm1-build/tree/v1), the same reviewed
+builder used by [Melodee](https://github.com/keremimo/melodee/commit/4f5fb6df7cb5573bd4694df78f81a0a416c0dfd2).
+The builder runs X0X's `./build.sh --release VERSION` and `tests/run_tests.sh`, then signs
+GitHub build provenance for both `x0x-VERSION.fwsc` and `x0x-VERSION-app.bin`. The reference
+engines used by the host tests are fetched at fixed commits. Test failures block attestation
+and publication.
+
+The workflow prepares a draft, verifies the packages' SHA-256 checksums and attestations
+against the shared builder, source tag and commit, then publishes the release. Tags with a
+suffix (such as `v1.2-beta`) become prereleases. An existing public release is never rebuilt;
+use a new tag. Reruns can resume a draft. A manual run on a branch builds and attests a
+development package, available in the run's `packages` artifact, without creating a release.
+
+To verify a downloaded release package yourself (requires GitHub CLI authentication):
+
+```sh
+tag=v1.1.1
+repo=charlesvestal/fm1-x0x
+gh release download "$tag" --repo "$repo" --dir build/verify --pattern '*.fwsc'
+git fetch origin "refs/tags/$tag:refs/tags/$tag"
+gh attestation verify "build/verify/x0x-${tag#v}.fwsc" --repo "$repo" \
+  --signer-workflow zvenson/fm1-build/.github/workflows/build.yml \
+  --source-ref "refs/tags/$tag" --source-digest "$(git rev-parse "$tag^{commit}")"
+```
+
+The same command verifies the release's `*-app.bin`. `SHA256SUMS` accompanies the downloads;
+checksums alone do not establish signed build provenance. The Firmware Hub recognises the
+shared builder's signed attestations as evidence that a package was built from source.
+
+GitHub Pages remains a separate publication step. Download the attested `.fwsc` from the
+release into `build/`, then run `tools/publish_pages.sh VERSION`. This builds the landing page,
+web installer, manual and emulator with `tools/make_pages.py` and pushes the site, including
+that exact firmware package, to `gh-pages` at <https://charlesvestal.github.io/fm1-x0x/>.
