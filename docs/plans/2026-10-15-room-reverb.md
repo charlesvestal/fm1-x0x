@@ -9,9 +9,10 @@ and for the same knob settings it has CLASSIC's decay time and loudness. The cod
 ## Constraints
 
 - **Memory.** `tools/build.py` fails a build with less than 8 KB of pool free, and the image is
-  close to that limit, so ROOM cannot add memory. The two types share CLASSIC's reverb buffer
-  (18,008 B, `fx_rv_buf_t`, a union of the two layouts); `fx_room_t` is 17,676 B. Switching type
-  clears the buffer, which cuts off the tail.
+  close to that limit (64 B over it on upstream main), so ROOM can add almost nothing. The two types
+  share CLASSIC's reverb buffer (18,008 B, `fx_rv_buf_t`, a union of the two layouts); `fx_room_t`
+  is 17,684 B, its state included. Beyond the buffer, ROOM adds one field to `fxbus_t`, the type
+  (4 B). Switching type clears the buffer, which cuts off the tail.
 - **CPU.** The FX bus runs on core 0 in the audio interrupt. ROOM costs about 41 timer ticks per
   sample (1 tick = 15 cycles = 0.18 % of the core), CLASSIC about 29.
 - **Host and device agreement.** Host and device compute the same samples (`-ffp-contract=off`), so

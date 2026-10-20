@@ -171,7 +171,7 @@ static void fx_rv_clear(fx_rv_buf_t *b)
         w[i] = 0;
 }
 
-void fxbus_init(fxbus_t *f, int16_t *dly_buf, int dly_len, fx_rv_buf_t *rv_buf)
+void fxbus_init(fxbus_t *f, int16_t *dly_buf, int dly_len)
 {
     uint8_t *p = (uint8_t *)f;
     for (unsigned i = 0; i < sizeof(*f); ++i)
@@ -180,8 +180,6 @@ void fxbus_init(fxbus_t *f, int16_t *dly_buf, int dly_len, fx_rv_buf_t *rv_buf)
         dly_buf[i] = 0;
     f->dbuf = dly_buf;
     f->dlen = dly_len;
-    fx_rv_clear(rv_buf);
-    f->rv_buf = rv_buf;
     f->rv_type = FX_RV_CLASSIC;
 
     f->rv_decay = 0.62f; f->rv_tone = 0.45f; f->rv_level = 0.8f;
@@ -228,9 +226,9 @@ static void fx_reverb(fxbus_t *f, const float *in, float *out, float *out_r, int
     const float damp = 0.75f - f->rv_tone * 0.55f;
     const float fb = f->rv_decay;
     const float lvl = f->rv_level;
-    float *const ap = f->rv_buf->classic.ap, *const apr = f->rv_buf->classic.apr;
+    float *const ap = f->rv.classic.ap, *const apr = f->rv.classic.apr;
     int16_t *cb[4];
-    cb[0] = f->rv_buf->classic.comb;
+    cb[0] = f->rv.classic.comb;
     cb[1] = cb[0] + fx_cl[0];
     cb[2] = cb[1] + fx_cl[1];
     cb[3] = cb[2] + fx_cl[2];
@@ -325,7 +323,7 @@ static const float fx_rm_dif_gain[4] = { FX_RM_G0, FX_RM_G1, FX_RM_G2, FX_RM_G3 
 #define FX_RM_DSCALE 2048.0f                /* the diffusers' int16 units: 1.0 is 2048 (CLASSIC's combs') */
 #define FX_RM_TINY 1e-6f                    /* a block quieter than this (-120 dB) is stored as silence */
 
-static inline fx_room_t *fx_rm(const fxbus_t *f) { return &f->rv_buf->room; }
+static inline fx_room_t *fx_rm(fxbus_t *f) { return &f->rv.room; }
 
 /* Return 2^e as a float (e within the normal range). */
 static inline float fx_pow2i(int32_t e)
@@ -497,7 +495,7 @@ static void fx_room_times(fx_room_t *rm, float t_dc, float t_ny)
 }
 
 /* Set ROOM's decay and output gain from RvDec and RvTone. The knobs map to the decay times t_dc and
- * t_ny, and to the output gain rm_out, by polynomials fitted to CLASSIC's decay as heard and to its
+ * t_ny, and to the output gain out_gain, by polynomials fitted to CLASSIC's decay as heard and to its
  * loudness over the knobs' range (tools/fit_room.py, which prints them; the design doc has the
  * method). Do nothing unless ROOM is selected: otherwise the buffer is CLASSIC's. */
 static void fx_room_coeffs(fxbus_t *f)
@@ -509,8 +507,9 @@ static void fx_room_coeffs(fxbus_t *f)
     const float t_dc = fm_expf(-1.7984f + x * (1.1228f + x * (-0.6857f + x * 2.1048f)) + 0.0597f * y);
     const float t_ny = fm_minf(t_dc, fm_expf(-2.0520f - 0.6055f * x - 0.1850f * y + 1.2173f * x * y
                                              + 0.2419f * y * y + 0.5170f * x * x));
-    fx_room_times(fx_rm(f), t_dc, t_ny);
-    f->rm_out = 1.8963f + 0.3712f * x + 0.1889f * y;
+    fx_room_t *const rm = fx_rm(f);
+    fx_room_times(rm, t_dc, t_ny);
+    rm->out_gain = 1.8963f + 0.3712f * x + 0.1889f * y;
 }
 
 /* Set ROOM's state as at power-on, in a cleared buffer: lay out the rings, and start each line's read
@@ -526,8 +525,8 @@ static void fx_room_reset(fxbus_t *f)
         rm->wblk[j] = 0;
         base += FX_RM_NB(len);
     }
-    f->rm_pos = 0;
-    f->rm_quiet = FX_RM_QUIET;
+    rm->pos = 0;
+    rm->quiet = FX_RM_QUIET;
 }
 
 /* Run the dampers of lines j .. j + 3 over samples [pos, pos + m) of the block, then the first two
@@ -643,16 +642,16 @@ D9_INLINE float fx_rm_ap(int16_t **pp, int16_t *buf, int32_t len, float g, float
  * same code compiled (device clang) to 5 to 17 more instructions here, with more spills. */
 static void fx_room(fxbus_t *f, const float *in, float *out, float *out_r, int n)
 {
-    if (f->rm_quiet >= FX_RM_QUIET) {
+    fx_room_t *const rm = fx_rm(f);
+    if (rm->quiet >= FX_RM_QUIET) {
         int any = 0;
         for (int i = 0; i < n; ++i)
             any |= in[i] != 0.0f;
         if (!any)
             return;                         /* silent in, silent lines: 0 out */
     }
-    fx_room_t *const rm = fx_rm(f);
-    const float lvl = f->rv_level * f->rm_out * 0.35355339f * rm->tap_k;   /* 1/sqrt(8): the taps' sum */
-    int32_t pos = f->rm_pos, quiet = f->rm_quiet;
+    const float lvl = f->rv_level * rm->out_gain * 0.35355339f * rm->tap_k;   /* 1/sqrt(8): the taps' sum */
+    int32_t pos = rm->pos, quiet = rm->quiet;
 
     for (int i0 = 0; i0 < n;) {
         const int m = n - i0 < FX_RM_BLK - pos ? n - i0 : FX_RM_BLK - pos;
@@ -715,8 +714,8 @@ static void fx_room(fxbus_t *f, const float *in, float *out, float *out_r, int n
             }
         }
     }
-    f->rm_pos = (uint8_t)pos;
-    f->rm_quiet = quiet;
+    rm->pos = (uint8_t)pos;
+    rm->quiet = quiet;
 }
 
 /* Set the reverb's type (FX_RV_TYPE): the two share the buffer, so a change clears it, cutting the tail. */
@@ -726,7 +725,7 @@ static void fx_rv_type(fxbus_t *f, int type)
     if (type == f->rv_type)
         return;
     f->rv_type = type;
-    fx_rv_clear(f->rv_buf);
+    fx_rv_clear(&f->rv);
     for (int c = 0; c < 4; ++c) {
         f->cpos[c] = 0;
         f->cdmp[c] = 0.0f;

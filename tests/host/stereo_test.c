@@ -29,7 +29,6 @@ static float rnd(void) { rs = rs * 1664525u + 1013904223u; return (float)(int)(r
 static master_t m1, m2;
 static fxbus_t f1, f2;
 static int16_t dl1[88200], dl2[88200];
-static fx_rv_buf_t rv1, rv2;
 
 /* Return the energy of PING's echoes of one impulse at this width (both sides), and in *same whether the
  * left and right were the same throughout. */
@@ -89,8 +88,8 @@ int main(void)
     }
     check(same, "master: centred stereo == mono, bit for bit (comp, PUMP, filter, limiter)");
 
-    fxbus_init(&f1, dl1, 88200, &rv1);
-    fxbus_init(&f2, dl2, 88200, &rv2);
+    fxbus_init(&f1, dl1, 88200);
+    fxbus_init(&f2, dl2, 88200);
     {
         static const int P[][2] = {{FX_DIST, 2}, {FX_DRIVE, 70}, {FX_COMP, 90}, {FX_DL_FDBK, 100}, {FX_DL_LEVEL, 110}};
         for (i = 0; i < (int)(sizeof P / sizeof P[0]); i++) {
@@ -113,8 +112,8 @@ int main(void)
 
     {   /* the reverb: left = 9W9's, right = its own */
         double sl = 0, sr = 0, slr = 0;
-        fxbus_init(&f1, dl1, 88200, &rv1);
-        fxbus_init(&f2, dl2, 88200, &rv2);
+        fxbus_init(&f1, dl1, 88200);
+        fxbus_init(&f2, dl2, 88200);
         same = 1;
         for (b = 0; b < BLOCKS; b++) {
             for (i = 0; i < N; i++) {
@@ -136,7 +135,7 @@ int main(void)
     }
     {   /* PING: one impulse, echoes at T (left) and 2T (right) */
         int first_l = -1, first_r = -1, t;
-        fxbus_init(&f2, dl2, 88200, &rv2);
+        fxbus_init(&f2, dl2, 88200);
         fxbus_set(&f2, FX_DL_PING, 1);
         fxbus_set(&f2, FX_DL_FDBK, 0);
         fxbus_set(&f2, FX_DL_HPF, 0);

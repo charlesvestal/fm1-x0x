@@ -194,7 +194,7 @@ def main():
     print(f"    const float t_dc = fm_expf({d[0]:.4f}f + x * ({d[1]:.4f}f + x * ({d[2]:.4f}f + x * {d[3]:.4f}f)){s(d[4])} * y);")
     print(f"    const float t_ny = fm_minf(t_dc, fm_expf({n[0]:.4f}f{s(n[1])} * x{s(n[2])} * y{s(n[3])} * x * y")
     print(f"                                            {s(n[4])} * y * y{s(n[5])} * x * x));")
-    print(f"    f->rm_out = {g[0]:.4f}f{s(g[1])} * x{s(g[2])} * y;")
+    print(f"    rm->out_gain = {g[0]:.4f}f{s(g[1])} * x{s(g[2])} * y;")
 
 if __name__ == "__main__":
     main()
