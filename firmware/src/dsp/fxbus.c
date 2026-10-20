@@ -321,7 +321,15 @@ _Static_assert(FX_RM_L0 <= FX_RM_LMAX && FX_RM_L1 <= FX_RM_LMAX && FX_RM_L2 <= F
 static const int32_t fx_rm_dif_len[4] = { FX_RM_D0, FX_RM_D1, FX_RM_D2, FX_RM_D3 };
 static const float fx_rm_dif_gain[4] = { FX_RM_G0, FX_RM_G1, FX_RM_G2, FX_RM_G3 };
 #define FX_RM_DSCALE 2048.0f                /* the diffusers' int16 units: 1.0 is 2048 (CLASSIC's combs') */
-#define FX_RM_TINY 1e-6f                    /* a block quieter than this (-120 dB) is stored as silence */
+/* Emphasis around the lines' storage: the network's input is pre-emphasized after the diffusers,
+ * x - FX_RM_EMPH x[-1], and its outputs are de-emphasized, y + FX_RM_EMPH y[-1]. The network is linear,
+ * so the two cancel, except on the lines' rounding noise, which only the de-emphasis filters: the
+ * noise moves down in frequency, away from the top of low tails, where it is heard as fizz (on toms at
+ * the default low cut, about 4 dB less at 4 to 12 kHz), and rises below. */
+#define FX_RM_EMPH 0.8f
+/* A block quieter than this is stored as silence: -120 dB at the outputs, since the pre-emphasis scales
+ * the lines' low frequencies, where a tail ends, by 1 - FX_RM_EMPH. */
+#define FX_RM_TINY (1e-6f * (1.0f - FX_RM_EMPH))
 
 static inline fx_room_t *fx_rm(fxbus_t *f) { return &f->rv.room; }
 
@@ -568,7 +576,7 @@ D9_INLINE void fx_rm_net(fx_room_t *rm, const float *xin, int32_t pos, int m, fl
                          float lvl)
 {
     const float tap_a = rm->tap_a;
-    float zl = rm->tap_zl, zr = rm->tap_zr;
+    float zl = rm->tap_zl, zr = rm->tap_zr, el = rm->emph_l, er = rm->emph_r;
     fx_rm_damp4(rm, 0, pos, m);
     fx_rm_damp4(rm, 4, pos, m);
     for (int t = 0; t < m; ++t) {
@@ -591,15 +599,19 @@ D9_INLINE void fx_rm_net(fx_room_t *rm, const float *xin, int32_t pos, int m, fl
 
         /* Add the outputs: two of the mix's rows, before the input is added. L is row 1
          * (+ - + - + - + -), b1 + b5; R is row 6 (+ + - - - - + +), b2 - b6. Each has the lines' mean
-         * damper undone (fx_room_times). */
+         * damper undone (fx_room_times), then is de-emphasized (FX_RM_EMPH). */
         const float sl = b1 + b5, sr = b2 - b6;
-        out[t] += (sl - tap_a * zl) * lvl;
-        out_r[t] += (sr - tap_a * zr) * lvl;
+        el = (sl - tap_a * zl) + FX_RM_EMPH * el;
+        er = (sr - tap_a * zr) + FX_RM_EMPH * er;
+        out[t] += el * lvl;
+        out_r[t] += er * lvl;
         zl = sl;
         zr = sr;
     }
     rm->tap_zl = zl;
     rm->tap_zr = zr;
+    rm->emph_l = el;
+    rm->emph_r = er;
 }
 
 /* Run fx_rm_net over a whole block, or over part of one. Each is its own function so that the compiler
@@ -677,20 +689,24 @@ static void fx_room(fxbus_t *f, const float *in, float *out, float *out_r, int n
             h->x1 = x1; h->x2 = x2; h->y1 = y1 * (1.0f / FX_RM_DSCALE); h->y2 = y2 * (1.0f / FX_RM_DSCALE);
         }
 
-        /* Run the four input diffusers in series, in place. All four run on a sample before the next
-         * sample, so that it stays in a register between them. */
+        /* Run the four input diffusers in series, in place, then pre-emphasize (FX_RM_EMPH). All four
+         * run on a sample before the next sample, so that it stays in a register between them. */
         {
             int16_t *const d0 = rm->dif, *const d1 = d0 + fx_rm_dif_len[0], *const d2 = d1 + fx_rm_dif_len[1],
                     *const d3 = d2 + fx_rm_dif_len[2];
             int16_t *p0 = d0 + rm->dif_pos[0], *p1 = d1 + rm->dif_pos[1], *p2 = d2 + rm->dif_pos[2],
                     *p3 = d3 + rm->dif_pos[3];
+            float xp = rm->emph_x;
             for (int t = 0; t < m; ++t) {
                 float x = xin[t];
                 x = fx_rm_ap(&p0, d0, fx_rm_dif_len[0], fx_rm_dif_gain[0], x);
                 x = fx_rm_ap(&p1, d1, fx_rm_dif_len[1], fx_rm_dif_gain[1], x);
                 x = fx_rm_ap(&p2, d2, fx_rm_dif_len[2], fx_rm_dif_gain[2], x);
-                xin[t] = fx_rm_ap(&p3, d3, fx_rm_dif_len[3], fx_rm_dif_gain[3], x);
+                x = fx_rm_ap(&p3, d3, fx_rm_dif_len[3], fx_rm_dif_gain[3], x);
+                xin[t] = x - FX_RM_EMPH * xp;
+                xp = x;
             }
+            rm->emph_x = xp;
             rm->dif_pos[0] = (int16_t)(p0 - d0); rm->dif_pos[1] = (int16_t)(p1 - d1);
             rm->dif_pos[2] = (int16_t)(p2 - d2); rm->dif_pos[3] = (int16_t)(p3 - d3);
         }
@@ -705,10 +721,10 @@ static void fx_room(fxbus_t *f, const float *in, float *out, float *out_r, int n
         if (pos == FX_RM_BLK) {
             pos = 0;
             quiet = fx_rm_commit_all(rm) ? 0 : quiet + 1;   /* (the input is in the blocks: fx_rm_net) */
-            if (quiet == FX_RM_QUIET) {     /* idle from here: clear the dampers, taps and diffusers too */
+            if (quiet == FX_RM_QUIET) {     /* idle from here: clear the dampers, taps, emphasis, diffusers */
                 for (int j = 0; j < FX_RM_N; ++j)
                     rm->lp[j] = 0.0f;
-                rm->tap_zl = rm->tap_zr = 0.0f;
+                rm->tap_zl = rm->tap_zr = rm->emph_x = rm->emph_l = rm->emph_r = 0.0f;
                 for (int k = 0; k < FX_RM_DIF_TOTAL; ++k)
                     rm->dif[k] = 0;
             }

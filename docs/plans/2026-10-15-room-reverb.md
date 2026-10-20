@@ -13,8 +13,12 @@ and for the same knob settings it has CLASSIC's decay time and loudness. The cod
   share CLASSIC's reverb buffer (18,008 B, `fx_rv_buf_t`, a union of the two layouts); `fx_room_t`
   is 17,684 B, its state included. Beyond the buffer, ROOM adds one field to `fxbus_t`, the type
   (4 B). Switching type clears the buffer, which cuts off the tail.
+  close to that limit, so ROOM cannot add memory. The two types share CLASSIC's reverb buffer
+  (18,008 B, `fx_rv_buf_t`, a union of the two layouts); `fx_room_t` is 17,688 B. Switching type
+  clears the buffer, which cuts off the tail.
 - **CPU.** The FX bus runs on core 0 in the audio interrupt. ROOM costs about 41 timer ticks per
-  sample (1 tick = 15 cycles = 0.18 % of the core), CLASSIC about 29.
+  sample without emphasis (1 tick = 15 cycles = 0.18 % of the core), 2 to 3 more with it, and
+  CLASSIC about 29.
 - **Host and device agreement.** Host and device compute the same samples (`-ffp-contract=off`), so
   the DSP is written in plain C and the host tests check the code the device runs.
 
@@ -148,6 +152,32 @@ a fixed scale would leave late tails only a few steps above zero. Instead, each 
   block, before that block's commit at its end. The block being written is kept as floats
   (`stage`) until it is committed.
 
+### Emphasis
+
+The rounding noise is white and about 47 to 53 dB below each block's peak. On a low tonal tail, such
+as a tom's, the peak is set by the fundamental, and the tail has little energy at high frequencies
+to cover the noise there, so the noise is heard as a fizz above the tail. To reduce it, the
+network's input is pre-emphasized after the diffusers (`x - 0.8 x[-1]`) and its outputs are
+de-emphasized (`y + 0.8 y[-1]`), `FX_RM_EMPH` in the code. The network is linear and time-invariant,
+so the two filters cancel on the signal (in float, to -135 dB); the rounding noise passes only
+through the de-emphasis, which moves it down in frequency. The block-silence threshold is scaled by
+1 - 0.8, since the pre-emphasis scales the low frequencies, where a tail ends, by that amount.
+
+Storage noise on toms at 4 to 12 kHz, relative to the same network with float lines (ROOM's int16
+diffusers set a floor of about -9 dB):
+
+| RvLowCut | Without emphasis | With emphasis |
+|---|---|---|
+| Default (150 Hz) | -4.6 dB | -8.5 dB |
+| Minimum (30 Hz) | +2.9 dB | -5.7 dB |
+
+The noise is reduced at high frequencies and increased at low ones, so the broadband error at the
+longest settings rises from about -40 to -32 dB relative to float lines, and on crashes at 100 Hz to
+1 kHz by about 4 dB; `reverb_test` allows 30 dB instead of 35. Emphasis costs about 0.5 points of
+PERF load (2 to 3 ticks) and 12 bytes of state. At the default RvLowCut the difference in fizz was
+small in listening, and a per-line form of the same filtering was rejected as too costly (about 58
+instructions per sample, against 16).
+
 ### Loud and quiet tails together
 
 A block's step is set by its loudest sample, so when a loud hit arrives while a quiet tail is still
@@ -239,7 +269,6 @@ was refitted.
 | Other orders with less loop-period repeat | Preferred less than the current order (1/16 and 4/16): more wobble, or low-end clutter on 303 notes |
 | Shorter diffusers (73 to 257, or 67 to 131 samples) | Not preferred in informal listening |
 | Diffusers spaced at a ratio of 2 or 3 (47 to 397, 13 to 397 samples) | No clear preference over the current ones; ratio 2 would free 640 B |
-| Emphasis around the lines' storage (pre-emphasis of the network's input after the diffusers, de-emphasis of its outputs, coefficient 0.8) | It lowers the storage noise on low tom tails at 4 to 12 kHz by about 4 dB at the default RvLowCut (9 dB at its minimum), but costs about 0.5 points of PERF load (2 to 3 ticks), raises the error at the longest settings from about -40 to -33 dB relative to float lines, and raises the error on crashes at 100 Hz to 1 kHz by about 4 dB. At the default RvLowCut the difference was small in listening |
 
 ## Cost on the device
 
@@ -275,7 +304,8 @@ repeated runs differ by up to about 0.7 points in load):
 | | Factory | All five | Worst |
 |---|---|---|---|
 | CLASSIC | 40.5 / 49 | 54.6 / 67 | 68.1 / 86 |
-| ROOM | 43.3 / 60 | 57.0 / 69 | 71.1 / 90 |
+| ROOM without emphasis | 43.3 / 60 | 57.0 / 69 | 71.1 / 90 |
+| ROOM with emphasis | 43.7 / 61 | 57.5 / 70 | 71.6 / 91 |
 
 The same ROOM code run from RAM measured 0.6 to 1.8 points lower, with the difference growing with
 load. Code from flash costs more inside the audio interrupt than in a warm loop; the reason is not

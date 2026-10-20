@@ -79,6 +79,9 @@ typedef struct {
     float c[FX_RM_N], a[FX_RM_N], lp[FX_RM_N];
     /* the outputs' filter, y = (s - tap_a s[-1]) tap_k, and its state for L and R (fx_room_times) */
     float tap_a, tap_k, tap_zl, tap_zr;
+    /* the emphasis around the lines' storage (fxbus.c, FX_RM_EMPH): the last diffused input, and the
+     * last L and R outputs */
+    float emph_x, emph_l, emph_r;
     /* the output gain, the energy match to CLASSIC (fx_room_coeffs); the blocks committed silent
      * (input and lines) in a row; and the place in the blocks being filled (all lines together) */
     float out_gain;

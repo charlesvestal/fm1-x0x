@@ -2,14 +2,15 @@
 /* The reverb's ROOM type (fxbus.c).
  *
  * Most of this compares ROOM's output with a float reference written out here: the same network (the
- * high-pass, the diffusers, eight lines with their dampers, the mix and the output filter), with
- * plain float lines and diffusers and fxbus's own coefficients. The two differ only by ROOM's storage
- * (8-bit block-float lines, int16 diffusers), which puts their outputs about 40 dB apart; the check
- * allows 35. Anything else that differs in ROOM's signal path fails it: a read or write in the wrong
- * place, a wrong sign, a wrong damper or filter, even a diffuser's gain 1.4 % off. A wrong coefficient
- * passes, since both sides use the same ones (the loop gains, the dampers, the knob mapping); a
- * separate, coarse check holds ROOM's decay to CLASSIC's, and tools/fit_room.py --check measures it
- * closely.
+ * high-pass, the diffusers, eight lines with their dampers, the mix and the output filter), with plain
+ * float lines and diffusers and fxbus's own coefficients. The two differ only by ROOM's storage (8-bit
+ * block-float lines, int16 diffusers, and the emphasis around the lines, which moves their rounding
+ * noise down in frequency and raises its total), which puts their outputs 32 to 37 dB apart; the check
+ * allows 30 (REF_DB). Anything else that differs in ROOM's signal path fails it: a read or write in the
+ * wrong place, a wrong sign, a wrong damper or filter, even a diffuser's gain 2 % off. A wrong
+ * coefficient passes, since both sides use the same ones (the loop gains, the dampers, the knob
+ * mapping); a separate, coarse check holds ROOM's decay to CLASSIC's, and tools/fit_room.py --check
+ * measures it closely.
  *
  * Checked:
  *  - a block of a line comes back from storage (fx_rm_commit, fx_rm_unpack) within half a step, at
@@ -226,13 +227,16 @@ static const int SZ[] = {256, 13, 256, 1, 37, 256, 200, 3, 256, 64};
  * under FX_RM_TINY (-120 dB at their peak), about 110 dB under the reference here. A gate ten times
  * higher fails at most settings, and one a hundred times higher at all of them. */
 #define TAIL_DB -105.0
+/* The most the output may differ from the reference's, in dB of it: ROOM's storage puts them 32 to 37
+ * dB apart, the most at the longest settings. */
+#define REF_DB -30.0
 
 /* Check ROOM against the float reference at each reverb knob's ends and middle, and that its tail goes
  * silent and idle, but no sooner than the reference's falls under TAIL_DB, with its sides
  * uncorrelated and as loud.
  *
  * At each setting, send 3 s of bursts and then 11 s of silence through ROOM and the reference, in
- * calls of every size in SZ. The difference must be under -35 dB of the reference. The output must
+ * calls of every size in SZ. The difference must be under REF_DB of the reference. The output must
  * sound until the reference is under TAIL_DB, reach exact silence before the end, and ROOM go idle.
  * L and R must be uncorrelated (|r| < 0.5) and within 3 dB of each other. */
 static void test_against_reference(void)
@@ -287,9 +291,11 @@ static void test_against_reference(void)
         }
 
         /* Check the difference, the silence and idle, and the two sides. */
-        snprintf(what, sizeof what, "Decay %3d Tone %3d LowCut %3d Level %3d: against the float reference %.1f dB (< -35)",
-                 SET[c][0], SET[c][1], fxbus_get(&F, FX_RV_HPF), fxbus_get(&F, FX_RV_LEVEL), 10 * log10(d / e));
-        check(10 * log10(d / e) < -35.0, what);
+        snprintf(what, sizeof what,
+                 "Decay %3d Tone %3d LowCut %3d Level %3d: against the float reference %.1f dB (< %.0f)",
+                 SET[c][0], SET[c][1], fxbus_get(&F, FX_RV_HPF), fxbus_get(&F, FX_RV_LEVEL), 10 * log10(d / e),
+                 REF_DB);
+        check(10 * log10(d / e) < REF_DB, what);
         snprintf(what, sizeof what,
                  "  sounds until %.2f s after the last burst (the reference over %.0f dB until %.2f s), then silent, "
                  "idle at %.2f s",
