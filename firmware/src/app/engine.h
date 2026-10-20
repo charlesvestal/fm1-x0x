@@ -28,6 +28,8 @@ enum { PART_909, PART_808, PART_303A, PART_303B, PART_BRK, NPARTS };
 enum { MX_LEVEL, MX_REV, MX_DLY, MX_PAN, MX_NPARAMS };
 #define NVOICES_MAX 12                 /* a drum machine: 11 tracks + the kit */
 #define NPARAMS_MAX 16                 /* params per (target, voice) */
+#define FX_VOICE(k) ((k) / NPARAMS_MAX)   /* T_FX's voice and index of fxbus.h's parameter k */
+#define FX_INDEX(k) ((k) % NPARAMS_MAX)
 
 /* the sound of a project: every pot of every engine, mirrored here by the main loop */
 typedef struct {
@@ -44,6 +46,7 @@ void engine_motion_reset(void);                             /* lanes replaced (u
 void engine_load(uint32_t pct, uint32_t frames);           /* ISR, after engine_render */
 void engine_guard_enable(int on);                           /* off: full quality always (the PERF test) */
 int engine_guard_active(void);
+int engine_fx_rv_type(void);                                /* the reverb's type, as the engine has it */
 extern volatile uint32_t eng_guard_count;                   /* times it engaged (PERF screen) */
 extern volatile uint8_t eng_step[NTRACKS];   /* playheads for the UI */
 extern volatile uint16_t eng_peak[NPARTS];   /* part meters, Q15, decaying (UI) */
