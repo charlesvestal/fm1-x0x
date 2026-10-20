@@ -564,8 +564,9 @@ static void pref_value_of(pref_t r, int v, char *num, char *unit)
     *num = *unit = 0;
     if (!d || r.kind == R_ACT)
         return;
-    if (d->names) {
-        put_s(num, d->names[v]);
+    if (d->names) {                                      /* (a value past the list, from a damaged or newer
+                                                          * save, shows as the list's last) */
+        put_s(num, d->names[v < 0 ? 0 : v > d->max ? d->max : v]);
         return;
     }
     if (r.kind == R_TAPE) {
