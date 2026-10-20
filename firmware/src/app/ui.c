@@ -355,7 +355,7 @@ static int pref_get(pref_t r)
     case R_BATT: return plat_battery() < 0 ? 5 : plat_battery();
     case R_SLEN: return song()->len;
     case R_STALLS: return perf.stalls_on;
-    case R_TAPE: return proj.sound.v[T_FX][1][0];       /* (kept in an engine slot nothing reads) */
+    case R_TAPE: return proj.sound.v[T_FX][1][0];       /* (fxbus's FX_DL_TAPE, which plays nothing) */
     default: return 0;
     }
 }
@@ -518,7 +518,7 @@ static const char *pref_name(pref_t r)
     if (r.kind == R_ENG && r.a == T_MIX && r.b < NPARTS && r.c < MX_NPARAMS)
         return MIXN[r.b][r.c];
     if (r.kind == R_ENG && r.a == T_FX) {               /* the page says which effect: the knob, what */
-        switch (r.c) {
+        switch (r.b * NPARAMS_MAX + r.c) {               /* (fxbus.h's parameter: engine.h) */
         case FX_RV_DECAY: return "DECAY";
         case FX_RV_TONE: case FX_DL_TONE: return "TONE";
         case FX_DL_TIME: return "TIME";

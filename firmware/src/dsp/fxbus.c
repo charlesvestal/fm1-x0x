@@ -48,6 +48,9 @@ static const fx_pspec_t fx_p[FX_NPARAMS] = {
     [FX_DL_TYPE]  = { { "DlType", 1, 0, fx_type_names }, CV_SW, 0, 0.0f, 0.0f },
     [FX_DL_WEAR]  = { { "Wear", 127, 64, 0 }, CV_LIN, 0, 0.0f, 1.0f },
     [FX_DL_PING]  = { { "Ping", 1, 0, fx_onoff_names }, CV_SW, 0, 0.0f, 0.0f },
+    /* X0X: the one-knob TAPE (ui.c R_TAPE), kept with the sound so the knob reads back where it was
+     * left. It sets DlType and Wear, which are what the delay plays; it plays nothing itself. */
+    [FX_DL_TAPE]  = { { "Tape", 127, 72, 0 }, CV_SW, 0, 0.0f, 0.0f },
 };
 
 int fxbus_nparams(void) { return FX_NPARAMS; }
