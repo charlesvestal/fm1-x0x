@@ -456,16 +456,6 @@ int project_load(void)
     sound_ok = load_obj(OBJ_SOUND, &proj.sound, sizeof proj.sound) == 0;
     if (!sound_ok)
         bad = 1;
-    if (sound_ok && proj.set.snd_rev < 3)             /* before the 909 BD's sends: its pan moves up two */
-        sound_bd_sends(T_909, 8);                     /* (first: the pans' own fixes below see the new place) */
-    if (sound_ok && proj.set.snd_rev < 4)             /* the 808 BD's, the same */
-        sound_bd_sends(T_808, 7);
-    if (proj.set.stereo < 1)                          /* saved mono: no pans there (zeros = hard left) */
-        for (i = 0; i < NPARTS; i++)
-            proj.sound.v[T_MIX][i][MX_PAN] = 64;
-    if (proj.set.stereo < 2)                          /* saved before the drum voices had pans */
-        engine_sound_centre_drum_pans(&proj.sound);
-    proj.set.stereo = PROJ_STEREO;
     n = plat_store_load(OBJ_PAT0, io_buf, sizeof io_buf);
     if (n >= 4 && get32(io_buf) == PROJ_STREAM) {
         if (load_stream(n, 0)) {                      /* torn (a power cut mid-save) or broken: the previous
@@ -497,6 +487,18 @@ int project_load(void)
     }
     if (proj.arr.song.len > NSONG)
         proj.arr.song.len = NSONG;
+    /* Migrate the sound only now, after the pattern stream is loaded: the BD-sends revisions also move
+     * motion lanes, and loading the stream (which holds the lanes) would undo that. */
+    if (sound_ok && proj.set.snd_rev < 3)             /* before the 909 BD's sends: its pan moves up two */
+        sound_bd_sends(T_909, 8);                     /* (first: the pans' own fixes below see the new place) */
+    if (sound_ok && proj.set.snd_rev < 4)             /* the 808 BD's, the same */
+        sound_bd_sends(T_808, 7);
+    if (proj.set.stereo < 1)                          /* saved mono: no pans there (zeros = hard left) */
+        for (i = 0; i < NPARTS; i++)
+            proj.sound.v[T_MIX][i][MX_PAN] = 64;
+    if (proj.set.stereo < 2)                          /* saved before the drum voices had pans */
+        engine_sound_centre_drum_pans(&proj.sound);
+    proj.set.stereo = PROJ_STEREO;
     if (sound_ok && proj.set.snd_rev < 1)             /* saved before the 909 SD's DECAY: its pots move up one */
         sound_rev1();
     if (sound_ok && proj.set.snd_rev < 2)             /* before the one-knob COMP, FILTER, TAPE */

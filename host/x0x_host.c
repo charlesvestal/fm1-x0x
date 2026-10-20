@@ -25,6 +25,10 @@
  *   expect WHAT VALUE            check state (playing, pattern, cue, view-part, ...): exit 1 on mismatch;
  *                                VALUE "<N" / ">N" is a bound
  *   reboot                       save nothing; re-run boot from the simulated flash (persistence test)
+ *   sndrev N                     mark the project's sound as revision N (a save then loads through
+ *                                the migrations after N, as one saved by that firmware would)
+ *   lane T V I S VALUE           set step S of the motion lane on sound pot T V I (in the part's
+ *                                current pattern) to VALUE, making the lane if need be
  *   snapline B                   remember 303 B's line on the pattern shown (expect linechgB: 1 = it changed since)
  *   projimg FILE                 a project as the FM-1 holds it in RAM (fm1_debug peek of proj): saved
  *                                to the simulated flash and booted, as if it had been made here
@@ -965,9 +969,9 @@ int main(int argc, char **argv)
         ann_frame(HELLO, sizeof HELLO, now_ms);
     }
     while (fgets(line, sizeof line, sc)) {
-        char cmd[32] = {0}, a[256] = {0}, b[64] = {0}, c[64] = {0}, line_d[64] = {0};
+        char cmd[32] = {0}, a[256] = {0}, b[64] = {0}, c[64] = {0}, line_d[64] = {0}, line_e[64] = {0};
         lineno++;
-        if (line[0] == '#' || sscanf(line, "%31s %255s %63s %63s %63s", cmd, a, b, c, line_d) < 1)
+        if (line[0] == '#' || sscanf(line, "%31s %255s %63s %63s %63s %63s", cmd, a, b, c, line_d, line_e) < 1)
             continue;
         if (!strcmp(cmd, "wait"))
             run_ms((uint32_t)atoi(a));
@@ -1179,6 +1183,21 @@ int main(int argc, char **argv)
             memcpy(pat_snap, proj.pat, sizeof pat_snap);
         } else if (!strcmp(cmd, "fakecrash")) {
             host_crash = 1;
+        } else if (!strcmp(cmd, "sndrev")) {           /* sndrev N: the project's sound as revision N (saved so) */
+            proj.set.snd_rev = (uint8_t)atoi(a);
+        } else if (!strcmp(cmd, "lane")) {             /* lane T V I S VALUE: one step of a lane, as recorded */
+            int t = atoi(a), v = atoi(b), i = atoi(c), st = atoi(line_d), val = atoi(line_e), part, k = -1;
+            if (line_e[0] && st >= 0 && st < NSTEPS) {
+                part = engine_motion_part(t, v);
+                k = motion_find(proj.arr.lane, seq.ppat[part], part, t, v, i);
+                if (k < 0)
+                    k = motion_alloc(proj.arr.lane, seq.ppat[part], part, t, v, i);
+            }
+            if (k < 0) {
+                printf("line %d: no lane %d %d %d step %d\n", lineno, t, v, i, st);
+                return 2;
+            }
+            proj.arr.lane[k].val[st] = (uint8_t)val;
         } else if (!strcmp(cmd, "tearsave")) {          /* tearsave N: the next save stops after N object writes */
             store_tear = atoi(a);
         } else if (!strcmp(cmd, "reboot")) {
