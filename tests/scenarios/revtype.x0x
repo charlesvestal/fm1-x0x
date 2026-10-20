@@ -1,0 +1,58 @@
+# FX > SEL list > REV TYPE: a new project's reverb is CLASSIC (as every save from before the setting,
+# whose slot is 0); a slot past the list's end (a damaged or newer save) reads as the engine plays
+# it, ROOM; ROOM from the list; undo and redo carry it to the engine; undoing another edit leaves
+# it; ROOM saved loads as ROOM
+wait 300
+expect sound4.1.1 0
+expect rvtype 0
+param 4 1 1 2
+wait 50
+expect rvtype 1
+listen
+tap FX
+tap SEL
+turn SELECT 7
+wait 600
+said REV TYPE ROOM
+param 4 1 1 0
+wait 50
+expect rvtype 0
+wait 600
+shot revtype_list.png
+turn ALGO 1
+expect sound4.1.1 1
+expect rvtype 1
+shot revtype_room.png
+# undo (HOME + REC): back to CLASSIC, in the engine too; redo (HOME + PLAY): ROOM again
+wait 600
+press HOME
+tap REC
+release HOME
+wait 100
+expect sound4.1.1 0
+expect rvtype 0
+press HOME
+tap PLAY
+release HOME
+wait 100
+expect sound4.1.1 1
+expect rvtype 1
+# another edit (DECAY), undone: the decay goes back, the type stays ROOM
+wait 600
+param 4 0 4 82
+wait 600
+press HOME
+tap REC
+release HOME
+wait 100
+expect sound4.0.4 73
+expect sound4.1.1 1
+expect rvtype 1
+# saved with ROOM: loads with ROOM
+tap HOME
+tap SAVE
+wait 300
+reboot
+wait 300
+expect sound4.1.1 1
+expect rvtype 1

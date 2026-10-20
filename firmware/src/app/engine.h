@@ -47,6 +47,7 @@ void engine_load(uint32_t pct, uint32_t frames);           /* ISR, after engine_
 void engine_guard_enable(int on);                           /* off: full quality always (the PERF test) */
 int engine_guard_active(void);
 float engine_fx_dl_wb(void);                                /* ping-pong: an echo's share on the other side */
+int engine_fx_rv_type(void);                                /* the reverb's type, as the engine has it */
 extern volatile uint32_t eng_guard_count;                   /* times it engaged (PERF screen) */
 extern volatile uint8_t eng_step[NTRACKS];   /* playheads for the UI */
 extern volatile uint16_t eng_peak[NPARTS];   /* part meters, Q15, decaying (UI) */
