@@ -355,7 +355,7 @@ static int pref_get(pref_t r)
     case R_BATT: return plat_battery() < 0 ? 5 : plat_battery();
     case R_SLEN: return song()->len;
     case R_STALLS: return perf.stalls_on;
-    case R_TAPE: return proj.sound.v[T_FX][1][0];       /* (kept in an engine slot nothing reads) */
+    case R_TAPE: return proj.sound.v[T_FX][1][0];       /* (fxbus's FX_DL_TAPE, which plays nothing) */
     default: return 0;
     }
 }
@@ -518,7 +518,7 @@ static const char *pref_name(pref_t r)
     if (r.kind == R_ENG && r.a == T_MIX && r.b < NPARTS && r.c < MX_NPARAMS)
         return MIXN[r.b][r.c];
     if (r.kind == R_ENG && r.a == T_FX) {               /* the page says which effect: the knob, what */
-        switch (r.c) {
+        switch (r.b * NPARAMS_MAX + r.c) {               /* (fxbus.h's parameter: engine.h) */
         case FX_RV_DECAY: return "DECAY";
         case FX_RV_TONE: case FX_DL_TONE: return "TONE";
         case FX_DL_TIME: return "TIME";
@@ -528,6 +528,7 @@ static const char *pref_name(pref_t r)
         case FX_RV_LEVEL: return "REV RETURN";
         case FX_DL_LEVEL: return "DLY RETURN";
         case FX_DL_PING: return "PING-PONG";
+        case FX_RV_TYPE: return "REV TYPE";
         case FX_COMP: return "GLUE";
         default: break;
         }
@@ -564,8 +565,9 @@ static void pref_value_of(pref_t r, int v, char *num, char *unit)
     *num = *unit = 0;
     if (!d || r.kind == R_ACT)
         return;
-    if (d->names) {
-        put_s(num, d->names[v]);
+    if (d->names) {                                      /* (a value past the list, from a damaged or newer
+                                                          * save, shows as the list's last) */
+        put_s(num, d->names[v < 0 ? 0 : v > d->max ? d->max : v]);
         return;
     }
     if (r.kind == R_TAPE) {
@@ -844,6 +846,7 @@ static void build_pages(void)
         add_page("DELAY", PR(R_ENG, T_FX, 0, FX_DL_TIME), PR(R_ENG, T_FX, 0, FX_DL_FDBK),
                  PR(R_ENG, T_FX, 0, FX_DL_TONE), PR(R_TAPE, 0, 0, 0));
         more(PR(R_ENG, T_FX, 0, FX_RV_HPF));
+        more(PR(R_ENG, T_FX, FX_VOICE(FX_RV_TYPE), FX_INDEX(FX_RV_TYPE)));
         more(PR(R_ENG, T_FX, 0, FX_RV_LEVEL));
         more(PR(R_ENG, T_FX, 0, FX_DL_HPF));
         more(PR(R_ENG, T_FX, 0, FX_DL_LEVEL));
@@ -1343,8 +1346,9 @@ static void save_project(void)
  * against the 24 MHz timer), the audio load and its peak, dropouts, stall cycles (when switched on),
  * and each stage's share of the CPU (the engine times them: engine.h ENG_PROF_N). PERF TEST plays
  * three patterns of its own (the factory loop, all five parts, a dense worst case) on the factory
- * sound, 1 s to settle and 3 s measured each, and keeps the table; then it puts back the project's
- * patterns, sound, tempo, mutes, chain and song mode. The project itself is never written. */
+ * sound, the worst case with the costlier reverb (ROOM), 1 s to settle and 3 s measured each, and keeps
+ * the table; then it puts back the project's patterns, sound, tempo, mutes, chain and song mode. The
+ * project itself is never written. */
 static const char *const PT_N[3] = {"FACTORY LOOP", "ALL FIVE", "WORST CASE"};
 static pattern_t perf_bench[3];
 static sound_t perf_snd;
@@ -1532,6 +1536,8 @@ static void perf_test_tick(void)
             perf.res_peak[perf.test] = perf.peak;
             perf.res_cps[perf.test] = perf.cps;
             if (++perf.test < 3) {
+                if (perf.test == 2)                   /* the worst case: ROOM (before the settling) */
+                    engine_set(T_FX, FX_VOICE(FX_RV_TYPE), FX_INDEX(FX_RV_TYPE), FX_RV_ROOM);
                 seq_cue(&seq, perf.test);
                 perf.phase = 1;
                 perf.test_t0 = now;

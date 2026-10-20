@@ -9,7 +9,8 @@
  *   T_909 / T_808   voice = track 0..10, or DR_KIT / D8_KIT (= 11) for the kit
  *   T_303           voice = 0 / 1 (303 A / B)
  *   T_BRK           voice 0: breaks.h params (the per-pattern ones live in the pattern)
- *   T_FX            voice 0: fxbus.h params (reverb, delay, master drive / comp)
+ *   T_FX            fxbus.h params (reverb, delay, master drive / comp), 16 a voice: param k is voice
+ *                   k / 16, index k % 16 (voice 0: the first 16; voice 1: TAPE, and those added since)
  *   T_MIX           voice = part 0..4: Level, Rev send, Dly send (drums: on top of the per-voice sends)
  *   T_MST           voice 0: master filter + limiter
  */
@@ -27,6 +28,8 @@ enum { PART_909, PART_808, PART_303A, PART_303B, PART_BRK, NPARTS };
 enum { MX_LEVEL, MX_REV, MX_DLY, MX_PAN, MX_NPARAMS };
 #define NVOICES_MAX 12                 /* a drum machine: 11 tracks + the kit */
 #define NPARAMS_MAX 16                 /* params per (target, voice) */
+#define FX_VOICE(k) ((k) / NPARAMS_MAX)   /* T_FX's voice and index of fxbus.h's parameter k */
+#define FX_INDEX(k) ((k) % NPARAMS_MAX)
 
 /* the sound of a project: every pot of every engine, mirrored here by the main loop */
 typedef struct {
@@ -43,6 +46,7 @@ void engine_motion_reset(void);                             /* lanes replaced (u
 void engine_load(uint32_t pct, uint32_t frames);           /* ISR, after engine_render */
 void engine_guard_enable(int on);                           /* off: full quality always (the PERF test) */
 int engine_guard_active(void);
+int engine_fx_rv_type(void);                                /* the reverb's type, as the engine has it */
 extern volatile uint32_t eng_guard_count;                   /* times it engaged (PERF screen) */
 extern volatile uint8_t eng_step[NTRACKS];   /* playheads for the UI */
 extern volatile uint16_t eng_peak[NPARTS];   /* part meters, Q15, decaying (UI) */
