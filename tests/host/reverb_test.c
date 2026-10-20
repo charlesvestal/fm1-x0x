@@ -50,7 +50,6 @@ static float rnd(void) { rs = rs * 1664525u + 1013904223u; return (float)(int)(r
 
 static fxbus_t F, G;
 static int16_t dl1[88200], dl2[88200];
-static fx_rv_buf_t rv1, rv2;
 static const float zero[N];
 
 /* ---- the lines' block format (fx_rm_commit, fx_rm_unpack) ---- */
@@ -161,8 +160,8 @@ static ref_t R;
  * ROOM). */
 static void ref_run(ref_t *r, const fxbus_t *f, const float *in, float *ol, float *orr, int n)
 {
-    const fx_room_t *rm = &f->rv_buf->room;
-    const float lvl = f->rv_level * f->rm_out * 0.35355339f * rm->tap_k;
+    const fx_room_t *rm = &f->rv.room;
+    const float lvl = f->rv_level * rm->out_gain * 0.35355339f * rm->tap_k;
     for (int i = 0; i < n; i++) {
         float x = d9_biquad_tick(&r->hp, in[i]), s[8];
         for (int k = 0; k < 4; k++) {
@@ -198,9 +197,9 @@ static void ref_run(ref_t *r, const fxbus_t *f, const float *in, float *ol, floa
 
 /* Set f up fresh, with only the reverb heard (no distortion or glue, full volume): the given type, RvDec
  * and RvTone, and every other knob at its default. */
-static void setup(fxbus_t *f, int16_t *dl, fx_rv_buf_t *rv, int type, int dec, int tone)
+static void setup(fxbus_t *f, int16_t *dl, int type, int dec, int tone)
 {
-    fxbus_init(f, dl, 88200, rv);
+    fxbus_init(f, dl, 88200);
     fxbus_set(f, FX_DIST, 0);
     fxbus_set(f, FX_COMP, 0);
     fxbus_set(f, FX_VOLUME, 127);
@@ -249,7 +248,7 @@ static void test_against_reference(void)
         const int on = 520 * N;                              /* 3 s of bursts, then the tail: 14 s in all */
         char what[160];
 
-        setup(&F, dl1, &rv1, FX_RV_ROOM, SET[c][0], SET[c][1]);
+        setup(&F, dl1, FX_RV_ROOM, SET[c][0], SET[c][1]);
         if (SET[c][2] >= 0)
             fxbus_set(&F, FX_RV_HPF, SET[c][2]);
         if (SET[c][3] >= 0)
@@ -283,7 +282,7 @@ static void test_against_reference(void)
                 }
             }
             t0 += n;
-            if (idle_at < 0 && t0 >= on && F.rm_quiet >= FX_RM_QUIET)
+            if (idle_at < 0 && t0 >= on && F.rv.room.quiet >= FX_RM_QUIET)
                 idle_at = t0;
         }
 
@@ -356,7 +355,7 @@ static double band_t60(const float *h, int n, double fc)
 static void burst_response(int type, int dec, int tone, float *l, float *r)
 {
     uint32_t rng = 12345u;
-    setup(&F, dl1, &rv1, type, dec, tone);
+    setup(&F, dl1, type, dec, tone);
     for (int b = 0; b < DLEN; b += N) {
         const int n = DLEN - b < N ? DLEN - b : N;
         float in[N];
@@ -416,7 +415,7 @@ static void test_level_zero(void)
 {
     float x[N], l[N], r[N];
     int silent = 1;
-    setup(&F, dl1, &rv1, FX_RV_ROOM, 100, 70);
+    setup(&F, dl1, FX_RV_ROOM, 100, 70);
     fxbus_set(&F, FX_RV_LEVEL, 0);
     rs = 4u;
     for (int b = 0; b < 400; b++) {
@@ -431,7 +430,7 @@ static void test_level_zero(void)
 /* Return how many of ROOM's diffuser cells hold the clamp's value (+-32767). */
 static int diffusers_clamped(const fxbus_t *f)
 {
-    const fx_room_t *rm = &f->rv_buf->room;
+    const fx_room_t *rm = &f->rv.room;
     int k = 0;
     for (int i = 0; i < FX_RM_DIF_TOTAL; i++)
         k += rm->dif[i] == 32767 || rm->dif[i] == -32767;
@@ -457,7 +456,7 @@ static void test_hot_send(void)
     char what[120];
 
     /* The sine sweep. */
-    setup(&F, dl1, &rv1, FX_RV_ROOM, 127, 115);
+    setup(&F, dl1, FX_RV_ROOM, 127, 115);
     fxbus_set(&F, FX_RV_HPF, 0);
     for (int b = 0; b < 1200; b++) {
         for (int i = 0; i < N; i++) {
@@ -477,7 +476,7 @@ static void test_hot_send(void)
     /* The bursts, at the loudest send and then past it. */
     for (int k = 0; k < 2; k++) {
         const float amp = k ? 12.0f : 3.0f;
-        setup(&F, dl1, &rv1, FX_RV_ROOM, 127, 115);
+        setup(&F, dl1, FX_RV_ROOM, 127, 115);
         fxbus_set(&F, FX_RV_HPF, 0);
         rs = 11u;
         finite = 1;
@@ -513,8 +512,8 @@ static void check_switch(int from, int to, unsigned seed, const char *what)
 {
     float x[N], l[N], r[N], rl[N], rr[N];
     int same = 1;
-    setup(&F, dl1, &rv1, from, 120, 90);
-    setup(&G, dl2, &rv2, to, 120, 90);
+    setup(&F, dl1, from, 120, 90);
+    setup(&G, dl2, to, 120, 90);
     rs = seed;
     for (int b = 0; b < 200; b++) {
         send(x, b * N, N, 200 * N);
@@ -540,7 +539,7 @@ static void test_knobs_while_playing(void)
 {
     static const int TURN[2][2] = {{30, 70}, {30, 110}};    /* RvDec and RvTone after each turn */
     float x[N], l[N], r[N];
-    setup(&F, dl1, &rv1, FX_RV_ROOM, 100, 70);
+    setup(&F, dl1, FX_RV_ROOM, 100, 70);
     rs = 6u;
     for (int b = 0; b < 50; b++) {
         send(x, b * N, N, 50 * N);
@@ -548,10 +547,10 @@ static void test_knobs_while_playing(void)
     }
     for (int k = 0; k < 2; k++) {
         fxbus_set(&F, k ? FX_RV_TONE : FX_RV_DECAY, TURN[k][k]);
-        setup(&G, dl2, &rv2, FX_RV_ROOM, TURN[k][0], TURN[k][1]);
-        const fx_room_t *a = &F.rv_buf->room, *g = &G.rv_buf->room;
+        setup(&G, dl2, FX_RV_ROOM, TURN[k][0], TURN[k][1]);
+        const fx_room_t *a = &F.rv.room, *g = &G.rv.room;
         check(!memcmp(a->a, g->a, sizeof a->a) && !memcmp(a->c, g->c, sizeof a->c) && a->tap_a == g->tap_a &&
-                  a->tap_k == g->tap_k && F.rm_out == G.rm_out,
+                  a->tap_k == g->tap_k && a->out_gain == g->out_gain,
               k ? "RvTone turned while ROOM plays: its coefficients follow"
                 : "RvDec turned while ROOM plays: its coefficients follow");
     }
@@ -562,8 +561,8 @@ static void test_mono(void)
 {
     float x[N], l[N], r[N], m[N];
     int same = 1;
-    setup(&F, dl1, &rv1, FX_RV_ROOM, 100, 70);
-    setup(&G, dl2, &rv2, FX_RV_ROOM, 100, 70);
+    setup(&F, dl1, FX_RV_ROOM, 100, 70);
+    setup(&G, dl2, FX_RV_ROOM, 100, 70);
     rs = 5u;
     for (int b = 0; b < 400; b++) {
         send(x, b * N, N, 300 * N);
@@ -581,7 +580,7 @@ static void info_host_time(void)
     float x[N], l[N], r[N];
     for (int t = 0; t < 2; t++) {
         struct timespec a, b;
-        setup(&F, dl1, &rv1, t ? FX_RV_ROOM : FX_RV_CLASSIC, 127, 115);
+        setup(&F, dl1, t ? FX_RV_ROOM : FX_RV_CLASSIC, 127, 115);
         rs = 3u;
         clock_gettime(CLOCK_MONOTONIC, &a);
         for (int k = 0; k < 4000; k++) {

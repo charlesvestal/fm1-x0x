@@ -17,7 +17,6 @@
 
 static fxbus_t F;
 static int16_t dly[88200];
-static fx_rv_buf_t rv;
 static float out_l[LEN], out_r[LEN];
 
 int main(int argc, char **argv)
@@ -26,7 +25,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "usage: fit_room_render classic|room DECAY TONE [T_DC T_NY GAIN]\n");
         return 2;
     }
-    fxbus_init(&F, dly, 88200, &rv);
+    fxbus_init(&F, dly, 88200);
     fxbus_set(&F, FX_DIST, 0);
     fxbus_set(&F, FX_COMP, 0);
     fxbus_set(&F, FX_VOLUME, 127);
@@ -35,7 +34,7 @@ int main(int argc, char **argv)
     fxbus_set(&F, FX_RV_TYPE, strcmp(argv[1], "room") ? FX_RV_CLASSIC : FX_RV_ROOM);
     if (argc == 7) {
         fx_room_times(fx_rm(&F), (float)atof(argv[4]), (float)atof(argv[5]));
-        F.rm_out = (float)atof(argv[6]);
+        fx_rm(&F)->out_gain = (float)atof(argv[6]);
     }
     static const float zero[256];
     uint32_t rng = 12345u;

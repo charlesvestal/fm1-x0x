@@ -21,9 +21,10 @@
  *    compressor (hard bypass at 0), then volume.
  *
  * The delay line is int16 (9W9 writes it at 12 bits, so nothing is lost; values
- * past +-16 full scale saturate) and is passed in by the caller (.pool), as are the
- * reverb's lines (fx_rv_buf_t, shared by the two types: switching clears it). Both
- * effects go idle (no per-sample work) once their input and their lines are silent. */
+ * past +-16 full scale saturate) and is passed in by the caller (.pool). The reverb's
+ * lines are inside the struct (fx_rv_buf_t, shared by the two types: switching clears
+ * it). Both effects go idle (no per-sample work) once their input and their lines are
+ * silent. */
 #pragma once
 #include <stdint.h>
 #include "x0x_param.h"
@@ -78,6 +79,11 @@ typedef struct {
     float c[FX_RM_N], a[FX_RM_N], lp[FX_RM_N];
     /* the outputs' filter, y = (s - tap_a s[-1]) tap_k, and its state for L and R (fx_room_times) */
     float tap_a, tap_k, tap_zl, tap_zr;
+    /* the output gain, the energy match to CLASSIC (fx_room_coeffs); the blocks committed silent
+     * (input and lines) in a row; and the place in the blocks being filled (all lines together) */
+    float out_gain;
+    int32_t quiet;
+    uint8_t pos;
     /* each line's ring: its first block in exp / man, its number of blocks, and the block being
      * written (the read's first block too: see above) */
     uint16_t base[FX_RM_N], nblk[FX_RM_N], wblk[FX_RM_N];
@@ -93,8 +99,8 @@ typedef struct {
 _Static_assert(FX_RM_BLOCKS <= 65535, "ROOM's rings: their blocks are numbered in uint16_t");
 _Static_assert(FX_RM_D0 <= 32767 && FX_RM_D1 <= 32767 && FX_RM_D2 <= 32767 && FX_RM_D3 <= 32767,
                "ROOM's diffusers: their places are int16_t");
-/* The reverb's buffer (the caller's: fxbus_init): either type's lines, one type at a time. Each is
- * reached through its own member, and a change of FX_RV_TYPE clears the buffer between them. */
+/* The reverb's buffer (fxbus_t rv): either type's lines, one type at a time. Each is reached through
+ * its own member, and a change of FX_RV_TYPE clears the buffer between them. */
 typedef union {
     struct {
         float ap[FX_RV_AP_TOTAL];     /* the left's allpasses (9W9's) */
@@ -103,6 +109,8 @@ typedef union {
     } classic;
     fx_room_t room;
 } fx_rv_buf_t;
+_Static_assert(sizeof(fx_room_t) <= sizeof(((fx_rv_buf_t *)0)->classic),
+               "ROOM's state must fit in CLASSIC's lines, so that ROOM adds no memory");
 enum { FX_RV_CLASSIC, FX_RV_ROOM };   /* FX_RV_TYPE's values (CLASSIC: fxbus_init's); a change cuts the tail */
 
 /* FX parameters. A sound keeps 16 a voice, so the engine stores parameter k at FX's voice k / 16,
@@ -123,10 +131,6 @@ struct fxbus {
     int32_t aposr[2];                 /* X0X stereo: the right side reads the combs with alternating
                                        * signs through its own allpasses (the left is 9W9's) */
     int32_t rv_type;                  /* FX_RV_CLASSIC / FX_RV_ROOM */
-    fx_rv_buf_t *rv_buf;              /* the reverb's buffer: CLASSIC's lines, or ROOM's */
-    float rm_out;                     /* ROOM: output gain (the energy match to CLASSIC) */
-    int32_t rm_quiet;                 /* ROOM: blocks committed silent (input and lines), in a row */
-    uint8_t rm_pos;                   /* ROOM: the place in the blocks being filled (all lines together) */
     /* delay */
     float dl_time_ms, dl_fdbk, dl_tone, dl_level, bpm, wear;
     int32_t dl_div, dl_type;
@@ -143,10 +147,12 @@ struct fxbus {
     float crush_st[2], crush_str[2];
     float comp_env_db, comp_det, c_thr, c_slope, c_makeup, c_drel, c_atk, c_rel;
     uint8_t pots[FX_NPARAMS];
+    fx_rv_buf_t rv;                   /* the reverb's lines, CLASSIC's or ROOM's (last, so that the fields
+                                       * above, and the code that reaches them, stay as they were) */
 };
 typedef struct fxbus fxbus_t;
 
-void fxbus_init(fxbus_t *f, int16_t *dly_buf, int dly_len, fx_rv_buf_t *rv_buf);
+void fxbus_init(fxbus_t *f, int16_t *dly_buf, int dly_len);
 void fxbus_set_bpm(fxbus_t *f, float bpm);
 void fxbus_process(fxbus_t *f, const float *dry, const float *rev, const float *dly, float *out, int n);
 /* X0X stereo: dry in L / R, the sends mono; with everything centred and no reverb, out_l and out_r
