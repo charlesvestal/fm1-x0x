@@ -48,6 +48,10 @@ static const fx_pspec_t fx_p[FX_NPARAMS] = {
     [FX_DL_TYPE]  = { { "DlType", 1, 0, fx_type_names }, CV_SW, 0, 0.0f, 0.0f },
     [FX_DL_WEAR]  = { { "Wear", 127, 64, 0 }, CV_LIN, 0, 0.0f, 1.0f },
     [FX_DL_PING]  = { { "Ping", 1, 0, fx_onoff_names }, CV_SW, 0, 0.0f, 0.0f },
+    /* X0X: the one-knob TAPE (ui.c R_TAPE), kept with the sound so the knob reads back where it was
+     * left. It sets DlType and Wear, which are what the delay plays; it plays nothing itself. */
+    [FX_DL_TAPE]  = { { "Tape", 127, 72, 0 }, CV_SW, 0, 0.0f, 0.0f },
+    [FX_DL_WIDTH] = { { "Width", 127, 127, 0 }, CV_LIN, 0, 0.0f, 1.0f },   /* X0X: ping-pong's */
 };
 
 int fxbus_nparams(void) { return FX_NPARAMS; }
@@ -84,6 +88,21 @@ static void fx_comp_prep(fxbus_t *f)
     f->c_makeup = a * 2.2f + a * a * 6.6f;
 }
 
+/* Set ping-pong's width, w from 0 (every echo centred) to 1. An echo goes to its own side at dl_wa and
+ * to the other at dl_wb, with dl_wa^2 + dl_wb^2 = 1 so that it keeps its power as it moves to the
+ * centre. At full width they are exactly 1 and 0, so the delay sounds as it did before WIDTH. */
+static void fx_dl_width(fxbus_t *f, float w)
+{
+    if (w >= 1.0f) {
+        f->dl_wa = 1.0f;
+        f->dl_wb = 0.0f;
+    } else {
+        w = w < 0.0f ? 0.0f : w;
+        f->dl_wa = fm_sqrtf(0.5f + 0.5f * w);
+        f->dl_wb = fm_sqrtf(0.5f - 0.5f * w);
+    }
+}
+
 static void fx_apply(fxbus_t *f, int i, float v)
 {
     switch (i) {
@@ -103,6 +122,7 @@ static void fx_apply(fxbus_t *f, int i, float v)
     case FX_DL_TYPE: f->dl_type = (int32_t)v; break;
     case FX_DL_WEAR: f->wear = v; break;
     case FX_DL_PING: f->dl_ping = (int32_t)v; break;
+    case FX_DL_WIDTH: fx_dl_width(f, v); break;
     default: break;
     }
     if (i == FX_DIST || i == FX_DRIVE)
@@ -158,6 +178,7 @@ void fxbus_init(fxbus_t *f, int16_t *dly_buf, int dly_len)
     f->dl_quiet = dly_len;
     f->dl_type = 0;
     f->wear = 64.0f / 127.0f;
+    fx_dl_width(f, 1.0f);
 
     f->comp = 0.0f;
     f->drive = 2.0f;
@@ -273,8 +294,9 @@ static inline float dl_tap(const int16_t *buf, int32_t len, float flen, int32_t 
 }
 
 /* out_r 0: 9W9's mono delay. Else both sides get the echo, or with PING the left reads at the time and
- * the right at twice it, the loop fed from the right: echoes alternate L R L R, one time apart. The
- * line holds both, so PING needs twice the time to fit (a 2 s line: 1 s); past that it plays centred. */
+ * the right at twice it, the loop fed from the right: echoes alternate L R L R, one time apart, as far
+ * apart as the width puts them (fx_dl_width). The line holds both, so PING needs twice the time
+ * to fit (a 2 s line: 1 s); past that it plays centred. */
 static void fx_delay(fxbus_t *f, const float *in, float *out, float *out_r, int n)
 {
     const float target = f->dl_time_ms * 0.001f * D9_SR;
@@ -310,6 +332,10 @@ static void fx_delay(fxbus_t *f, const float *in, float *out, float *out_r, int 
     const float flen = (float)len;
     const int ping = out_r && f->dl_ping && 2.0f * fm_maxf(f->dcur, target) + 4.0f < flen;
     const float lvl = f->dl_level;
+    /* each side's share of its own tap (y on the left, y2 on the right), and with PING narrowed, of the
+     * other's: without PING, or at full width, the delay plays as it did before the width */
+    const float la = ping ? lvl * f->dl_wa : lvl, lb = ping ? lvl * f->dl_wb : 0.0f;
+    const int cross = lb != 0.0f;
     int32_t quiet = f->dl_quiet;
     int32_t w = f->w;
     float dcur = f->dcur, lp = f->lp;
@@ -336,9 +362,13 @@ static void fx_delay(fxbus_t *f, const float *in, float *out, float *out_r, int 
             if (k < -32767) k = -32767;
             buf[w] = (int16_t)k;
             if (++w >= len) w = 0;
-            out[i] += y * lvl;
+            out[i] += y * la;
             if (out_r)
-                out_r[i] += y2 * lvl;
+                out_r[i] += y2 * la;
+            if (cross) {
+                out[i] += y2 * lb;
+                out_r[i] += y * lb;
+            }
             quiet = (k == 0 && in[i] == 0.0f) ? quiet + 1 : 0;
         }
     } else {
@@ -378,9 +408,13 @@ static void fx_delay(fxbus_t *f, const float *in, float *out, float *out_r, int 
             if (k < -32767) k = -32767;
             buf[w] = (int16_t)k;
             if (++w >= len) w = 0;
-            out[i] += y * lvl;
+            out[i] += y * la;
             if (out_r)
-                out_r[i] += y2 * lvl;
+                out_r[i] += y2 * la;
+            if (cross) {
+                out[i] += y2 * lb;
+                out_r[i] += y * lb;
+            }
             quiet = (k == 0 && in[i] == 0.0f) ? quiet + 1 : 0;
         }
         f->wow_ph = wp;

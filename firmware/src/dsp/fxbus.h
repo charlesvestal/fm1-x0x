@@ -29,10 +29,13 @@
 #define FX_RV_AP_TOTAL (556 + 441)
 #define FX_RV_APR_TOTAL (579 + 457)   /* X0X: the right side's allpasses */
 
+/* FX parameters. A sound keeps 16 a voice, so the engine stores parameter k at FX's voice k / 16,
+ * index k % 16 (engine.h). */
 enum { FX_VOLUME, FX_DIST, FX_DRIVE, FX_COMP,
        FX_RV_DECAY, FX_RV_TONE, FX_RV_HPF, FX_RV_LEVEL,
        FX_DL_TIME, FX_DL_FDBK, FX_DL_TONE, FX_DL_LEVEL,
-       FX_DL_HPF, FX_DL_TYPE, FX_DL_WEAR, FX_DL_PING, FX_NPARAMS };
+       FX_DL_HPF, FX_DL_TYPE, FX_DL_WEAR, FX_DL_PING,
+       FX_DL_TAPE, FX_DL_WIDTH, FX_NPARAMS };
 
 struct fxbus {
     /* reverb */
@@ -55,6 +58,8 @@ struct fxbus {
     float dcur, lp, tape_hp;
     uint32_t wow_ph, flut_ph;
     int32_t dl_ping;                  /* X0X: ping-pong, a second tap at twice the time */
+    float dl_wa, dl_wb;               /* X0X: ping-pong's width: each echo goes to its own side at dl_wa
+                                       * and to the other at dl_wb (FX_DL_WIDTH) */
     /* master */
     float drive, volume, comp;
     int32_t dist_mode;

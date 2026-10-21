@@ -503,6 +503,8 @@ int project_load(void)
         sound_rev2();
     if (sound_ok && proj.set.snd_rev < 5)             /* before the break's FILTER: off (its pot held a 0) */
         proj.sound.v[T_BRK][0][2] = engine_param(T_BRK, 0, 2)->def;
+    if (sound_ok && proj.set.snd_rev < 6)             /* before ping-pong's WIDTH: full, as it was */
+        proj.sound.v[T_FX][FX_VOICE(FX_DL_WIDTH)][FX_INDEX(FX_DL_WIDTH)] = 127;
     proj.set.snd_rev = PROJ_SND_REV;
     return bad ? -1 : 0;
 }

@@ -59,6 +59,7 @@ static uint32_t guard_avg_q8, guard_calm;
 volatile uint32_t eng_guard_count;
 void engine_guard_enable(int on) { guard_enabled = (uint8_t)(on != 0); }
 int engine_guard_active(void) { return guard_on; }
+float engine_fx_dl_wb(void) { return fx.dl_wb; }
 void engine_load(uint32_t pct, uint32_t frames)
 {
     guard_avg_q8 = (guard_avg_q8 * 15u + pct * 256u) / 16u;
@@ -116,12 +117,20 @@ static void cq_put(uint32_t type, uint32_t a, uint32_t b, uint32_t c)
 }
 
 /* ------------------------------------------------------------ params --- */
+/* Return fxbus.h's parameter at T_FX's voice v, index i (engine.h), or -1 if there is none. */
+static int fx_param_at(int v, int i)
+{
+    const int k = v * NPARAMS_MAX + i;
+    return v >= 0 && i >= 0 && i < NPARAMS_MAX && k < fxbus_nparams() ? k : -1;
+}
+
 int engine_nvoices(int t)
 {
     switch (t) {
     case T_909: return DR_NUM + 1;
     case T_808: return D8_NUM + 1;
     case T_303: return NBASS;
+    case T_FX: return (fxbus_nparams() + NPARAMS_MAX - 1) / NPARAMS_MAX;
     case T_MIX: return NPARTS;
     default: return 1;
     }
@@ -134,7 +143,10 @@ int engine_nparams(int t, int v)
     case T_808: return drum808_nparams(v);
     case T_303: return bass303_nparams();
     case T_BRK: return 3;                                /* Level, Pitch, Filter (sends: the mixer's; the rest: the pattern's) */
-    case T_FX: return fxbus_nparams();
+    case T_FX: {
+        const int n = fxbus_nparams() - v * NPARAMS_MAX;
+        return v < 0 || n < 0 ? 0 : n > NPARAMS_MAX ? NPARAMS_MAX : n;
+    }
     case T_MIX: return MX_NPARAMS;                       /* every part: Level, Rev send, Dly send */
     case T_MST: return master_nparams();
     default: return 0;
@@ -148,7 +160,7 @@ const x0x_param_t *engine_param(int t, int v, int i)
     case T_808: return drum808_param(v, i);
     case T_303: return bass303_param(i);
     case T_BRK: return breaks_param(BRK_NSET + i);
-    case T_FX: return fxbus_param(i);
+    case T_FX: return fxbus_param(fx_param_at(v, i));
     case T_MIX: return (i >= 0 && i < MX_NPARAMS) ? &MIX_P[i] : 0;
     case T_MST: return master_param(i);
     default: return 0;
@@ -179,7 +191,7 @@ static void apply_param(int t, int v, int i, int val)    /* ISR */
     case T_808: drum808_set(&d808, v, i, val); break;
     case T_303: if (v >= 0 && v < NBASS) bass303_set(&b303[v], i, val); break;
     case T_BRK: breaks_set(&brk, BRK_NSET + i, val); break;
-    case T_FX: fxbus_set(&fx, i, val); break;
+    case T_FX: fxbus_set(&fx, fx_param_at(v, i), val); break;
     case T_MIX:
         if (v < 0 || v >= NPARTS)
             break;
