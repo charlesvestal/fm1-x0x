@@ -2442,8 +2442,8 @@ static void button_tap(int b)
 }
 
 /* HOME + SEQ tapped in time: the tempo, from the last four gaps (two taps set it); a pause of two
- * seconds starts over. Playing, each tap also takes every part back to the start of the quarter it
- * is in, so the beat lands on the tap. Acts on the press, for timing. */
+ * seconds starts over. Playing, each tap also takes every part to the nearest quarter (seq_sync),
+ * so the beat lands on the tap. Acts on the press, for timing. */
 #define TAP_RESET 2000u
 #define TAP_N 5
 static void tap_tempo(void)

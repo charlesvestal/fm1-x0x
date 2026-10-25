@@ -432,9 +432,10 @@ HOME's knobs are for playing live: TEMPO, SWING, and the master's FILTER and PUM
 
 **Tap tempo.** Hold HOME and tap SEQ in time with the beat, from any screen, playing or stopped.
 Two taps set the tempo; keep tapping and it follows the last four. A pause of two seconds starts
-over. While playing, each tap also puts the beat on your tap: every part goes back to the start of
-the quarter note it's in and plays on from there (a single tap just moves the beat). Tap a little
-late rather than early: an early tap goes back almost a whole quarter. The TEMPO readout shows the result. While X0X follows an external MIDI clock, the clock
+over. While playing, each tap also puts the beat on your tap: every part jumps to the nearest quarter
+note and plays on from there (a single tap just moves the beat). A tap a little late goes back to
+the beat just passed; a tap a little early skips ahead to the coming one, and just before the bar
+line the bar ends on your tap, bringing in the next pattern or the song's next bar. The TEMPO readout shows the result. While X0X follows an external MIDI clock, the clock
 sets the tempo and tapping does nothing.
 
 ---

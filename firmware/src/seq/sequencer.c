@@ -436,27 +436,43 @@ static int prev_pos(seq_t *s, int t, int p)
     }
 }
 
-/* a tap: how far into its quarter the 909 is, every part goes back as much (in its own steps) and
- * the step there fires now. A part back at its first step starts again (not a wrap: no bar end,
- * no cue, no pass counted twice); the 303s let go first, so the quarter's note plays fresh. */
+/* a tap: the nearest quarter of the 909's, now. Tapped in a quarter's first half (late), every part
+ * goes back as much time as the 909 is into it (in its own steps); in its second half (early), on
+ * to the next one, the steps between left out. The step there fires at once. Back at its first step
+ * a part starts again (not a wrap: no bar end, no cue, no pass counted twice); on, the 909 wraps
+ * as it would have, cues and the song with it. The 303s let go first: the quarter's note plays fresh. */
 static void do_sync(seq_t *s, const seq_sink_t *o)
 {
     seq_track_t *d = &s->t[TRK_DRUM];
-    int t, q = 24 / TICKS_PER_STEP[part_rate(s, TRK_DRUM)];
-    float in, f;
+    int t, q = 24 / TICKS_PER_STEP[part_rate(s, TRK_DRUM)], ql, on, dp;
+    float in, e;
     if (!d->started || !d->step_len)
         return;
+    dp = d->pos < seq_part_len(s, TRK_DRUM) ? d->pos : seq_part_len(s, TRK_DRUM) - 1;
+    ql = seq_part_len(s, TRK_DRUM) - (dp - dp % q);   /* the quarter's steps: fewer in a short bar's last */
+    ql = ql < q ? ql : q;
     in = (float)(d->step_len - (d->to_next < d->step_len ? d->to_next : d->step_len)) / (float)d->step_len;
-    f = ((float)(d->pos % q) + (in < 0.999f ? in : 0.999f)) / (float)q;   /* 0..1: into the quarter */
+    e = (float)(dp % q) + (in < 0.999f ? in : 0.999f);   /* 909 steps into the quarter */
+    on = e * 2.0f >= (float)ql;
     for (t = 0; t < NTRACKS; t++) {
         seq_track_t *tr = &s->t[t];
         int len = seq_part_len(s, t), p = tr->pos < len ? tr->pos : len - 1;
-        int j = (int)(f * (float)(24 / TICKS_PER_STEP[part_rate(s, t)]));
+        int qt = 24 / TICKS_PER_STEP[part_rate(s, t)], j = (int)(e * (float)qt / (float)q);
         int first = is_bass(t) && (bpart(s, t - TRK_BASS0)->dir & 3) == DIR_REV ? len - 1 : 0;
         if (!tr->started)                            /* (it starts by itself) */
             continue;
         if (is_bass(t))
             bass_release(s, t - TRK_BASS0, o);
+        if (on) {                                    /* on to the next quarter: the steps before it unplayed */
+            for (j = (int)((float)(ql * qt) / (float)q + 0.5f) - j; --j > 0;) {
+                if (t == TRK_DRUM && next_pos(s, t, p, 0) == 0)
+                    break;                           /* a 909 shorter than its last quarter: its bar ends now */
+                p = next_pos(s, t, p, 1);
+            }
+            tr->pos = (uint8_t)p;
+            tr->to_next = 0;
+            continue;
+        }
         while (j-- > 0)
             p = prev_pos(s, t, p);
         if (p == first) {

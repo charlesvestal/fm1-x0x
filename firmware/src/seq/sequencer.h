@@ -161,7 +161,7 @@ void seq_advance(seq_t *s, uint32_t k, const seq_sink_t *o);
 void seq_start(seq_t *s);             /* from step 1 of the current (or cued) pattern */
 void seq_stop(seq_t *s);
 void seq_continue(seq_t *s);
-void seq_sync(seq_t *s);              /* a tap: every part back to the start of the 909's quarter, now */
+void seq_sync(seq_t *s);              /* a tap: every part to the 909's nearest quarter, now */
 void seq_ext_clock(seq_t *s);         /* one 24-ppqn tick (USB MIDI 0xF8) */
 void seq_cue(seq_t *s, int pattern);  /* every part, at the end of the bar (now, if stopped) */
 void seq_cue_part(seq_t *s, int part, int pattern);
