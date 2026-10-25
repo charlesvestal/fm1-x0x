@@ -461,6 +461,56 @@ static void test_polymeter_cue_chain(void)
     printf("  polymeter, cue on the bar, chain 4-6: checked\n");
 }
 
+/* seq_sync (a tap): every part back to the start of the 909's quarter, its step fired now, the
+ * beat counted from there; at the bar's start no bar end (a cue waits for the real one) */
+static void test_sync(void)
+{
+    int i;
+    uint32_t t0;
+    double step = 44100.0 * 60.0 / 120.0 / 4.0;
+    reset();
+    S.bpm = 120.0f;
+    P[0].drum[0].hit[0][0] = 1u << 4;                      /* BD on step 5, SD on step 7 */
+    P[0].drum[0].hit[1][0] = 1u << 6;
+    P[0].bass[0].len = 3;                                   /* a 3-step 303: a note on its step 2 only */
+    P[0].bass[0].step[1] = (bstep_t){36, G_NOTE};
+    seq_start(&S);
+    run((uint32_t)(step * 6.5));                            /* halfway into step 7: the quarter began at 5 */
+    nev = 0;
+    t0 = now;
+    seq_sync(&S);
+    run(16);
+    i = find(E_DRUM, 0, 0);
+    CHECK(i >= 0 && evs[i].t == t0, "sync: BD (step 5) again at once (%d at %u, tap %u)", i, i >= 0 ? evs[i].t : 0, t0);
+    CHECK(S.t[TRK_DRUM].pos == 4, "sync: the 909 on step 5 (pos %d)", S.t[TRK_DRUM].pos);
+    i = find(E_ON, 0, 0);                                   /* 6.5 steps: the 303 on its step 1, 2 back = step 2 */
+    CHECK(i >= 0 && evs[i].t == t0, "sync: the 303 went back as far (%d at %u)", i, i >= 0 ? evs[i].t : 0);
+    run((uint32_t)(step * 3));
+    i = find(E_DRUM, 1, 0);
+    CHECK(i >= 0 && abs((int)evs[i].t - (int)(t0 + 2 * step + 0.5)) <= 1, "sync: SD two steps after the tap (%u)",
+          i >= 0 ? evs[i].t : 0);
+    /* in the bar's first quarter: step 1 again, a start not a wrap: the cue waits for the bar */
+    reset();
+    S.bpm = 120.0f;
+    P[0].drum[0].hit[0][0] = 1u;
+    P[1].drum[0].hit[1][0] = 1u;
+    seq_start(&S);
+    run((uint32_t)(step * 18.5));                           /* bar 2, step 3 */
+    seq_cue(&S, 1);
+    nev = 0;
+    t0 = now;
+    seq_sync(&S);
+    run(16);
+    i = find(E_DRUM, 0, 0);
+    CHECK(i >= 0 && evs[i].t == t0, "sync on the bar: BD (step 1) again at once");
+    CHECK(S.ppat[0] == 0 && find(E_DRUM, 1, 0) < 0, "sync on the bar: no bar end, the cue waits");
+    run((uint32_t)(step * 16));
+    i = find(E_DRUM, 1, 0);
+    CHECK(i >= 0 && abs((int)evs[i].t - (int)(t0 + 16 * step + 0.5)) <= 1, "the cue on the next bar, 16 steps on (%u)",
+          i >= 0 ? evs[i].t : 0);
+    printf("  sync (tap): back to the quarter, the cue on the bar: checked\n");
+}
+
 /* one part's cue: it switches on the bar and restarts; the others keep their place */
 static void test_part_cue(void)
 {
@@ -674,6 +724,7 @@ int main(void)
     test_swing_continue();
     test_303();
     test_polymeter_cue_chain();
+    test_sync();
     test_part_cue();
     test_song();
     test_ext_clock_and_midi_out();

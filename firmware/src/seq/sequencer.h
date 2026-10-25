@@ -113,6 +113,7 @@ typedef struct {                      /* one part's runtime */
                                        * tell its order) */
     uint32_t to_next;                 /* samples to the next step (Q8 fraction) */
     uint32_t swing_delay;             /* how long after its grid slot the next step plays, Q8 (see Swing) */
+    uint32_t step_len;                /* the step playing: its length, Q8 (to_next when it fired) */
     uint32_t to_off;                  /* 303: samples to the gate falling, Q8; 0 = none */
     uint32_t rng;                     /* DIR_RANDOM and auto-mutate */
     uint16_t bars;                    /* wraps since the pattern started (auto-mutate) */
@@ -147,6 +148,7 @@ typedef struct {
     uint32_t ext_period;              /* smoothed samples per external clock, Q8 */
     volatile uint32_t ext_pending;    /* external clocks received, not yet consumed */
     volatile uint8_t req_start, req_stop, req_cont; /* transport requests from the UI / MIDI */
+    volatile uint8_t req_sync;        /* a tap: back to the quarter's start (seq_sync) */
     uint32_t mut_rng[NBASS];          /* auto-mutate random streams */
     uint8_t bass_notes_out[NBASS];    /* note echoed on MIDI, for the note off */
 } seq_t;
@@ -159,6 +161,7 @@ void seq_advance(seq_t *s, uint32_t k, const seq_sink_t *o);
 void seq_start(seq_t *s);             /* from step 1 of the current (or cued) pattern */
 void seq_stop(seq_t *s);
 void seq_continue(seq_t *s);
+void seq_sync(seq_t *s);              /* a tap: every part back to the start of the 909's quarter, now */
 void seq_ext_clock(seq_t *s);         /* one 24-ppqn tick (USB MIDI 0xF8) */
 void seq_cue(seq_t *s, int pattern);  /* every part, at the end of the bar (now, if stopped) */
 void seq_cue_part(seq_t *s, int part, int pattern);
