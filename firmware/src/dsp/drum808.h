@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* X0X 808 drum part: the 8W8 TR-808 engine (Charles Vestal and contributors,
- * GPL-3.0; the rim shot is Yoshinosuke Horiuchi's sc808, MIT) ported to the FM-1.
+/* X0X 808 drum part: the 8W8 TR-808 engine (athousanddetails and Gustavo Lima,
+ * github.com/athousanddetails/schwung-8W8, GPL-3.0; the rim shot is Yoshinosuke Horiuchi's sc808, MIT) ported to
+ * the FM-1.
  *
  * Same circuit models, pot tables, defaults, kit trims, velocity law and hat
  * choke as 8W8's sc808_engine.cpp. What is NOT here: 8W8's own reverb, delay,
