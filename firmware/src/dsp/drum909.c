@@ -717,18 +717,43 @@ static void d9_render_clap(d9_clap_t *v, const float *nz, const d9_bus_t *bus, i
     }
 }
 
-/* Hats, ride, crash (render_sampler) */
+/* Hats, ride, crash (render_sampler). Past the sample's end and at a whole-number rate: after Optimist
+ * (github.com/w0ts/optimist 537fbf00, GPL-3.0-only), the same samples */
 static void d9_render_smp(d9_smp_t *s, const d9_bus_t *bus, int n)
 {
     if (!s->playing)
         return;
     const int m = n < s->mute ? n : s->mute;
     s->mute -= m;
-    d9_env_anchor(&s->out);
     const int drive = s->drive > 0.25f;
+    const uint32_t len = s->len;
+    /* after Optimist: past the sample's end every sample is 0 x the envelope (+0: the envelope is positive), and
+     * the drive stage's +0 for the shapes that give +0 at 0 (Diode, SAT, PDIST, Fold; not the asymmetric clip or
+     * BFZ, whose small DC at 0 stays, nor Crush, whose hold count runs on): nothing to add. The envelope is not
+     * needed again (a hit sets it anew; a choke's ramp only scales these 0s) */
+    if (s->pos >= len && (!drive || s->shape.type == 0 || s->shape.type == 2 || s->shape.type == 4
+                          || s->shape.type == 5))
+        return;
+    d9_env_anchor(&s->out);
     const float pre = 1.0f + s->drive * 0.5f;
     const uint8_t *buf = s->buf;
-    const uint32_t len = s->len;
+    if (s->incf == 0u && s->frac == 0u && !drive) {
+        /* after Optimist: at a whole-number rate (Tune at its centre: 1.0) the read stays on the samples: fr is 0
+         * and a + (b - a) 0 is a */
+        const uint32_t inc = s->inc;
+        uint32_t p = s->pos;
+        for (int i = 0; i < m; ++i) {
+            float v = 0.0f;
+            if (p < len) {
+                v = (float)x0x_mulaw[buf[p]] * (1.0f / 32768.0f);
+                p += inc;
+            }
+            v *= d9_env_tick(&s->out);
+            d9_emit(bus, i, v);
+        }
+        s->pos = p;
+        return;
+    }
     for (int i = 0; i < m; ++i) {
         float v = 0.0f;
         if (s->pos < len) {
