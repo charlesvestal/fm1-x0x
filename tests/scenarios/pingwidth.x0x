@@ -1,0 +1,52 @@
+# FX > SEL list > PING WIDTH: a new project's is the full width; down to centred from the list; undo
+# and redo carry it to the engine; saved at half width, it loads at half width; a project saved before
+# the setting (sound revision 5: its slot held a 0) loads at the full width it played at
+wait 300
+expect sound4.1.1 127
+expect dlwb 0
+listen
+tap FX
+tap SEL
+turn SELECT 20
+wait 600
+said PING WIDTH 127, 12 OF 12
+shot pingwidth_list.png
+turn ALGO -127
+expect sound4.1.1 0
+expect dlwb 707
+shot pingwidth_centred.png
+# undo (HOME + REC): full width again, in the engine too; redo (HOME + PLAY): centred
+wait 600
+press HOME
+tap REC
+release HOME
+wait 100
+expect sound4.1.1 127
+expect dlwb 0
+press HOME
+tap PLAY
+release HOME
+wait 100
+expect sound4.1.1 0
+expect dlwb 707
+# half width, saved: loads at half width
+wait 600
+turn ALGO 64
+expect sound4.1.1 64
+expect dlwb 498
+tap HOME
+tap SAVE
+wait 300
+reboot
+wait 300
+expect sound4.1.1 64
+expect dlwb 498
+# saved by a firmware before PING WIDTH (its slot 0): full width
+param 4 1 1 0
+sndrev 5
+tap SAVE
+wait 300
+reboot
+wait 300
+expect sound4.1.1 127
+expect dlwb 0

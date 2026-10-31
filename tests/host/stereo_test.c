@@ -4,7 +4,9 @@
  *  - master_process_st with l == r is master_process, bit for bit, compressor, PUMP, filter, limiter;
  *  - fxbus_process_st with dry l == r and no reverb is fxbus_process on both sides, bit for bit;
  *  - with reverb, the left is 9W9's mono reverb exactly and the right is a different (decorrelated) one;
- *  - PING: an impulse into the delay comes back on the left one time later, on the right two. */
+ *  - PING: an impulse into the delay comes back on the left one time later, on the right two.
+ *  - WIDTH: at 0 every echo is centred (left and right the same), and at any width each echo keeps
+ *    its power. */
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,6 +29,34 @@ static float rnd(void) { rs = rs * 1664525u + 1013904223u; return (float)(int)(r
 static master_t m1, m2;
 static fxbus_t f1, f2;
 static int16_t dl1[88200], dl2[88200];
+
+/* Return the energy of PING's echoes of one impulse at this width (both sides), and in *same whether the
+ * left and right were the same throughout. */
+static double ping_energy(int width, int *same)
+{
+    static float dry[N], rev[N], dly[N], l[N], r[N];
+    double e = 0.0;
+    int b, i;
+    fxbus_init(&f2, dl2, 88200);
+    fxbus_set(&f2, FX_DL_PING, 1);
+    fxbus_set(&f2, FX_DL_FDBK, 0);
+    fxbus_set(&f2, FX_DL_HPF, 0);
+    fxbus_set(&f2, FX_DL_WIDTH, width);
+    fxbus_set_bpm(&f2, 120.0f);
+    *same = 1;
+    for (b = 0; b < BLOCKS; b++) {
+        for (i = 0; i < N; i++) {
+            dry[i] = rev[i] = 0.0f;
+            dly[i] = (b == 2 && i == 0) ? 1.0f : 0.0f;
+        }
+        fxbus_process_st(&f2, dry, dry, rev, dly, l, r, N);
+        for (i = 0; i < N; i++) {
+            e += (double)l[i] * l[i] + (double)r[i] * r[i];
+            *same &= l[i] == r[i];
+        }
+    }
+    return e;
+}
 
 int main(void)
 {
@@ -125,6 +155,15 @@ int main(void)
         printf("       first echo: left at %d, right at %d samples (time %.0f)\n", first_l, first_r,
                (double)(f2.dl_time_ms * 0.001f * 44100.0f));
         check(first_l > 0 && first_r > first_l && abs(first_r - 2 * first_l) < 8, "ping: left at T, right at 2T");
+    }
+    {   /* WIDTH: centred at 0; the same power at every width */
+        int same_full, same_half, same_none;
+        double e_full = ping_energy(127, &same_full), e_half = ping_energy(64, &same_half),
+               e_none = ping_energy(0, &same_none);
+        printf("       echo energy: width 127 %.4f, 64 %.4f, 0 %.4f\n", e_full, e_half, e_none);
+        check(same_none && !same_half && !same_full, "width: 0 centres the echoes, 64 and 127 don't");
+        check(fabs(e_half / e_full - 1.0) < 1e-4 && fabs(e_none / e_full - 1.0) < 1e-4,
+              "width: each echo keeps its power");
     }
     printf(fails ? "stereo: %d FAILED\n" : "stereo: ok\n", fails);
     return fails != 0;

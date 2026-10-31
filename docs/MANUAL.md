@@ -546,8 +546,9 @@ sends, and has two pages:
   the far left (DIGI) is a clean 12-bit digital delay; turned up, it is a tape delay that wobbles,
   saturates and wears more the further you turn it, and can feed back on itself at high feedback.
 
-In SEL's list, under MORE: each effect's low cut and return level, and PING-PONG, which bounces
-the echoes between left and right.
+In SEL's list, under MORE: each effect's low cut and return level, PING-PONG, which bounces the
+echoes between left and right, and PING WIDTH, how far apart: 127 puts them hard left and right, 0
+in the centre.
 
 ---
 
