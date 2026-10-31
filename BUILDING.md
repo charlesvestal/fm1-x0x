@@ -97,7 +97,7 @@ cd build/pages && python3 -m http.server 8000
 ```
 
 Installing firmware is at your own risk. If the FM-1 no longer starts but reaches the chip's
-update mode (4C4A:8057 on USB), `tools/fm1_rescue.sh` puts stock V15 back from a Mac (docs/MANUAL.md,
+update mode (4C4A:8057 on USB), `tools/fm1_rescue.sh` puts stock back from a Mac (V15 or V16, whichever bootloader the FM-1 has) (docs/MANUAL.md,
 Troubleshooting); otherwise recovery needs [FM-1-transporter](https://github.com/kurogedelic/FM-1-transporter).
 
 ## Publishing a release

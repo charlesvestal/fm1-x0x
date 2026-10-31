@@ -60,7 +60,7 @@
   <p class="small" data-t="stockwhy"></p>
   <p class="small"><span data-t="keep"></span> <a href="../backup/" style="color:inherit" data-t="keeplink"></a></p>
   <ol class="small">
-    <li><span data-t="stock1"></span> <a id="stocklink" href="https://yms-file-store.oss-cn-hongkong.aliyuncs.com/software/firmware/FM-1.fwsc" style="color:inherit">FM-1.fwsc</a></li>
+    <li><span data-t="stock1"></span> <a id="stocklink" href="https://yms-file-store.oss-cn-hongkong.aliyuncs.com/software/firmware/FM-1.fwsc" style="color:inherit">FM-1.fwsc</a> (V16)<br><span data-t="stock1b"></span> <a id="stocklink15" href="https://web.archive.org/web/20261009203224id_/https://yms-file-store.oss-cn-hongkong.aliyuncs.com/software/firmware/FM-1.fwsc" style="color:inherit">FM-1.fwsc</a> (V15)</li>
     <li><label for="stockfile" data-t="stock2"></label><br><input type="file" id="stockfile" accept=".fwsc"></li>
     <li data-t="stock3"></li>
   </ol>
@@ -87,15 +87,17 @@ const TEXT = {
     beta: "これはベータ版で、不安定な場合があります。このカスタムファームウェアを使ったことで FM-1 が壊れたり不具合が起きたりしても、作者は一切の責任を負いません。自己責任でお使いください。",
     back: "公式ファームウェアに戻すには、このページ下の「純正ファームウェアに戻す」か、M-VAVE 公式のアップデーター M-UPGRADE（Downloads → PC Software → M-UPGRADE）を使います。",
     stockh: "純正ファームウェアに戻す",
-    stockwhy: "M-VAVE の FM-1 V15 を、X0X（またはそのセーフモード）から同じ USB ケーブルで書き込みます。X0X で保存したパターンは消えることがあります。",
+    stockwhy: "M-VAVE の FM-1 ファームウェア（V15 または V16）を、X0X（またはそのセーフモード）から同じ USB ケーブルで書き込みます。X0X で保存したパターンは消えることがあります。",
     keep: "他のファームウェアを入れると、X0X のプロジェクトは消えます。先にファイルに保存しておけます:",
     keeplink: "プロジェクトのバックアップ",
-    stock1: "M-VAVE の FM-1 V15 をダウンロード:",
+    stock1: "M-VAVE の FM-1 ファームウェアをダウンロード:",
+    stock1b: "FM-1 が受け付けない場合は V15（Internet Archive）:",
     stock2: "ダウンロードしたファイルを選ぶ:",
     stock3: "FM-1 を USB で接続し、下のボタンを押す。",
     stockinstall: "純正ファームウェアを書き込む",
-    stockok: "M-VAVE の FM-1 V15 です。ボタンを押してください。",
-    stockbad: "これは M-VAVE の FM-1 V15 のファイルではありません。上のリンクのファイルを選んでください。",
+    stockok: "M-VAVE の FM-1 ファームウェア（{V}）です。ボタンを押してください。",
+    stockbad: "これは M-VAVE の FM-1 V15 / V16 のファイルではありません。上のリンクのファイルを選んでください。",
+    stockhead: "何も書き込まれていません。FM-1 は、すでに入っているブートローダーと同じバージョンしか受け付けません。もう一方のファイル（V15 または V16）を選んで、もう一度ボタンを押してください。",
     stockdone: "完了。FM-1 は純正ファームウェアで起動しました。",
     nomidi: "このブラウザでは使えません。Chrome か Edge で開いてください。", loadfail: "読み込めませんでした: ",
     start: "開始します", verify: "確認中", loader: "書き込みモードに切り替え中", write: "書き込み中",
@@ -125,15 +127,17 @@ const TEXT = {
     beta: "This is a beta and may be unstable. The author accepts no responsibility if your FM-1 is damaged or misbehaves because of this custom firmware. Use it at your own risk.",
     back: "To go back to the official firmware, use \"Back to the stock firmware\" below, or M-VAVE's own updater, M-UPGRADE (Downloads → PC Software → M-UPGRADE).",
     stockh: "Back to the stock firmware",
-    stockwhy: "This writes M-VAVE's own FM-1 V15 back, from X0X (or its safe mode, or Felucca) over the same USB cable. Patterns saved in X0X may be lost.",
+    stockwhy: "This writes M-VAVE's own FM-1 firmware (V15 or V16) back, from X0X (or its safe mode, or Felucca) over the same USB cable. Patterns saved in X0X may be lost.",
     keep: "Installing other firmware replaces X0X's project. To keep it, save it to a file first:",
     keeplink: "back up your project",
-    stock1: "Download M-VAVE's FM-1 V15:",
+    stock1: "Download M-VAVE's FM-1 firmware:",
+    stock1b: "If the FM-1 doesn't take it, V15 (Internet Archive):",
     stock2: "Choose the file you downloaded:",
     stock3: "Connect the FM-1 by USB and press the button below.",
     stockinstall: "Install the stock firmware",
-    stockok: "That is M-VAVE's FM-1 V15. Press the button to install it.",
-    stockbad: "That is not M-VAVE's FM-1 V15 file. Choose the file from the link above.",
+    stockok: "That is M-VAVE's FM-1 {V}. Press the button to install it.",
+    stockbad: "That is not M-VAVE's FM-1 V15 or V16 file. Choose a file from the links above.",
+    stockhead: "Nothing was written. The FM-1 takes only the version whose bootloader it already has: choose the other file (V15 or V16) and press the button again.",
     stockdone: "Done. The FM-1 has restarted with its original firmware.",
     nomidi: "This browser cannot do it. Open the page in Chrome or Edge.", loadfail: "Could not load: ",
     start: "Starting", verify: "Verifying", loader: "Switching to update mode", write: "Writing",
@@ -153,7 +157,8 @@ const TEXT = {
   },
 };
 let lang = "en";                                 /* X0X: English first (the manual is English); 日本語 is a click away */
-const t = (k) => TEXT[lang][k];
+let stockV = "";                                   /* the stock version chosen: {V} in the texts */
+const t = (k) => (TEXT[lang][k] || "").replace("{V}", stockV);
 let lastKey = null, lastArg = "";
 function applyLang() {
   document.documentElement.lang = lang;
@@ -167,7 +172,7 @@ $("lang").addEventListener("click", () => { lang = lang === "ja" ? "en" : "ja"; 
 applyLang();
 /* the step in words in a status region (polite), a failure in an alert; progress at most every 2 s or 10 percent */
 const FAILS = new Set(["nomidi", "loadfail", "stopped", "error", "denied", "notfound", "model", "lost", "noloader", "noreturn",
-                       "mismatch", "badpkg", "stockbad"]);
+                       "mismatch", "badpkg", "stockbad", "stockhead"]);
 function show(txt, fail) {
   $(fail ? "status" : "alert").textContent = "";
   $(fail ? "alert" : "status").textContent = txt;
@@ -202,9 +207,13 @@ window.addEventListener("beforeunload", (e) => { if (writing) { e.preventDefault
   } catch (e) { sayK("loadfail", e.message); }
 })();
 
-/* stock firmware: M-VAVE's FM-1 V15, chosen by the user (M-VAVE's server allows no cross-site
-   download) and checked against its SHA-256 before anything is written */
-const STOCK_SHA256 = "db1642b2b6fa5c2cccb11ffd13878068bb28601678d3644049f99dc40e7edb8a";
+/* stock firmware: M-VAVE's FM-1 V15 or V16, chosen by the user (M-VAVE's server allows no cross-site
+   download) and checked against its SHA-256 before anything is written. The FM-1 takes only the one whose
+   flash head it has (firmware/src/ota.c: M-VAVE's loader rewrites the head; M-UPGRADE gives V16 its own) */
+const STOCK = {
+  "db1642b2b6fa5c2cccb11ffd13878068bb28601678d3644049f99dc40e7edb8a": "V15",
+  "d017fb65e70aca97ee29d944470c3515a74581df5c0576bf70de917c7b2b61d5": "V16",
+};
 let stock = null;
 $("stockfile").addEventListener("change", async (e) => {
   stock = null;
@@ -214,9 +223,10 @@ $("stockfile").addEventListener("change", async (e) => {
   try {
     const raw = new Uint8Array(await f.arrayBuffer());
     const hex = [...new Uint8Array(await crypto.subtle.digest("SHA-256", raw))].map((b) => b.toString(16).padStart(2, "0")).join("");
-    if (hex !== STOCK_SHA256) { sayK("stockbad"); return; }
+    if (!STOCK[hex]) { sayK("stockbad"); return; }
     stock = { image: logicalImage(raw), product: productOf(raw) };
     $("stockgo").disabled = writing;
+    stockV = STOCK[hex];
     sayK("stockok");
   } catch (err) { sayK("error", err && err.message); }
 });
@@ -248,6 +258,7 @@ async function run(img, product, isStock) {
     }
   } catch (e) {
     if (isStock && e && e.code === "mismatch") { $("bar").value = 100; sayK("stockdone"); }   /* stock names itself its own way */
+    else if (isStock && e && e.code === "stopped" && e.step === 1) sayK("stockhead");          /* the other version's head */
     else if (e && e.code && TEXT[lang][e.code]) sayK(e.code, e.detail || "");
     else sayK("error", e && e.message);
     log(String(e && e.stack || e));

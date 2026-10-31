@@ -49,8 +49,8 @@ to X0X starts with an empty project. To keep it, save it to a file first (see
 [Back up your project](#back-up-your-project)).
 
 **Go back:** "Back to the stock firmware", at the bottom of the same page, puts M-VAVE's firmware
-back (download the FM-1 V15 file from the link there, choose it, press the button). M-VAVE's own
-updater, M-UPGRADE, works too.
+back (download the FM-1 file from the link there, choose it, press the button; if the FM-1 doesn't
+take it, use the V15 file from the second link). M-VAVE's own updater, M-UPGRADE, works too.
 
 > Installing other firmware is at your own risk. If the FM-1 ever won't start, see
 > [Recovering an FM-1 that won't start](#recovering-an-fm-1-that-won-t-start).
@@ -804,7 +804,9 @@ normally.
 
 Since 0.5-beta, an FM-1 that keeps crashing starts in safe mode (above), where the web installer
 can fix it. Older versions instead dropped into the chip's own update mode after two crashes (0.2-
-beta did this: the X0X screen, a red X0X CRASH screen, then a blank screen). Neither the web
+beta did this: the X0X screen, a red X0X CRASH screen, then a blank screen). An install cut short
+(the cable pulled, the computer asleep) can leave it there too: a blank screen, and only the red
+charging light. Neither the web
 installer nor M-VAVE's updater can see an FM-1 in that state, but a script can put M-VAVE's
 firmware back, on a Mac, with the USB cable you already have:
 
@@ -823,9 +825,11 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/charlesvestal/fm1-x0x/ma
 4. Type **yes** and press Return. Don't unplug anything until it says it's restarting the FM-1.
    The FM-1 then starts into its original firmware, and you can install X0X again from there.
 
-The script downloads M-VAVE's FM-1 V15 firmware and JieLi's flash loader, and checks both against
-known fingerprints. It writes only the firmware area of the memory, never the bootloader or the
-FM-1's own settings, and checks everything it writes. Running it again is always safe. If it fails,
+The script downloads M-VAVE's FM-1 firmware (V16, and V15 from the Internet Archive) and JieLi's
+flash loader, and checks them against known fingerprints. It puts back the version whose bootloader
+the FM-1 already has; to go from V15 to V16 after that, use M-VAVE's M-UPGRADE. It writes only the
+firmware area of the memory, never the bootloader or the FM-1's own settings, and checks everything
+it writes. Running it again is always safe. If it fails,
 copy everything in the Terminal window and
 [open an issue](https://github.com/charlesvestal/fm1-x0x/issues). If the FM-1 never shows up at
 all, Felucca's [FM-1-transporter](https://github.com/kurogedelic/FM-1-transporter) (a small
