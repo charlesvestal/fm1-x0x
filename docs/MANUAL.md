@@ -618,7 +618,9 @@ Press GLO for these settings, in five sections (MIDI, AUDIO, KEYS AND SCREEN, PR
 |---|---|
 | CLOCK OUT | Sends MIDI clock and start/stop messages. |
 | NOTES OUT | Sends the patterns out as MIDI notes. |
-| 909 … BREAK MIDI CH | Each part's MIDI channel, for notes in and out: 1–16, or OFF to ignore incoming notes for that part (and send none). |
+| 909 … BREAK MIDI CH | Each part's MIDI channel, for notes and CCs in and out: 1–16, or OFF to ignore incoming notes and CCs for that part (and send none). |
+| CC OUT | OFF (the default): X0X sends no CCs. KNOBS: the knobs you turn go out as CCs. ALL: what knob motion and p-locks play goes out too. For details, see section 16. |
+| MIX MIDI CH | The channel for the mixer's levels, the effects and the master: 1 (the default) to 16, or OFF. |
 | OUTPUT | NORMAL, or LOUD: 6 dB more at the headphones and line out (and USB audio), for headphones that need it. The master's LIMIT (on by default) keeps it from clipping. |
 | USB AUDIO | FOLLOWS KNOB (the default): USB audio is as loud as the FM-1, MASTER knob and all. FULL: USB audio stays at full level whatever the knob says, so you can record over the cable with the speaker turned down. |
 | LIGHTS | ON: the key lights show the steps, and the unlit buttons glow dimly so they can be read. KEYS: the key lights only. OFF: neither. |
@@ -760,6 +762,56 @@ is on.
 While X0X follows an external clock, the tempo on the top line is averaged over about a second,
 so it doesn't flicker with every clock.
 
+### MIDI CC
+
+A controller can turn X0X's knobs with MIDI CCs. Each part takes its CCs on its own channel, the same
+one as its notes, and MIX MIDI CH (channel 1 by default) takes the mixer, the effects and the master.
+A CC sets its knob just as turning it would, whatever page is showing. While REC is on during
+playback, it records knob motion. Otherwise it sets the knob, and if the knob has motion in the
+pattern, the CC wins over it for one pass. A sweep of CCs is one undo step. The map is fixed: there
+is no MIDI learn. Its first banks match CTL-1's, so CTL-1 plays these knobs as it comes.
+
+On a part's channel (909 on 10, 808 on 11, 303A on 2, 303B on 3, the break on 4):
+
+| CC | 303A and 303B | 909 and 808 | Break |
+|---|---|---|---|
+| 7, 10, 91, 93 | The part's level, pan, reverb send and delay send | The same | The same |
+| 16–19 | CUTOFF, RESO, ENVMOD, DECAY | | 16 FILTER, 17 LEVEL, 18 PITCH |
+| 20–23 | ACCENT, WAVE, DRIVE, SLIDE | 20–30: TUNE of tracks 1–11 | |
+| 24–27 | TUNE, VOLUME, DRVTYP, ACCDEC | | |
+| 74, 71, 75 | CUTOFF, RESO, DECAY again (taken in, never sent) | | 74: FILTER again |
+| 70–80 | | DECAY of tracks 1–11 | |
+| 102–112 | | LEVEL of tracks 1–11 | |
+| 12 | | The kit's ACCENT | |
+
+The drum tracks count in screen order. On the 909 that is BD, SD, LT, MT, HT, RS, CP, CH, OH, CR,
+RD, and on the 808 BD, SD, LT, MT, HT, RS, CP, CB, CY, OH, CH. The 909 clap's DECAY is its TAIL,
+and the 909 rimshot has no DECAY, so CC 75 does nothing on channel 10.
+
+On MIX MIDI CH:
+
+| CC | What it sets |
+|---|---|
+| 16–19 | The MASTER page: DRIVE, COMP, PUMP, FILTER (64 is off) |
+| 74, 71 | The master's FILTER again, and its RESO |
+| 20, 21 | The reverb's DECAY and TONE |
+| 22–25 | The delay's TIME, FEEDBACK, TONE and TAPE |
+| 102–106 | The level of the 909, 808, 303A, 303B and break |
+
+A switch such as WAVE changes at 64. CC 120 (all sound off) and CC 123 (all notes off) on a part's
+channel let go of the notes that MIDI holds there.
+
+X0X sends CCs when CC OUT (GLO) is on. KNOBS sends a knob's CC each time you change it by hand,
+with a knob, a row in a SEL list, or ENV and a knob. A CC that came in is never sent back, so a DAW
+that echoes MIDI doesn't loop. A part's level goes out twice, as CC 7 on the part's channel and as
+102–106 on MIX MIDI CH. ALL also sends what knob motion and p-locks play, for driving other synths
+with X0X's lanes. The lanes send at most 8 CCs every 6 ms, and only while there is room left for the
+notes, so a busy pattern never loses a note to its CCs. In ALL, a CC that comes back with the value a
+lane just sent is ignored.
+
+When a project loads, and after an undo or a redo, X0X sends every knob on the map once, so a
+controller with LED rings shows the values as they are.
+
 ### USB audio
 
 Over the same USB cable, the FM-1 also shows up on a computer as an audio input called
@@ -775,7 +827,7 @@ app opens the input can click while the FM-1 settles.
 X0X can tell a screen reader what its screen shows. Connect the FM-1 by USB, open the
 [FM-1 Screen Reader](https://charlesvestal.github.io/fm1-reader/) in Chrome or Edge, and click
 Connect. It reads out the page you're on and its knobs, a knob's value as you turn it, list rows
-with their place ("clock out on, 1 of 20"), help cards, questions, steps you put on or off, play and
+with their place ("clock out on, 1 of 22"), help cards, questions, steps you put on or off, play and
 stop, and every message, in words: "bass drum tune 37", not "BD TUNE 37".
 
 The page can speak with its own voice, at the speed and pitch you choose, or pass everything to your
