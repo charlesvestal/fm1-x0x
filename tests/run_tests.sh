@@ -47,6 +47,8 @@ run motion sh -c "$CC $W -o $OUT/motion_test tests/host/motion_test.c firmware/s
 # the drum tables the DSP tests below include (build/gen, as the host build makes them): a fresh checkout has none yet
 [ -f build/gen/x0x_drum_tables.h ] || { mkdir -p build/gen && python3 tools/gen_drum_samples.py build/gen/x0x_drum_samples.h >/dev/null; }
 run drum-pan sh -c "$CC -O2 -ffp-contract=off -w -Ifirmware/src/dsp -Ifirmware/src -Ibuild/gen -o $OUT/drum_pan_test tests/host/drum_pan_test.c firmware/src/dsp/drum909.c firmware/src/dsp/drum808.c -lm && $OUT/drum_pan_test"
+# the 303, 909 and 808 bit for bit as their golden renders (tests/host/dsp_hash.golden): a speed-up changes no sample
+run dsp-hash sh -c "$CC $W -Ifirmware/src/dsp -Ifirmware/src -Ibuild/gen -o $OUT/dsp_hash_test tests/host/dsp_hash_test.c firmware/src/dsp/bass303.c firmware/src/dsp/drum909.c firmware/src/dsp/drum808.c -lm && $OUT/dsp_hash_test tests/host/dsp_hash.golden"
 run stereo sh -c "$CC -O2 -ffp-contract=off -w -Ifirmware/src/dsp -Ifirmware/src -Ibuild/gen -o $OUT/stereo_test tests/host/stereo_test.c firmware/src/dsp/master.c firmware/src/dsp/fxbus.c -lm && $OUT/stereo_test"
 run reverb sh -c "$CC $W -Wno-double-promotion -Ifirmware/src/dsp -Ifirmware/src -Ibuild/gen -o $OUT/reverb_test tests/host/reverb_test.c -lm && $OUT/reverb_test"
 run master sh -c "$CC $W -Wno-double-promotion -o $OUT/master_test tests/host/master_test.c firmware/src/dsp/master.c -lm && $OUT/master_test"
