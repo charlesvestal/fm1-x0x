@@ -903,7 +903,8 @@ D8_TICK float bank_tick(d8_bank_t *b)
  * drift's six before the squares of its sample), so every square gets the same numbers on the same samples. The
  * squares' parts are summed per sample in bank_tick's order: the same bus. pair: the CB pair, (o5 + o6) / 2. */
 #define BANK_NONE 0x7FFF
-typedef struct { float c[6][CHUNK]; float sq[2][CHUNK]; } d8_bank_buf_t;
+#define BANK_SUB 16                               /* bank_block's pieces: its buffers on the second core's stack */
+typedef struct { float c[6][BANK_SUB]; float sq[2][BANK_SUB]; } d8_bank_buf_t;
 
 /* square i, samples [from, lim) on its present step: its part into c, and returns the sample it wraps on (its
  * jitter is due after it), or BANK_NONE */
@@ -953,7 +954,7 @@ static int bank_run(d8_bank_t *b, int i, int from, int lim, d8_bank_buf_t *w)
     return ev;
 }
 
-static void bank_block(d8_bank_t *b, float *bus, float *pair, int n)
+static void bank_sub(d8_bank_t *b, float *bus, float *pair, int n)   /* n <= BANK_SUB */
 {
     d8_bank_buf_t w;
     int ev[6], i, k, sd = b->drift_cnt - 1;
@@ -994,6 +995,17 @@ static void bank_block(d8_bank_t *b, float *bus, float *pair, int n)
             sum += w.c[i][k];
         bus[k] = sum * (1.0f / 21.0f);
         pair[k] = (w.sq[0][k] + w.sq[1][k]) * 0.5f;
+    }
+}
+/* in pieces of BANK_SUB (the squares' phases and steps, the drift's count and the pending wraps carry on from one to
+ * the next as from one sample to the next: the same output). X0X: half the buffers Optimist's one pass of CHUNK needs
+ * (1 KB on the 2.8 KB stack of the second core, where the 808 renders) */
+static void bank_block(d8_bank_t *b, float *bus, float *pair, int n)
+{
+    int k, m;
+    for (k = 0; k < n; k += m) {
+        m = n - k < BANK_SUB ? n - k : BANK_SUB;
+        bank_sub(b, bus + k, pair + k, m);
     }
 }
 
