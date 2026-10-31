@@ -94,11 +94,10 @@ jobs:
         # Use the versions before the er99/sc808 filenames changed: the X0X
         # comparison harnesses include those original headers and source files.
         # athousanddetails/schwung-9W9 and -8W8 were re-created with a new history
-        # on 2026-10-27, without these commits: they come from copies that kept them.
-        fetch_ref schwung-9W9 10cbe5c1e1c9e65b0818bb34644ab1a13092082c \
-          charlesvestal/schwung-9W9 synthfr/schwung-9W9
-        fetch_ref schwung-8W8 94aa2716d4c2e5851fc7c5dbb4c17adfd133c997 \
-          charlesvestal/schwung-8W8 DimaDake/schwung-8W8 michaelmenesescs/schwung-8W8
+        # on 2026-10-27, without these commits: kept as X0X's references in
+        # charlesvestal/schwung-9W9 (branch x0x-reference) and charlesvestal/schwung-8W8.
+        fetch_ref schwung-9W9 10cbe5c1e1c9e65b0818bb34644ab1a13092082c charlesvestal/schwung-9W9
+        fetch_ref schwung-8W8 94aa2716d4c2e5851fc7c5dbb4c17adfd133c997 charlesvestal/schwung-8W8
         fetch_ref schwung-303 7680578cdecd91e512cfddb9c9eb07b287fb64f4 charlesvestal/schwung-303
         fetch_ref schwung-tb3po f49d81d05d1e29ae37728a08e30f193892be3bc9 charlesvestal/schwung-tb3po
         export NINEW9_DIR="$PWD/build/refs/schwung-9W9"
