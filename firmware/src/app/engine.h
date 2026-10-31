@@ -9,7 +9,8 @@
  *   T_909 / T_808   voice = track 0..10, or DR_KIT / D8_KIT (= 11) for the kit
  *   T_303           voice = 0 / 1 (303 A / B)
  *   T_BRK           voice 0: breaks.h params (the per-pattern ones live in the pattern)
- *   T_FX            voice 0: fxbus.h params (reverb, delay, master drive / comp)
+ *   T_FX            fxbus.h params (reverb, delay, master drive / comp), 16 a voice: param k is voice
+ *                   k / 16, index k % 16 (voice 0: the first 16; voice 1: TAPE, and those added since)
  *   T_MIX           voice = part 0..4: Level, Rev send, Dly send (drums: on top of the per-voice sends)
  *   T_MST           voice 0: master filter + limiter
  */
