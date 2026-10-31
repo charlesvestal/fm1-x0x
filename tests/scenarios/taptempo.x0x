@@ -1,0 +1,75 @@
+# Tap tempo: hold HOME and tap SEQ in time. From the third tap it sets the tempo (one or two taps
+# change nothing), the last four gaps average; a pause of two seconds starts over. SEQ's release does nothing (the steps screen doesn't open), nor HOME's.
+# (The simulator reads the buttons once a block: a tap lands a few ms late, so the tempo is a bound.)
+wait 300
+expect tempo 125
+tapkey b0
+tapkey w0
+tapkey w8
+tap PLAY
+press HOME
+press SEQ
+wait 30
+release SEQ
+wait 370
+expect tempo 125
+press SEQ
+wait 30
+release SEQ
+wait 470
+expect tempo 125
+press SEQ
+wait 30
+release SEQ
+expect tempo >130
+expect tempo <136
+wait 470
+press SEQ
+wait 30
+release SEQ
+wait 470
+press SEQ
+wait 30
+release SEQ
+shot tap.png
+release HOME
+wait 100
+expect view 1
+expect playing 1
+expect tempo >121
+expect tempo <127
+# a pause, then 4 taps at 100 BPM: the old taps are forgotten
+wait 2500
+press HOME
+press SEQ
+wait 30
+release SEQ
+wait 570
+press SEQ
+wait 30
+release SEQ
+wait 570
+press SEQ
+wait 30
+release SEQ
+wait 570
+press SEQ
+wait 30
+release SEQ
+release HOME
+expect tempo >98
+expect tempo <102
+expect dirty 1
+# the help cards say how
+wait 600
+press HOME
+wait 1000
+shot homecard.png
+release HOME
+wait 100
+expect view 1
+press SEQ
+wait 1000
+shot seqcard.png
+release SEQ
+wait 100

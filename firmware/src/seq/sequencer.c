@@ -364,6 +364,7 @@ static uint32_t fire_step(seq_t *s, int t, const seq_sink_t *o)
         uint32_t slot = L > tr->swing_delay ? L - tr->swing_delay : 0;
         tr->swing_delay = next_swing_delay(s, t, p, rate, L);
         tr->to_next = carry + slot + tr->swing_delay;
+        tr->step_len = tr->to_next;                  /* (tap tempo's sync: how far into the step it is) */
     }
     return changed;
 }
@@ -407,6 +408,83 @@ static void do_start(seq_t *s, int from_top, const seq_sink_t *o)
     s->playing = 1;
     if (!s->ext && s->send_clock)
         midi(o, from_top ? 0xFA : 0xFB, 0, 0);
+}
+
+/* the step before p in this part's direction (a ping-pong turns back at the ends; random stays) */
+static int prev_pos(seq_t *s, int t, int p)
+{
+    seq_track_t *tr = &s->t[t];
+    int len = seq_part_len(s, t), dir = is_bass(t) ? bpart(s, t - TRK_BASS0)->dir : DIR_FWD, n;
+    if (p >= len)
+        p = len - 1;
+    switch (dir & 3) {
+    case DIR_REV:
+        return (p + 1) % len;
+    case DIR_PINGPONG:
+        if (len == 1)
+            return 0;
+        n = p - tr->pp_dir;
+        if (n >= len || n < 0) {
+            tr->pp_dir = (int8_t)-tr->pp_dir;
+            n = p - tr->pp_dir;
+        }
+        return n;
+    case DIR_RANDOM:
+        return p;
+    default:
+        return (p - 1 + len) % len;
+    }
+}
+
+/* a tap: the nearest quarter of the 909's, now. Tapped in a quarter's first half (late), every part
+ * goes back as much time as the 909 is into it (in its own steps); in its second half (early), on
+ * to the next one, the steps between left out. The step there fires at once. Back at its first step
+ * a part starts again (not a wrap: no bar end, no cue, no pass counted twice); on, the 909 wraps
+ * as it would have, cues and the song with it. The 303s let go first: the quarter's note plays fresh.
+ * The tap is the step's grid slot (swing_delay 0, see Swing), so the parts keep their grid from it. */
+static void do_sync(seq_t *s, const seq_sink_t *o)
+{
+    seq_track_t *d = &s->t[TRK_DRUM];
+    int t, q = 24 / TICKS_PER_STEP[part_rate(s, TRK_DRUM)], ql, on, dp;
+    float in, e;
+    if (!d->started || !d->step_len)
+        return;
+    dp = d->pos < seq_part_len(s, TRK_DRUM) ? d->pos : seq_part_len(s, TRK_DRUM) - 1;
+    ql = seq_part_len(s, TRK_DRUM) - (dp - dp % q);   /* the quarter's steps: fewer in a short bar's last */
+    ql = ql < q ? ql : q;
+    in = (float)(d->step_len - (d->to_next < d->step_len ? d->to_next : d->step_len)) / (float)d->step_len;
+    e = (float)(dp % q) + (in < 0.999f ? in : 0.999f);   /* 909 steps into the quarter */
+    on = e * 2.0f >= (float)ql;
+    for (t = 0; t < NTRACKS; t++) {
+        seq_track_t *tr = &s->t[t];
+        int len = seq_part_len(s, t), p = tr->pos < len ? tr->pos : len - 1;
+        int qt = 24 / TICKS_PER_STEP[part_rate(s, t)], j = (int)(e * (float)qt / (float)q);
+        int first = is_bass(t) && (bpart(s, t - TRK_BASS0)->dir & 3) == DIR_REV ? len - 1 : 0;
+        if (!tr->started)                            /* (it starts by itself) */
+            continue;
+        if (is_bass(t))
+            bass_release(s, t - TRK_BASS0, o);
+        if (on) {                                    /* on to the next quarter: the steps before it unplayed */
+            for (j = (int)((float)(ql * qt) / (float)q + 0.5f) - j; --j > 0;) {
+                if (t == TRK_DRUM && next_pos(s, t, p, 0) == 0)
+                    break;                           /* a 909 shorter than its last quarter: its bar ends now */
+                p = next_pos(s, t, p, 1);
+            }
+            tr->pos = (uint8_t)p;
+            tr->to_next = 0;
+            tr->swing_delay = 0;
+            continue;
+        }
+        while (j-- > 0)
+            p = prev_pos(s, t, p);
+        if (p == first) {
+            tr->started = 0;
+            tr->pp_dir = 1;
+        } else
+            tr->pos = (uint8_t)prev_pos(s, t, p);
+        tr->to_next = 0;
+        tr->swing_delay = 0;
+    }
 }
 
 static void do_stop(seq_t *s, const seq_sink_t *o)
@@ -502,6 +580,11 @@ void seq_advance(seq_t *s, uint32_t k, const seq_sink_t *o)
         s->req_cont = 0;
         do_start(s, 0, o);
     }
+    if (s->req_sync) {
+        s->req_sync = 0;
+        if (s->playing && !s->ext)
+            do_sync(s, o);
+    }
     if (s->ext_pending)
         ext_ticks(s);
     if (!s->playing) {
@@ -551,6 +634,7 @@ void seq_advance(seq_t *s, uint32_t k, const seq_sink_t *o)
 void seq_start(seq_t *s) { s->req_start = 1; }
 void seq_stop(seq_t *s) { s->req_stop = 1; }
 void seq_continue(seq_t *s) { s->req_cont = 1; }
+void seq_sync(seq_t *s) { s->req_sync = 1; }
 void seq_ext_clock(seq_t *s) { s->ext_pending++; }
 void seq_cue(seq_t *s, int p)
 {

@@ -461,6 +461,115 @@ static void test_polymeter_cue_chain(void)
     printf("  polymeter, cue on the bar, chain 4-6: checked\n");
 }
 
+/* seq_sync (a tap): every part to the 909's nearest quarter, its step fired now, the beat counted
+ * from there. Late (first half): back, and at the bar's start no bar end (a cue waits for the real
+ * one). Early (second half): on, the steps between unplayed; before the bar line the bar ends now. */
+static void sync_at(double steps)
+{
+    reset();
+    S.bpm = 120.0f;
+    P[0].drum[0].hit[0][0] = 1u << 4 | 1u << 8;            /* BD on steps 5 and 9, SD on 7, LT on 1 */
+    P[0].drum[0].hit[1][0] = 1u << 6;
+    P[0].drum[0].hit[2][0] = 1u;
+    P[1].drum[0].hit[3][0] = 1u;                            /* pattern 2: MT on 1 */
+    P[0].bass[0].len = 3;                                   /* a 3-step 303: notes 36 and 48 on its steps 2, 3 */
+    P[0].bass[0].step[1] = (bstep_t){36, G_NOTE};
+    P[0].bass[0].step[2] = (bstep_t){48, G_NOTE};
+    seq_start(&S);
+    run((uint32_t)(44100.0 * 60.0 / 120.0 / 4.0 * steps));
+}
+
+static int at_once(int kind, int a, uint32_t t0)
+{
+    int i = find(kind, a, 0);
+    return i >= 0 && evs[i].t == t0;
+}
+
+static void test_sync(void)
+{
+    int i;
+    uint32_t t0;
+    double step = 44100.0 * 60.0 / 120.0 / 4.0;
+    sync_at(5.5);                                           /* late: in step 6, the quarter began at 5 */
+    nev = 0;
+    t0 = now;
+    seq_sync(&S);
+    run(16);
+    CHECK(at_once(E_DRUM, 0, t0), "late sync: BD (step 5) again at once");
+    CHECK(S.t[TRK_DRUM].pos == 4, "late sync: the 909 on step 5 (pos %d)", S.t[TRK_DRUM].pos);
+    i = find(E_ON, 0, 0);                                   /* the 303 on its step 3, 1 back = step 2 */
+    CHECK(i >= 0 && evs[i].t == t0 && evs[i].b == 36, "late sync: the 303 went back as far");
+    run((uint32_t)(step * 3));
+    i = find(E_DRUM, 1, 0);
+    CHECK(i >= 0 && abs((int)evs[i].t - (int)(t0 + 2 * step + 0.5)) <= 1, "late sync: SD two steps after the tap (%u)",
+          i >= 0 ? evs[i].t : 0);
+    sync_at(6.5);                                           /* early: in step 7, the next quarter at 9 */
+    nev = 0;
+    t0 = now;
+    seq_sync(&S);
+    run(16);
+    CHECK(at_once(E_DRUM, 0, t0), "early sync: BD (step 9) at once");
+    CHECK(S.t[TRK_DRUM].pos == 8, "early sync: the 909 on step 9 (pos %d)", S.t[TRK_DRUM].pos);
+    i = find(E_ON, 0, 0);                                   /* the 303 on its step 1, on 2 = step 3 */
+    CHECK(i >= 0 && evs[i].t == t0 && evs[i].b == 48, "early sync: the 303 went on as far");
+    CHECK(find(E_DRUM, 1, 0) < 0, "early sync: SD (step 7) left out");
+    /* late, in the bar's first quarter: step 1 again, a start not a wrap: the cue waits for the bar */
+    sync_at(17.5);
+    seq_cue(&S, 1);
+    nev = 0;
+    t0 = now;
+    seq_sync(&S);
+    run(16);
+    CHECK(at_once(E_DRUM, 2, t0), "late sync on the bar: LT (step 1) again at once");
+    CHECK(S.ppat[0] == 0 && find(E_DRUM, 3, 0) < 0, "late sync on the bar: no bar end, the cue waits");
+    run((uint32_t)(step * 16));
+    i = find(E_DRUM, 3, 0);
+    CHECK(i >= 0 && abs((int)evs[i].t - (int)(t0 + 16 * step + 0.5)) <= 1, "the cue on the next bar, 16 steps on (%u)",
+          i >= 0 ? evs[i].t : 0);
+    /* early, before the bar line: the bar ends now, the cue with it */
+    sync_at(14.5);
+    seq_cue(&S, 1);
+    nev = 0;
+    t0 = now;
+    seq_sync(&S);
+    run(16);
+    CHECK(at_once(E_DRUM, 3, t0) && S.ppat[0] == 1, "early sync before the bar: the cued pattern at once");
+    /* a 909 of 14 steps: its last quarter is 13-14, so half a step before the bar line is early: it ends now */
+    sync_at(0);
+    P[0].drum[0].len = 14;
+    run((uint32_t)(step * 13.5));
+    nev = 0;
+    t0 = now;
+    seq_sync(&S);
+    run(16);
+    CHECK(at_once(E_DRUM, 2, t0) && S.t[TRK_DRUM].pos == 0, "early sync, short bar: step 1 at once (pos %d)",
+          S.t[TRK_DRUM].pos);
+    /* swung: the tap is the grid. The pending step (8, odd) was due late; the sync puts the 909 on step 9
+     * at once, and from there odd steps are late by the swing, even ones on time (swing_delay reset) */
+    reset();
+    S.bpm = 120.0f;
+    P[0].swing = 100;                                       /* 75 %: odd 16ths half a step late */
+    P[0].drum[0].hit[7][0] = 0xFFFFu;
+    seq_start(&S);
+    run((uint32_t)(step * 6.5));
+    nev = 0;
+    t0 = now;
+    seq_sync(&S);
+    run((uint32_t)(step * 4));
+    {
+        static const double WANT[4] = { 0.0, 1.5, 2.0, 3.5 };   /* steps 9 (now), 10 (late), 11, 12 (late) */
+        int k;
+        for (i = 0, k = 0; k < 4; i++, k++) {
+            i = find(E_DRUM, 7, i);
+            CHECK(i >= 0 && abs((int)evs[i].t - (int)(t0 + WANT[k] * step + 0.5)) <= 1,
+                  "swung sync: CH %d at %u, want %.1f steps after the tap", k, i >= 0 ? evs[i].t : 0, WANT[k]);
+            if (i < 0)
+                break;
+        }
+    }
+    printf("  sync (tap): the nearest quarter, back or on, the cue on the bar, swung: checked\n");
+}
+
 /* one part's cue: it switches on the bar and restarts; the others keep their place */
 static void test_part_cue(void)
 {
@@ -674,6 +783,7 @@ int main(void)
     test_swing_continue();
     test_303();
     test_polymeter_cue_chain();
+    test_sync();
     test_part_cue();
     test_song();
     test_ext_clock_and_midi_out();

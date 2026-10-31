@@ -1148,7 +1148,7 @@ static int help_lines(int b, const char *l[HELP_LINES])
         L("HOLD A STEP + SELECT: ITS CHANCE"); break;
     case B_GLO: L("SETTINGS, SAVE, CLEAR,"); L("FACTORY RESET, PERFORMANCE"); L("AGAIN: CLOSE"); break;
     case B_HOME:
-        L("THE PATTERN: ALL FIVE PARTS"); L("AGAIN: THE SONG   + SELECT: TEMPO"); L("+ WHITE KEY: PATTERN");
+        L("THE PATTERN: ALL FIVE PARTS"); L("AGAIN: THE SONG   + SELECT: TEMPO"); L("+ WHITE KEY: PATTERN   + SEQ: TAP");
         if (is_drum() && part_view()) L("+ BLACK KEY: MUTE THE TRACK");
         L("+ REC: UNDO   + PLAY: REDO"); L("LIST: BACK   QUESTION: NO");
         break;
@@ -1167,6 +1167,7 @@ static int help_lines(int b, const char *l[HELP_LINES])
         break;
     case B_SEQ:
         L("THE PART'S STEPS: LENGTH, RATE"); L("AGAIN: THE NEXT PAGE"); L("HOLD A STEP + SELECT: ITS CHANCE");
+        L("HOME + SEQ, IN TIME: TAP TEMPO");
         break;
     case B_PLAY: L("START / STOP"); L("HOME + PLAY: REDO"); break;
     case B_REC:
@@ -2440,6 +2441,45 @@ static void button_tap(int b)
     }
 }
 
+/* HOME + SEQ tapped in time: from the third tap in a row, the tempo, from the last four gaps; a pause
+ * of two seconds starts over. Playing, each of those taps also takes every part to the nearest
+ * quarter (seq_sync), so the beat lands on the tap. One or two taps change nothing: a stray press, or
+ * the first two of a count-in, leave the tempo and the beat alone. Acts on the press, for timing. */
+#define TAP_MIN 3
+#define TAP_RESET 2000u
+#define TAP_N 5
+static void tap_tempo(void)
+{
+    static uint32_t t[TAP_N];
+    static uint8_t n;
+    uint32_t now = plat_ms();
+    int i;
+    if (seq.ext) {
+        warn("TEMPO: FOLLOWING MIDI CLOCK", 0);
+        return;
+    }
+    if (n && now - t[n - 1] > TAP_RESET)
+        n = 0;
+    if (n == TAP_N) {
+        for (i = 1; i < TAP_N; i++)
+            t[i - 1] = t[i];
+        n--;
+    }
+    t[n++] = now;
+    ui.touched = 4;                                   /* the TEMPO readout */
+    ui.touch_until = now + 900u;
+    if (n < TAP_MIN)
+        return;
+    if (seq.playing)
+        seq_sync(&seq);
+    if (now > t[0]) {
+        float bpm = 60000.0f * (float)(n - 1) / (float)(now - t[0]);
+        bpm = bpm < 20.0f ? 20.0f : bpm > 275.0f ? 275.0f : bpm;
+        seq.bpm = (float)(int)(bpm + 0.5f);
+        mark_dirty();
+    }
+}
+
 static void input(void)
 {
     uint32_t btn = plat_buttons(), keys = plat_keys(), ch, i;
@@ -2453,7 +2493,10 @@ static void input(void)
             any_button = 1;
             ui.btn_used &= ~m;
             ui.down_t[i] = plat_ms();
-            if (i == B_REC || i == B_PLAY)             /* transport acts on the press: timing */
+            if (i == B_SEQ && (btn & (1u << B_HOME)) && ui.overlay != O_ASK && !perf_testing()) {
+                ui.btn_used |= m | 1u << B_HOME;      /* HOME + SEQ: tap tempo (its release does nothing) */
+                tap_tempo();
+            } else if (i == B_REC || i == B_PLAY)             /* transport acts on the press: timing */
                 button_tap((int)i);
         } else if (!(ui.btn_used & m) && i != B_REC && i != B_PLAY) {
             button_tap((int)i);

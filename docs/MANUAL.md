@@ -131,7 +131,8 @@ page. SEQ, EDIT and ARP show the part you choose with ALGORITHM.
 | White keys | Steps. On HOME, patterns. On MASTER and FX they do nothing. |
 | Black keys | Drum tracks, or the break's slices. On HOME they mute parts; on the mixer they pick a channel. |
 
-**Hold HOME** for these: + REC undoes, + PLAY redoes, + SELECT sets the tempo, + a white key picks
+**Hold HOME** for these: + REC undoes, + PLAY redoes, + SELECT sets the tempo, + SEQ tapped in
+time taps the tempo, + a white key picks
 a pattern from any screen, and + a black key mutes a drum track (on the 909 or 808 screen) or a
 channel (on the mixer).
 
@@ -428,6 +429,15 @@ a song.
 every part. Swing delays every second 16th note: 50% is straight, 75% the most.
 
 HOME's knobs are for playing live: TEMPO, SWING, and the master's FILTER and PUMP.
+
+**Tap tempo.** Hold HOME and tap SEQ in time with the beat, from any screen, playing or stopped.
+From the third tap in a row it sets the tempo; keep tapping and it follows the last four. One or two
+taps change nothing, so a stray press does no harm. A pause of two seconds starts over. While playing,
+from the third tap on, each tap also puts the beat on your tap: every part jumps to the nearest quarter
+note and plays on from there. A tap a little late goes back to
+the beat just passed; a tap a little early skips ahead to the coming one, and just before the bar
+line the bar ends on your tap, bringing in the next pattern or the song's next bar. The TEMPO readout shows the result. While X0X follows an external MIDI clock, the clock
+sets the tempo and tapping does nothing.
 
 ---
 
