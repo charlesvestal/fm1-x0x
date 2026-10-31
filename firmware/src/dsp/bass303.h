@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
+/* BASS303_LITE, bass303_fixed_t and the biquads' coefficients apart from their state: after Optimist
+ * (github.com/w0ts/optimist 3b695372, a64ca03b, GPL-3.0-only). */
 /* X0X TB-303 bass engine: a C99 / float / no-libm port of Open303 (Robin Schmidt, MIT) with
  * the Devilfish ranges and the Soft / RAT drive of schwung-303 (GPL-3.0; the RAT model is
  * from davemollen/dm-Rat, GPL-3.0).
@@ -60,6 +62,11 @@
 #if BASS303_CTRL < 1 || BASS303_CTRL > 4
 #error "BASS303_CTRL must be 1..4"
 #endif
+/* bass303_set_lite (X0X's overload guard). 0: compiled out, the render always oversamples (the ACID engine,
+ * acid_dsp.c, never sets it: one specialised oversampling loop per wave instead of a third, generic one) */
+#ifndef BASS303_LITE
+#define BASS303_LITE 1
+#endif
 #define BASS303_SR 44100.0f
 #define BASS303_MAX_BLOCK 256
 
@@ -72,7 +79,8 @@ enum {
 };
 enum { BASS303_DRV_OFF, BASS303_DRV_SOFT, BASS303_DRV_RAT };
 
-typedef struct { float b0, b1, b2, a1, a2, z1, z2; } bass303_bq_t;     /* TDF-II biquad */
+typedef struct { float b0, b1, b2, a1, a2; } bass303_bq_t;             /* TDF-II biquad coefficients */
+typedef struct { float z1, z2; } bass303_bqz_t;                         /* its state */
 typedef struct { float x1, x2, y1, y2; } bass303_df1_t;                /* DF-I state */
 typedef struct { float x1, y1; } bass303_ap_t;                         /* halfband allpass */
 
@@ -92,17 +100,7 @@ typedef struct bass303 {
     int drv_type;
     float drv_amt;
 
-    /* fixed coefficients (sample-rate dependent; set in bass303_init) */
-    float rc1_c, rc2_c;                 /* filter-envelope RC followers (3 ms, 15 ms) */
-    float dc_b0, dc_b1, dc_a1, dc_a2;   /* de-clicker: 200 Hz Butterworth lowpass, b2 = b0 */
-    float hp1_b0, hp1_a1;               /* pre-filter highpass at the oversampled rate */
-    float fbhp_b0, fbhp_a1;             /* feedback highpass at the oversampled rate */
-    float hp1l_b0, hp1l_a1, fbhpl_b0, fbhpl_a1;   /* the same two at the base rate (lite) */
     int lite, lite_cur;      /* X0X overload guard: render without oversampling (bass303_set_lite) */
-    float ap_b0, ap_a1;                 /* 14 Hz allpass (b1 = 1) */
-    float hp2_b0, hp2_a1;               /* 24 Hz highpass */
-    float nt_b0, nt_b1, nt_a1, nt_a2;   /* 7.5 Hz notch (b2 = b0) */
-    float sq_dc, sq_h;                  /* 303 square: mean, hard-edge height */
 
     /* voice */
     int gate;                /* a note is held */
@@ -114,8 +112,7 @@ typedef struct bass303 {
 
     /* control rate: c^m for m = 0..BASS303_CTRL of each recursion, the RC followers'
      * closed-form gains, and the interpolated values the samples use */
-    float rc1_pw[BASS303_CTRL + 1], rc2_pw[BASS303_CTRL + 1], slew_pw[BASS303_CTRL + 1];
-    float ampd_pw[BASS303_CTRL + 1], ampn_pw[BASS303_CTRL + 1], ampa_pw[BASS303_CTRL + 1];
+    float slew_pw[BASS303_CTRL + 1];
     float env_pw[BASS303_CTRL + 1], g1[BASS303_CTRL + 1], g2[BASS303_CTRL + 1];
     float c_inc, c_b0, c_k, c_g2, c_a;
     float osc_freq, slew_y;
@@ -139,12 +136,31 @@ typedef struct bass303 {
     bass303_df1_t nt;
 
     /* drive (schwung-303 drive.h) */
-    bass303_bq_t s_pre, s_post, up_lp, down_lp;
+    bass303_bqz_t s_pre, s_post, up_lp, down_lp;   /* (their coefficients: bass303_fixed_t) */
     float s_gain, s_inv;
     float r_b[4], r_a[4], r_z[3];        /* RAT op-amp, 3rd-order TDF-II */
-    float r_corr_b1, r_corr_z, r_tone_b1, r_tone_z;
+    float r_corr_b1, r_corr_z, r_tone_z;
     float dcb_x1, dcb_y1;
 } bass303_t;
+
+/* The coefficients that depend on the sample rate only, the same for every instance: one table (bass303.c
+ * bass303_k), filled by the first bass303_init (later ones would write the same values) */
+typedef struct {
+    float rc1_c, rc2_c;                 /* filter-envelope RC followers (3 ms, 15 ms) */
+    float rc1_pw[BASS303_CTRL + 1], rc2_pw[BASS303_CTRL + 1];
+    float ampd_pw[BASS303_CTRL + 1], ampn_pw[BASS303_CTRL + 1], ampa_pw[BASS303_CTRL + 1];
+    float dc_b0, dc_b1, dc_a1, dc_a2;   /* de-clicker: 200 Hz Butterworth lowpass, b2 = b0 */
+    float hp1_b0, hp1_a1;               /* pre-filter highpass at the oversampled rate */
+    float fbhp_b0, fbhp_a1;             /* feedback highpass at the oversampled rate */
+    float hp1l_b0, hp1l_a1, fbhpl_b0, fbhpl_a1;   /* the same two at the base rate (lite) */
+    float ap_b0;                        /* 14 Hz allpass (b1 = 1, a1 = -b0) */
+    float hp2_b0, hp2_a1;               /* 24 Hz highpass */
+    float nt_b0, nt_b1, nt_a1, nt_a2;   /* 7.5 Hz notch (b2 = b0) */
+    float sq_dc, sq_h;                  /* 303 square: mean, hard-edge height */
+    bass303_bq_t s_pre, s_post, up_lp, down_lp;   /* drive: Soft shelves, the 2x resampler's lowpasses */
+    float r_tone_b1;                    /* RAT tone one-pole */
+    int ready;
+} bass303_fixed_t;
 
 void bass303_init(bass303_t *b);
 void bass303_note_on(bass303_t *b, int note, int accent, int slide);
