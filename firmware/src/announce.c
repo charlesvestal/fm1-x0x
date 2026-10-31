@@ -1,7 +1,9 @@
-/* SPDX-License-Identifier: MIT */
+/* SPDX-License-Identifier: MPL-2.0
+ * Copyright (C) 2026 Charles Vestal */
 /* Announce: what the screen says, for a screen reader on the computer (fm1-reader: a page that speaks it,
- * or hands it to the computer's own screen reader). Shared by the FM-1 firmwares, one copy:
- * fm1-reader/firmware/announce.c. The app says what changed and when; this keeps the protocol.
+ * or hands it to the computer's own screen reader). Shared by the FM-1 firmwares, one copy: fm1-base's
+ * device/announce.c (tests/announce_test.c); fm1-reader's tools/sync_announce.sh copies it into the firmwares not on
+ * fm1-base. Change it here, not in a copy. The app says what changed and when; this keeps the protocol.
  *
  * The firmware is in charge of the words, without spending flash on them: it sends the screen's own text,
  * and its HELLO gives the link to its words file (its words.tsv, built by gen_words.py into ANN_WORDS_URL),

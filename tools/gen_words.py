@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
-# SPDX-License-Identifier: MIT
-"""A firmware's words file for the screen reader (fm1-reader; copied into each firmware by sync_announce.sh).
+# SPDX-License-Identifier: MPL-2.0
+# Copyright (C) 2026 Charles Vestal
+"""A firmware's words file for the screen reader (fm1-reader). The one copy is fm1-base's tools/gen_words.py;
+fm1-reader's tools/sync_announce.sh copies it into the firmwares not on fm1-base. Change it here, not in a copy.
 
     gen_words.py firmware/words.tsv web/words build/gen/ann_words.h
 
@@ -12,9 +14,14 @@ says where the words files are published. Written:
                         the repo and publish them all; never change or delete one (a device in the wild points at
                         its own).
   ann_words.h           #define ANN_WORDS_URL "<url><id>.json": the link the device sends with its HELLO.
+A words file over the reader's limits (WORDS_MAX entries with the common ones, WORD_MAX characters a side) is refused:
+the reader's page (fm1-reader web/words.js) would not take it.
 """
 import hashlib, json, sys
 from pathlib import Path
+
+# the reader's limits (fm1-reader web/words.js WORDS_MAX, WORD_MAX): entries in a words file, characters a side
+WORDS_MAX, WORD_MAX = 5000, 120
 
 # words most FM-1 firmwares use; a firmware's own list comes first and can say any of them differently
 COMMON = [
@@ -44,6 +51,12 @@ def main(tsv, out_dir, header):
         own.append([parts[0].strip(), parts[1].strip()])
         if not all(32 <= ord(c) < 127 for c in parts[0] + parts[1]):
             raise SystemExit(f"{tsv}:{n}: ASCII only")
+        for side, what in zip(own[-1], ("the screen's text", "what is said")):
+            if len(side) > WORD_MAX:
+                raise SystemExit(f"{tsv}:{n}: {what} is {len(side)} characters; the screen reader takes {WORD_MAX} at most")
+    if len(own) + len(COMMON) > WORDS_MAX:
+        raise SystemExit(f"{tsv}: {len(own)} entries (and {len(COMMON)} common ones); the screen reader takes "
+                         f"{WORDS_MAX} at most, so {WORDS_MAX - len(COMMON)} of a firmware's own")
     if not url.startswith("https://") or not url.endswith("/"):
         raise SystemExit(f"{tsv}: needs a '# url: https://.../words/' line")
     body = {"format": 1, "words": own + [list(w) for w in COMMON]}
