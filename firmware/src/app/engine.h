@@ -88,5 +88,17 @@ void engine_motion_rec(int lane);                           /* record a pass fro
 void engine_motion_hold(int lane);                          /* the knob wins for a pass */
 float engine_gr_db(void);                                   /* master compressor gain reduction (UI meter) */
 void engine_master_format(int i, char *buf);                /* a master pot in its unit */
+/* MIDI CC (the fixed map: docs/MANUAL.md section 16). A role is a part (PART_*), its CCs on its own channel,
+ * or CC_ROLE_MIX: the mixer, the FX and the master, on MIX MIDI CH */
+enum { CC_OUT_OFF, CC_OUT_KNOBS, CC_OUT_ALL };
+#define CC_ROLE_MIX NPARTS
+void engine_cc_config(int mode, int mix_ch);               /* CC OUT; MIX MIDI CH 0-15, SEQ_CH_OFF = none */
+int engine_cc_chan(int role);                               /* the role's channel 0-15, SEQ_CH_OFF = none */
+int engine_cc_param(int role, int cc, int *t, int *v, int *i);   /* what the CC sets: 1, its pot; 0 nothing */
+int engine_cc_of(int t, int v, int i, int *role);           /* the CC a pot sends (never an alias), -1 none */
+int engine_cc_send(int t, int v, int i, int val);           /* main loop: the pot's CC out (CC OUT on, room
+                                                             * left for the notes): packets sent */
+int engine_cc_take(uint32_t *pkt);                          /* main loop: a CC that came in (USB-MIDI), 0 none */
+int engine_cc_echo(uint32_t pkt);                           /* 1: a CC the lanes just sent (ALL), come back */
 int engine_brk_nslots(void);                                /* built-in loops + user slots */
 const char *const *engine_brk_slot_names(void);

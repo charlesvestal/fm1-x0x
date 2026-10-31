@@ -95,6 +95,13 @@ int plat_midi_in(uint32_t *pkt)
     return 1;
 }
 void plat_midi_out(uint32_t pkt) { midi_out_event(pkt); }
+void plat_midi_out_main(uint32_t pkt)
+{
+    uint32_t f = irq_save();
+    midi_out_event(pkt);
+    irq_restore(f);
+}
+int plat_midi_out_room(void) { return usb.config ? (int)(MQ - (mo_w - mo_r)) : (int)MQ; }   /* (unplugged: dropped) */
 
 int plat_store_load(uint32_t obj, void *dst, uint32_t max) { return flash_ok ? st_load(obj, dst, max) : -1; }
 int plat_store_save(uint32_t obj, const void *src, uint32_t len) { return flash_ok ? st_save(obj, src, len) : -9; }

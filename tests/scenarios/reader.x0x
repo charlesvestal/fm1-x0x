@@ -21,10 +21,10 @@ tap PLAY
 said STOP
 tap GLO
 wait 400
-said GLOBAL LIST. MIDI. CLOCK OUT ON, 1 OF 20
+said GLOBAL LIST. MIDI. CLOCK OUT ON, 1 OF 22
 turn SELECT 1
 wait 300
-said NOTES OUT OFF, 2 OF 20
+said NOTES OUT OFF, 2 OF 22
 tap GLO
 wait 300
 press SAVE

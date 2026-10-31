@@ -1,0 +1,131 @@
+# MIDI CC out (fm1-x0x#15): GLO > CC OUT (OFF, KNOBS, ALL) and MIX MIDI CH, saved with the settings.
+# KNOBS sends what is changed by hand, never what came in; ALL adds what the lanes play. A load, an undo and a
+# redo send every mapped value (the snapshot). An older project, saved without these two, loads them off and 1.
+wait 300
+expect ccoutset 0
+expect mixchset 0
+# OFF: a knob sends nothing (the 909 BD's TUNE, CC 20 on channel 10)
+expect sound0.0.0 34
+spin K1 1
+wait 100
+expect sound0.0.0 35
+expect ccouts 0
+# GLO > CC OUT (the eighth row): KNOBS
+tap GLO
+turn SELECT 7
+turn ALGO 1
+tap GLO
+wait 100
+expect ccoutset 1
+spin K1 1
+wait 100
+expect cc10.20 36
+expect ccouts 1
+# a knob that has no CC (ATTACK) sends nothing
+spin K2 1
+wait 100
+expect ccouts 1
+# no echo: a CC that comes in is not sent back
+midi B9 14 50
+wait 100
+expect sound0.0.0 80
+expect cc10.20 36
+expect ccouts 1
+# undo sends the snapshot: every mapped value once (130 CCs), the BD's TUNE as it is now (the turns and the CC
+# were one step: nothing rested 400 ms between them)
+midiclear
+wait 600
+press HOME
+tap REC
+release HOME
+wait 600
+expect sound0.0.0 34
+expect ccouts 130
+expect cc10.20 34
+expect cc10.102 61
+expect cc2.16 48
+expect cc1.104 74
+expect cc1.25 71
+# and redo
+midiclear
+press HOME
+tap PLAY
+release HOME
+wait 600
+expect sound0.0.0 80
+expect ccouts 130
+expect cc10.20 80
+# GLO > MIX MIDI CH (the ninth row): 16; the master's FILTER (19) then comes on 16, not 1
+tap GLO
+turn SELECT 8
+turn ALGO 15
+tap GLO
+wait 100
+expect mixchset 16
+midi B0 13 00
+wait 50
+expect sound6.0.13 64
+midi BF 13 7F
+wait 50
+expect sound6.0.13 127
+# saved (the autosave), loaded at power-on: the settings kept, the snapshot sent (a level also on 102-106,
+# now on 16)
+wait 5000
+midiclear
+reboot
+wait 600
+expect ccoutset 1
+expect mixchset 16
+expect ccouts 130
+expect cc16.19 127
+expect cc16.104 74
+expect cc1.104 -1
+# a project saved before CC OUT and MIX MIDI CH: they load as OFF and 1 (and no snapshot goes out)
+settrunc 32
+midiclear
+reboot
+wait 600
+expect ccoutset 0
+expect mixchset 0
+expect ccouts 0
+midi B0 13 20
+wait 50
+expect sound6.0.13 32
+# ALL: what a lane plays goes out too, and the knob's own value when it stops (a CC wins over the lane for a
+# pass, as a knob). Under KNOBS it does not
+tap GLO
+turn SELECT 7
+turn ALGO 1
+tap GLO
+wait 100
+expect ccoutset 1
+lanefill 2 0 0 100 100
+midiclear
+tap PLAY
+wait 1000
+expect ccouts 0
+tap PLAY
+wait 200
+tap GLO
+turn SELECT 7
+turn ALGO 1
+tap GLO
+wait 100
+expect ccoutset 2
+midiclear
+tap PLAY
+wait 300
+expect cc2.16 100
+# the lane's value, come back from a DAW, is its echo: ignored
+midi B1 10 64
+wait 50
+expect sound2.0.0 48
+# another value is a hand on a controller: taken
+midi B1 10 05
+wait 50
+expect sound2.0.0 5
+wait 2500
+tap PLAY
+wait 200
+expect cc2.16 5
+expect ccblockmax <9

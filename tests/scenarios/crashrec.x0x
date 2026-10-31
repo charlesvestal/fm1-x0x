@@ -2,7 +2,7 @@
 wait 300
 fakecrash
 tap GLO
-turn SELECT 16
+turn SELECT 18
 tap SEL
 wait 1200
 shot crash_on_perf.png

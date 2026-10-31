@@ -42,6 +42,8 @@ typedef struct {
     uint8_t usb_full;                    /* 1: USB audio at full level, the MASTER knob for the FM-1's own outputs */
     uint8_t one_core;                    /* 1: the second core stays off (GLO > 2ND CORE, or after it crashed
                                           * beside it); applies at the next power-on. Older projects: 0, two */
+    uint8_t cc_out;                      /* CC OUT: 0 OFF, 1 KNOBS, 2 ALL (CC_OUT_*). Older projects: 0, off */
+    uint8_t mix_ch;                      /* MIX MIDI CH: 0 = its default (1), 1-16, 17 = OFF */
 } settings_t;
 
 /* the song and the motion lanes: one blob, split across OBJ_SONG and OBJ_MOTION */
@@ -64,6 +66,7 @@ int project_load(void);                  /* 0 = loaded; else defaults are in pla
 int project_save(void);                  /* 0 = saved and verified; -7 = too much to fit (nothing written) */
 int project_save_settings(void);         /* the settings alone (proj.set as it is): 0 = saved */
 void project_apply_io(void);             /* the settings into the sequencer and the engine: MIDI, the output */
+void project_apply_cc(void);             /* CC OUT and MIX MIDI CH into the engine */
 int project_mem_pct(void);
 void project_flash_changed(void);        /* a restore wrote the flash: the next save writes every object */               /* how full the room for patterns, song and motion is, % */
 

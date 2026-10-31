@@ -84,6 +84,13 @@ run upload-images sh -c "python3 tests/host/make_test_loops.py build/test_loops 
     python3 tools/upload_breaks.py --dry-run build/test_upload build/test_loops/loop*.wav"
 command -v node >/dev/null 2>&1 && run breaks-web node web/test_breaks.mjs   # the browser uploader: upload_breaks.py's bytes
 run host-build sh host/build_host.sh
+# the MIDI CC map (engine.c): the drum voices' pots by name, every CC its pot's own (or an alias), a value out and
+# back in unchanged (after the host build: the engine needs its generated tables)
+ENG_U="$(echo firmware/src/dsp/drum909.c firmware/src/dsp/drum808.c firmware/src/dsp/bass303.c firmware/src/dsp/breaks.c \
+    firmware/src/dsp/fxbus.c firmware/src/dsp/master.c firmware/src/seq/sequencer.c firmware/src/seq/tb3po.c \
+    firmware/src/seq/pattern.c firmware/src/seq/motion.c firmware/src/app/engine.c)"
+run midicc sh -c "$CC -O2 -ffp-contract=off -std=c99 -Wall -Wextra -Wno-unused-function -Wno-unused-parameter -DX0X_HOST \
+    -Ifirmware/src -Ifirmware/src/dsp -Ibuild/gen -o $OUT/midicc_test tests/host/midicc_test.c $ENG_U -lm && $OUT/midicc_test"
 if command -v emcc >/dev/null 2>&1 && command -v node >/dev/null 2>&1; then   # the browser build, when it can be built
     printf 'wav emu_ref.wav\nwait 500\ntapkey b0\ntapkey w0\ntapkey w8\ntap PLAY\nwait 2960\nwavstop\n' > build/host/emu_ref.x0x
     run emu sh -c "sh web/emu/build.sh >/dev/null 2>&1 && build/host/x0x_host build/host/emu_ref.x0x build/host >/dev/null && \

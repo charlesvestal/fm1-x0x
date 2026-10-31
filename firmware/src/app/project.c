@@ -524,6 +524,13 @@ void project_apply_io(void)
     }
     engine_out_loud(proj.set.out_loud);
     engine_usb_full(proj.set.usb_full);
+    project_apply_cc();
+}
+
+void project_apply_cc(void)
+{
+    engine_cc_config(proj.set.cc_out <= CC_OUT_ALL ? proj.set.cc_out : CC_OUT_OFF,
+                     !proj.set.mix_ch ? 0 : proj.set.mix_ch > 16 ? SEQ_CH_OFF : proj.set.mix_ch - 1);
 }
 
 /* 0 = saved and verified; -7 = the patterns, song and motion do not fit (nothing was written) */

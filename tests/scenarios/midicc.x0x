@@ -1,0 +1,154 @@
+# MIDI CC in (fm1-x0x#15): a CC on a part's channel (909 10, 808 11, 303 A 2, 303 B 3, break 4) or on MIX
+# MIDI CH (1) sets its pot as the knob would. CC OUT starts OFF: nothing goes out.
+wait 300
+expect ccoutset 0
+# CC 123 (all notes off) on 303 A's channel ends the note MIDI holds there; CC 120 (all sound off) on the
+# break's lets go of its slices (their sends off, so no tail is left)
+param 5 2 1 0
+param 5 2 2 0
+param 5 4 1 0
+param 5 4 2 0
+midi 91 30 64
+wait 300
+peakreset
+wait 100
+expect peak_db_min -30
+midi B1 7B 00
+wait 1500
+peakreset
+wait 300
+expect peak_db_max -60
+midi 93 24 7F
+wait 300
+peakreset
+wait 100
+expect peak_db_min -30
+midi B3 78 00
+wait 1500
+peakreset
+wait 300
+expect peak_db_max -60
+# 303 A: CC 16 Cutoff, 74 its alias; a switch (Wave, CC 21) turns over at 64
+midi B1 10 40
+wait 30
+expect sound2.0.0 64
+midi B1 4A 7F
+wait 30
+expect sound2.0.0 127
+midi B2 15 3F
+wait 30
+expect sound2.1.5 0
+midi B2 15 40
+wait 30
+expect sound2.1.5 1
+# 303 B: Tune is CC 24 (index 6), DrvType CC 26 (0..2)
+midi B2 18 00
+midi B2 1A 7F
+wait 30
+expect sound2.1.6 0
+expect sound2.1.9 2
+# the 909's voices by name: BD Level (CC 102), CH Decay (77: its Decay is pot 0), RS has no Decay (75)
+midi B9 66 20
+midi B9 4D 10
+wait 30
+expect sound0.0.3 32
+expect sound0.7.0 16
+expect sound0.5.0 103
+midi B9 4B 05
+wait 30
+expect sound0.5.0 103
+expect sound0.5.1 62
+# the 808's CY Tune (28: its Tune is pot 2), the kit's Accent (12)
+midi BA 1C 11
+midi BA 0C 22
+wait 30
+expect sound1.8.2 17
+expect sound1.11.1 34
+# a part's mixer on its own channel: 909 level (7), pan (10), reverb (91), delay (93)
+midi B9 07 50
+midi B9 0A 00
+midi B9 5B 7F
+midi B9 5D 40
+wait 30
+expect sound5.0.0 80
+expect sound5.0.3 0
+expect sound5.0.1 127
+expect sound5.0.2 64
+# MIX MIDI CH (1): the parts' levels 102-106, the master's FILTER (19, 74) and RESO (71), TAPE (25)
+midi B0 68 30
+wait 30
+expect sound5.2.0 48
+midi B0 13 20
+wait 30
+expect sound6.0.13 32
+midi B0 4A 60
+midi B0 47 7F
+midi B0 19 7F
+wait 30
+expect sound6.0.13 96
+expect sound6.0.10 127
+expect sound4.1.0 127
+expect sound4.0.13 1
+# the master's COMP (17), the delay's TIME (22: 0..12)
+midi B0 11 7F
+midi B0 16 7F
+wait 30
+expect sound6.0.12 127
+expect sound4.0.8 12
+# the break: Filter (16), Level (17), Pitch (18: 0..24)
+midi B3 10 00
+midi B3 11 40
+midi B3 12 7F
+wait 30
+expect sound3.0.2 0
+expect sound3.0.0 64
+expect sound3.0.1 24
+# a CC on a channel nobody has does nothing; a part's CC on another part's channel neither
+midi B4 10 00
+midi B9 10 00
+wait 30
+expect sound2.0.0 127
+# nothing went out: CC OUT is OFF
+expect ccouts 0
+# undo takes a sweep as one step: a run of CCs, then one undo puts the cutoff back where it began
+wait 600
+midi B1 10 10
+wait 20
+midi B1 10 20
+wait 20
+midi B1 10 30
+wait 600
+expect sound2.0.0 48
+press HOME
+tap REC
+release HOME
+expect sound2.0.0 127
+# recording, playing: a CC writes its lane, as a knob does
+expect lanes 0
+tap REC
+tap PLAY
+wait 200
+midi B1 11 10
+wait 150
+midi B1 11 30
+wait 150
+midi B1 11 50
+wait 300
+expect lanes 1
+tap PLAY
+tap REC
+wait 200
+# a screen reader says nothing for CCs, even for a knob on the page showing (the 909 BD's TUNE lights)
+listen
+wait 600
+said 909
+midi B9 14 30
+wait 50
+expect sound0.0.0 48
+midi B1 10 20
+wait 600
+said_none
+# a knob turned by hand after them is said
+turn K1 1
+wait 600
+said TUNE 49

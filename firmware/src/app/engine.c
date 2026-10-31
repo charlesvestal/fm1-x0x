@@ -427,14 +427,17 @@ static int mot_base(void *x, int t, int v, int i)
         return 100;                                   /* T_PROB: always */
     return mot_base_snd ? mot_base_snd->v[t][v][i] : 0;
 }
+static void cc_motion(int t, int v, int i, int val);
 static void mot_apply(void *x, int t, int v, int i, int val)
 {
     (void)x;
     if (t == T_PROB) {
         if ((v >> 4) < NPARTS && (v & 15) < NDRUM)
             prob[v >> 4][v & 15] = (uint8_t)val;
-    } else if (t < NTARGETS)
+    } else if (t < NTARGETS) {
         apply_param(t, v, i, val);
+        cc_motion(t, v, i, val);                      /* CC OUT ALL: what the lane plays goes out too */
+    }
 }
 
 int engine_motion_part(int t, int v)
@@ -454,8 +457,237 @@ void engine_motion_rec(int k) { motion_req_rec(&mot, k); }
 void engine_motion_hold(int k) { motion_req_hold(&mot, k); }
 static const seq_sink_t SINK = {s_drum_seq, s_bon, s_boff, s_brk, s_brkstop, s_midi, s_step, 0};
 
+/* ------------------------------------------------------------- MIDI CC --- */
+/* The fixed CC map (engine.h). A part's CCs on its own channel, the mixer's, the FX's and the master's on
+ * MIX MIDI CH. In: the ISR passes each CC to the main loop through a ring (ui.c midicc.c sets it as its
+ * knob). Out: the main loop sends what is changed by hand, the ISR what the lanes play (ALL), notes first. */
+static const uint8_t BASS_CC[BASS303_NPARAMS] = {16, 17, 18, 19, 20, 21, 24, 25, 22, 26, 23, 27};
+/* each drum voice's Level, Tune and Decay pots (255: none); tests/host/midicc_test.c checks them by name */
+#define NO_POT 255u
+static const uint8_t DRUM_POT[NKIT][NDRUM][3] = {
+    {{3, 0, 2}, {4, 0, 3}, {2, 0, 1}, {2, 0, 1}, {2, 0, 1}, {0, 1, NO_POT}, {0, 1, 2}, {1, 2, 0}, {1, 2, 0},
+     {1, 0, 2}, {1, 0, 2}},
+    {{0, 3, 2}, {0, 3, 4}, {0, 1, 2}, {0, 1, 2}, {0, 1, 2}, {0, 1, 2}, {0, 1, 2}, {0, 1, 2}, {0, 2, 1},
+     {0, 2, 1}, {0, 1, 2}}};
+static const uint8_t DRUM_CC0[3] = {102, 20, 70};       /* voice 1's Level, Tune, Decay; voice k: + k */
+static const uint8_t KIT_ACCENT[NKIT] = {0, 1};         /* the kit's Accent pot */
+static const uint8_t MIX_CC[MX_NPARAMS] = {7, 91, 93, 10};   /* a part's level, sends, pan */
+#define MIX_LEVEL_CC 102                                /* MIX MIDI CH: the parts' levels, 102-106 */
+static const struct { uint8_t cc, t, v, i; } MIXCH_MAP[] = {   /* MIX MIDI CH; the aliases last */
+    {16, T_FX, 0, FX_DRIVE},       {17, T_MST, 0, MST_COMP1},    {18, T_MST, 0, MST_PUMP},
+    {19, T_MST, 0, MST_DJF},       {71, T_MST, 0, MST_RESO},     {20, T_FX, 0, FX_RV_DECAY},
+    {21, T_FX, 0, FX_RV_TONE},     {22, T_FX, 0, FX_DL_TIME},    {23, T_FX, 0, FX_DL_FDBK},
+    {24, T_FX, 0, FX_DL_TONE},     {25, T_FX, 1, 0},             {74, T_MST, 0, MST_DJF}};
+#define MIXCH_SENT 11                                   /* the entries before the aliases */
+static volatile uint8_t cc_mode POOL, cc_mix POOL;      /* CC OUT; MIX MIDI CH 0-15 (SEQ_CH_OFF: none) */
+void engine_cc_config(int mode, int mix_ch)
+{
+    cc_mode = (uint8_t)mode;
+    cc_mix = (uint8_t)mix_ch;
+}
+int engine_cc_chan(int role) { return role < NPARTS ? seq.ch[role] : cc_mix; }
+
+int engine_cc_param(int role, int cc, int *t, int *v, int *i)
+{
+    uint32_t k;
+    int p = -1, kit;
+    *v = 0;
+    if (role < NPARTS)
+        for (k = 0; k < MX_NPARAMS; k++)
+            if (MIX_CC[k] == cc) {
+                *t = T_MIX;
+                *v = role;
+                *i = (int)k;
+                return 1;
+            }
+    switch (role) {
+    case PART_909:
+    case PART_808:
+        kit = role == PART_808;
+        *t = kit ? T_808 : T_909;
+        if (cc == 12) {
+            *v = NDRUM;
+            *i = KIT_ACCENT[kit];
+            return 1;
+        }
+        for (k = 0; k < 3; k++)
+            if (cc >= DRUM_CC0[k] && cc < DRUM_CC0[k] + NDRUM && DRUM_POT[kit][cc - DRUM_CC0[k]][k] != NO_POT) {
+                *v = cc - DRUM_CC0[k];
+                *i = DRUM_POT[kit][*v][k];
+                return 1;
+            }
+        return 0;
+    case PART_303A:
+    case PART_303B:
+        *t = T_303;
+        *v = role - PART_303A;
+        p = cc == 74 ? BASS303_CUTOFF : cc == 71 ? BASS303_RESO : cc == 75 ? BASS303_DECAY : -1;   /* the aliases */
+        for (k = 0; p < 0 && k < BASS303_NPARAMS; k++)
+            if (BASS_CC[k] == cc)
+                p = (int)k;
+        *i = p;
+        return p >= 0;
+    case PART_BRK:
+        *t = T_BRK;
+        *i = cc == 16 || cc == 74 ? 2 : cc == 17 ? 0 : cc == 18 ? 1 : -1;   /* Filter, Level, Pitch */
+        return *i >= 0;
+    default:
+        if (cc >= MIX_LEVEL_CC && cc < MIX_LEVEL_CC + NPARTS) {
+            *t = T_MIX;
+            *v = cc - MIX_LEVEL_CC;
+            *i = MX_LEVEL;
+            return 1;
+        }
+        for (k = 0; k < sizeof MIXCH_MAP / sizeof MIXCH_MAP[0]; k++)
+            if (MIXCH_MAP[k].cc == cc) {
+                *t = MIXCH_MAP[k].t;
+                *v = MIXCH_MAP[k].v;
+                *i = MIXCH_MAP[k].i;
+                return 1;
+            }
+        return 0;
+    }
+}
+
+int engine_cc_of(int t, int v, int i, int *role)
+{
+    uint32_t k;
+    switch (t) {
+    case T_MIX:
+        *role = v;
+        return v >= 0 && v < NPARTS && i >= 0 && i < MX_NPARAMS ? MIX_CC[i] : -1;
+    case T_303:
+        *role = PART_303A + (v & 1);
+        return i >= 0 && i < BASS303_NPARAMS ? BASS_CC[i] : -1;
+    case T_909:
+    case T_808: {
+        int kit = t == T_808;
+        *role = kit;
+        if (v == NDRUM)
+            return i == KIT_ACCENT[kit] ? 12 : -1;
+        if (v < 0 || v >= NDRUM)
+            return -1;
+        for (k = 0; k < 3; k++)
+            if (DRUM_POT[kit][v][k] == i)
+                return DRUM_CC0[k] + v;
+        return -1;
+    }
+    case T_BRK:
+        *role = PART_BRK;
+        return i == 0 ? 17 : i == 1 ? 18 : i == 2 ? 16 : -1;
+    default:
+        *role = NPARTS;
+        for (k = 0; k < MIXCH_SENT; k++)
+            if (MIXCH_MAP[k].t == t && MIXCH_MAP[k].v == v && MIXCH_MAP[k].i == i)
+                return MIXCH_MAP[k].cc;
+        return -1;
+    }
+}
+
+static int cc_scaled(int t, int v, int i, int val)       /* a pot's value as 0..127 */
+{
+    const x0x_param_t *d = engine_param(t, v, i);
+    int max = d && d->max ? d->max : 127;
+    return (val * 127 + max / 2) / max;
+}
+static void cc_put(int ch, int cc, int val, int isr)
+{
+    uint32_t pkt = 0x0Bu | (uint32_t)(0xB0 | ch) << 8 | (uint32_t)cc << 16 | (uint32_t)val << 24;
+    if (isr)
+        plat_midi_out(pkt);
+    else
+        plat_midi_out_main(pkt);
+}
+/* a parameter's CC out, on its part's channel or MIX MIDI CH (a part's level also on MIX MIDI CH's 102-106):
+ * the packets sent, 0 none */
+static int cc_out(int t, int v, int i, int val, uint32_t *key, int isr)
+{
+    int role, cc = engine_cc_of(t, v, i, &role), ch, x, n = 0;
+    if (cc < 0)
+        return 0;
+    x = cc_scaled(t, v, i, val);
+    x = x < 0 ? 0 : x > 127 ? 127 : x;
+    ch = engine_cc_chan(role);
+    if (ch < 16) {
+        cc_put(ch, cc, x, isr);
+        *key = (uint32_t)ch << 16 | (uint32_t)cc << 8 | (uint32_t)x;
+        n++;
+    }
+    if (t == T_MIX && i == MX_LEVEL && cc_mix < 16) {
+        cc_put(cc_mix, MIX_LEVEL_CC + v, x, isr);
+        if (!n)
+            *key = (uint32_t)cc_mix << 16 | (uint32_t)(MIX_LEVEL_CC + v) << 8 | (uint32_t)x;
+        n++;
+    }
+    return n;
+}
+#define CC_ROOM 16                                      /* the out queue keeps this much for the notes */
+int engine_cc_send(int t, int v, int i, int val)
+{
+    uint32_t key;
+    if (cc_mode == CC_OUT_OFF || plat_midi_out_room() < CC_ROOM + 2)
+        return 0;
+    return cc_out(t, v, i, val, &key, 0);
+}
+
+/* ALL: the lanes' CCs, at most CC_LANES_BLOCK a block and only with room for the notes left; the last
+ * CC_ECHO_N sent, so a DAW sending them back is not taken for a hand on the knob */
+#define CC_LANES_BLOCK 8
+#define CC_ECHO_N 16u
+static uint8_t cc_lanes_sent POOL;
+static volatile uint32_t cc_echo[CC_ECHO_N] POOL;
+static uint8_t cc_echo_w POOL;
+static void cc_motion(int t, int v, int i, int val)    /* ISR */
+{
+    uint32_t key = 0;
+    int n;
+    if (cc_mode != CC_OUT_ALL || cc_lanes_sent + (t == T_MIX && i == MX_LEVEL ? 2 : 1) > CC_LANES_BLOCK ||
+        plat_midi_out_room() < CC_ROOM + 2)
+        return;                                         /* (a level goes out twice: its part's 7 and 102-106) */
+    n = cc_out(t, v, i, val, &key, 1);
+    if (n) {
+        cc_lanes_sent = (uint8_t)(cc_lanes_sent + n);
+        cc_echo[cc_echo_w++ % CC_ECHO_N] = key | 1u << 24;
+    }
+}
+int engine_cc_echo(uint32_t pkt)
+{
+    uint32_t key = (pkt >> 8 & 15u) << 16 | (pkt >> 16 & 0x7Fu) << 8 | (pkt >> 24 & 0x7Fu) | 1u << 24, k;
+    if (cc_mode != CC_OUT_ALL)
+        return 0;
+    for (k = 0; k < CC_ECHO_N; k++)
+        if (cc_echo[k] == key)
+            return 1;
+    return 0;
+}
+
+/* the CCs that came in, for the main loop (raw USB-MIDI packets); full, the newest is dropped */
+#define CC_INQ 32u
+static volatile uint32_t cc_inq[CC_INQ] POOL;
+static volatile uint8_t cc_in_w POOL, cc_in_r POOL;
+static void cc_in_put(uint32_t pkt)
+{
+    uint8_t w = cc_in_w;
+    if ((uint8_t)(w - cc_in_r) >= CC_INQ)
+        return;
+    cc_inq[w % CC_INQ] = pkt;
+    __asm__ volatile("" ::: "memory");
+    cc_in_w = (uint8_t)(w + 1u);
+}
+int engine_cc_take(uint32_t *pkt)
+{
+    uint8_t r = cc_in_r;
+    if (r == cc_in_w)
+        return 0;
+    *pkt = cc_inq[r % CC_INQ];
+    __asm__ volatile("" ::: "memory");
+    cc_in_r = (uint8_t)(r + 1u);
+    return 1;
+}
+
 /* ---------------------------------------------------------------- MIDI in --- */
 static uint8_t bass_held[NBASS];       /* note held from MIDI, for legato = slide */
+static uint8_t brk_held POOL;          /* the break's slices held from MIDI (bit: key) */
 
 static void midi_in(uint32_t pkt)
 {
@@ -468,6 +700,23 @@ static void midi_in(uint32_t pkt)
     case 0xFB: seq_continue(&seq); return;
     case 0xFC: seq_stop(&seq); return;
     default: break;
+    }
+    if (ty == 0xB0) {
+        if (d1 == 120 || d1 == 123) {                   /* all sound / notes off: the part's MIDI-held notes */
+            for (k = 0; k < NBASS; k++)
+                if (seq.ch[TRK_BASS0 + k] == ch && bass_held[k]) {
+                    bass303_note_off(&b303[k]);
+                    bass_held[k] = 0;
+                }
+            if (seq.ch[TRK_BRK] == ch) {
+                for (k = 0; k < 8; k++)
+                    if (brk_held >> k & 1u)
+                        breaks_live(&brk, k, 0);
+                brk_held = 0;
+            }
+        } else
+            cc_in_put(pkt);                             /* the main loop's (ui.c midicc.c) */
+        return;
     }
     if (ty == 0x90 && d2 == 0)
         ty = 0x80;
@@ -489,8 +738,10 @@ static void midi_in(uint32_t pkt)
                 bass_held[k] = 0;
             }
         }
-    if (seq.ch[TRK_BRK] == ch && (ty == 0x90 || ty == 0x80) && d1 >= 36 && d1 <= 43)   /* the break's slices */
+    if (seq.ch[TRK_BRK] == ch && (ty == 0x90 || ty == 0x80) && d1 >= 36 && d1 <= 43) {   /* the break's slices */
         breaks_live(&brk, d1 - 36, ty == 0x90);
+        brk_held = (uint8_t)(ty == 0x90 ? brk_held | 1u << (d1 - 36) : brk_held & ~(1u << (d1 - 36)));
+    }
 }
 
 /* ---------------------------------------------------------------- render --- */
@@ -738,6 +989,7 @@ void engine_render(int32_t *out_lr, uint32_t n)
     if (n > 256u)
         n = 256u;
     eng_prof_frames += n;
+    cc_lanes_sent = 0;
     if ((mot_was_on && !mot_on) || mot_release_req) {   /* motion off, or its lanes replaced: knobs back */
         mot_release_req = 0;
         motion_release(&mot);

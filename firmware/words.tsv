@@ -66,3 +66,5 @@ X0X	X zero X
 PAN C	pan center
 PAN L#	pan left #
 PAN R#	pan right #
+MIDI CH	MIDI channel
+CC OUT	control change out

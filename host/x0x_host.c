@@ -29,6 +29,10 @@
  *                                the migrations after N, as one saved by that firmware would)
  *   lane T V I S VALUE           set step S of the motion lane on sound pot T V I (in the part's
  *                                current pattern) to VALUE, making the lane if need be
+ *   lanefill T V I A B           every step of that lane: A on the even ones, B on the odd
+ *   midiclear                    forget the CCs sent (expect ccCH.N, ccouts, ccblockmax, notedrops)
+ *   midirate N                   the computer takes N MIDI packets a second (0: as fast as they come)
+ *   settrunc N                   the saved settings cut to N bytes (as an older firmware saved them)
  *   snapline B                   remember 303 B's line on the pattern shown (expect linechgB: 1 = it changed since)
  *   projimg FILE                 a project as the FM-1 holds it in RAM (fm1_debug peek of proj): saved
  *                                to the simulated flash and booted, as if it had been made here
@@ -120,8 +124,38 @@ int plat_midi_in(uint32_t *pkt)
     return 1;
 }
 static uint32_t midi_out_count, clock_out_count, note_ons;
+/* the out queue, as usb.c's (64 packets): "midirate N" lets the computer take N packets a second (0: all of it,
+ * every millisecond); what does not fit is dropped and counted (expect notedrops) */
+#define HOST_MOQ 64
+static uint32_t host_moq, midi_rate, midi_rate_acc, note_drops, cc_drops;
+static int16_t cc_last[16][128];                     /* the last value of each CC sent, -1 none (expect ccCH.N) */
+static uint32_t cc_outs, cc_block, cc_block_max;     /* CCs sent; in the block rendering now; the most in one */
+static void cc_last_clear(void)
+{
+    int c, n;
+    for (c = 0; c < 16; c++)
+        for (n = 0; n < 128; n++)
+            cc_last[c][n] = -1;
+    cc_outs = cc_block_max = note_drops = cc_drops = 0;
+}
+int plat_midi_out_room(void) { return HOST_MOQ - (int)host_moq; }
+void plat_midi_out_main(uint32_t pkt) { plat_midi_out(pkt); }
 void plat_midi_out(uint32_t pkt)
 {
+    uint32_t st = (pkt >> 8) & 0xFF;
+    if (host_moq >= HOST_MOQ) {
+        if ((st & 0xF0) == 0x90 || (st & 0xF0) == 0x80)
+            note_drops++;
+        else if ((st & 0xF0) == 0xB0)
+            cc_drops++;
+        return;
+    }
+    host_moq++;
+    if ((st & 0xF0) == 0xB0) {
+        cc_last[st & 15][(pkt >> 16) & 0x7F] = (int16_t)((pkt >> 24) & 0x7F);
+        cc_outs++;
+        cc_block++;
+    }
     midi_out_count++;
     if ((((pkt >> 8) & 0xF0) == 0x90) && ((pkt >> 24) & 0x7F))
         note_ons++;                                  /* the notes the sequence sent (expect noteons) */
@@ -498,7 +532,10 @@ static void run_ms(uint32_t ms)
             uint32_t pr0[ENG_PROF_N];
             for (k = 0; k < ENG_PROF_N; k++)
                 pr0[k] = eng_prof[k];
+            cc_block = 0;
             engine_render(blk, 256);
+            if (cc_block > cc_block_max)
+                cc_block_max = cc_block;
             engine_volume(blk, 256);
 #ifdef X0X_WEB
             web_audio(blk, 256);                         /* the browser build: to the AudioWorklet */
@@ -539,6 +576,11 @@ static void run_ms(uint32_t ms)
             }
             audio_due_ms += 256.0 * 1000.0 / 44100.0;
         }
+        if (!midi_rate)                                  /* the computer took what was sent */
+            host_moq = 0;
+        else
+            for (midi_rate_acc += midi_rate; midi_rate_acc >= 1000u; midi_rate_acc -= 1000u)
+                host_moq -= host_moq > 0;
         if (seq.ppat[TRK_BRK] != last_pat) {
             last_pat = seq.ppat[TRK_BRK];
             engine_brk_loops();
@@ -877,6 +919,21 @@ static int expect(const char *what, const char *val)
         got = (int)clock_out_count;
     else if (!strcmp(what, "noteons"))
         got = (int)note_ons;
+    else if (!strcmp(what, "notedrops"))           /* note packets the full out queue dropped */
+        got = (int)note_drops;
+    else if (!strcmp(what, "ccouts"))              /* CCs sent since the start (or midiclear) */
+        got = (int)cc_outs;
+    else if (!strcmp(what, "ccblockmax"))          /* the most CCs one audio block sent */
+        got = (int)cc_block_max;
+    else if (!strncmp(what, "cc", 2) && what[2] >= '0' && what[2] <= '9') {   /* ccCH.N: the last value of CC N
+                                                                                * sent on channel CH (1-16), -1 none */
+        int c = 1, n = 0;
+        sscanf(what, "cc%d.%d", &c, &n);
+        got = cc_last[(c - 1) & 15][n & 127];
+    } else if (!strcmp(what, "ccoutset"))          /* GLO's CC OUT: 0 OFF, 1 KNOBS, 2 ALL */
+        got = proj.set.cc_out;
+    else if (!strcmp(what, "mixchset"))            /* MIX MIDI CH as saved: 0 the default (1), 1-16, 17 OFF */
+        got = proj.set.mix_ch;
     else if (!strcmp(what, "store_writes"))
         got = (int)store_writes;
     else if (!strcmp(what, "peak_db_max")) {
@@ -967,6 +1024,7 @@ int main(int argc, char **argv)
         sim_listen = 1;
         said_print = 0;
     }
+    cc_last_clear();
     boot();
     if (sim_listen) {
         static const uint8_t HELLO[] = {ANN_H0, ANN_H1, ANN_H2, ANN_HELLO, ANN_VER};
@@ -1080,6 +1138,14 @@ int main(int argc, char **argv)
             smp_user_scan((uint32_t)k);
             printf("  slot %d: %d zone(s) from the image\n", k, usr_nz[k]);
             engine_brk_loops();
+        } else if (!strcmp(cmd, "midiclear")) {
+            cc_last_clear();
+        } else if (!strcmp(cmd, "midirate")) {
+            midi_rate = (uint32_t)atoi(a);
+        } else if (!strcmp(cmd, "settrunc")) {        /* the saved settings cut to N bytes: as a firmware before
+                                                       * the last ones were added saved them */
+            if (store_len[OBJ_SET] > atoi(a))
+                store_len[OBJ_SET] = atoi(a);
         } else if (!strcmp(cmd, "midi")) {
             uint32_t s = (uint32_t)strtoul(a, 0, 16), d1 = (uint32_t)strtoul(b, 0, 16), d2 = (uint32_t)strtoul(c, 0, 16);
             uint32_t cin = s >= 0xF0 ? 0x0F : s >> 4;
@@ -1202,6 +1268,16 @@ int main(int argc, char **argv)
                 return 2;
             }
             proj.arr.lane[k].val[st] = (uint8_t)val;
+        } else if (!strcmp(cmd, "lanefill")) {         /* lanefill T V I A B: a lane's every step, A on the even
+                                                         * ones and B on the odd (a busy lane) */
+            int t = atoi(a), v = atoi(b), i = atoi(c), part = engine_motion_part(t, v), k, st;
+            k = motion_find(proj.arr.lane, seq.ppat[part], part, t, v, i);
+            if (k < 0 && (k = motion_alloc(proj.arr.lane, seq.ppat[part], part, t, v, i)) < 0) {
+                printf("line %d: no lane %d %d %d\n", lineno, t, v, i);
+                return 2;
+            }
+            for (st = 0; st < NSTEPS; st++)
+                proj.arr.lane[k].val[st] = (uint8_t)atoi(st & 1 ? line_e : line_d);
         } else if (!strcmp(cmd, "tearsave")) {          /* tearsave N: the next save stops after N object writes */
             store_tear = atoi(a);
         } else if (!strcmp(cmd, "reboot")) {
@@ -1280,6 +1356,7 @@ int main(int argc, char **argv)
             }
             said_len = 0;
             said_log[0] = 0;
+            said_count = 0;                             /* (said_none: nothing since this check) */
         } else if (!strcmp(cmd, "echo"))
             printf("%s", line + 5);
         else {

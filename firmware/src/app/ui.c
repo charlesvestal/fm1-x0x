@@ -184,10 +184,17 @@ static void warn(const char *a, const char *b) { say_as(a, b, ANN_NOW | ANN_KEEP
 /* =============================================================== param refs === */
 enum { R_NONE, R_ENG, R_SWING, R_DLEN, R_DRATE, R_BLEN, R_BRATE, R_BDIR, R_BTRANS, R_GEN, R_BRKSET,
        R_BRKSLOT, R_TEMPO, R_ACCENT, R_CLKOUT, R_NOTEOUT, R_PALETTE, R_KEYLED, R_KEYSOUND, R_AUTOSAVE, R_ACT, R_SBAR, R_SPAT,
-       R_SLEN, R_STALLS, R_HDR, R_TAPE, R_MIDICH, R_OUTLOUD, R_SREP, R_BATT, R_USBFULL, R_FREEPLAY, R_CORES };   /* R_TAPE: FX's one-knob TAPE (DIGI .. worn tape) */          /* R_HDR: a list's section header (a = its group), never selected */
+       R_SLEN, R_STALLS, R_HDR, R_TAPE, R_MIDICH, R_OUTLOUD, R_SREP, R_BATT, R_USBFULL, R_FREEPLAY, R_CORES, R_CCOUT,
+       R_MIXCH };   /* R_TAPE: FX's one-knob TAPE (DIGI .. worn tape) */          /* R_HDR: a list's section header (a = its group), never selected */
 typedef struct { uint8_t kind, a, b, c; } pref_t;
 #define PR(k, a, b, c) ((pref_t){(k), (a), (b), (c)})
 #define NONE PR(R_NONE, 0, 0, 0)
+/* MIDI CC (midicc.c) */
+static uint8_t cc_hand X0X_POOL;       /* a knob or a list row is turning: what it changes goes out (CC OUT) */
+static void cc_out_pref(pref_t r);
+static void cc_in_drain(void);
+static void cc_snapshot(void);
+static void cc_snap_tick(void);
 
 static const char *const RATE_N[] = {"1/16", "1/16T", "1/32", "1/8T"};
 static const char *const DIR_N[] = {"FWD", "REV", "PING", "RND"};
@@ -226,6 +233,9 @@ static const char *const USBA_N[] = {"FOLLOWS KNOB", "FULL"};
 static const x0x_param_t USBA_P = {"USB AUDIO", 1, 0, USBA_N};
 static const char *const CORES_N[] = {"ON", "OFF"};
 static const x0x_param_t CORES_P = {"2ND CORE", 1, 0, CORES_N};   /* proj.set.one_core: at the next power-on */
+static const char *const CCOUT_N[] = {"OFF", "KNOBS", "ALL"};
+static const x0x_param_t CCOUT_P = {"CC OUT", 2, 0, CCOUT_N};       /* proj.set.cc_out: CC_OUT_* */
+static const x0x_param_t MIXCH_P = {"MIX MIDI CH", 16, 1, 0};       /* 0 = OFF, 1-16 */
 static const x0x_param_t FREEPLAY_P = {"FREE PLAY", 1, 0, ONOFF_N};
 static const x0x_param_t SREP_P = {"REPEAT", 7, 0, 0};    /* the bar plays 1-8 times */
 static const char *const BATT_N[] = {"EMPTY", "1/3", "2/3", "FULL", "USB POWER", "..."};
@@ -292,6 +302,8 @@ static const x0x_param_t *pref_desc(pref_t r)
     case R_OUTLOUD: return &OUT_P;
     case R_USBFULL: return &USBA_P;
     case R_CORES: return &CORES_P;
+    case R_CCOUT: return &CCOUT_P;
+    case R_MIXCH: return &MIXCH_P;
     case R_FREEPLAY: return &FREEPLAY_P;
     case R_SREP: return &SREP_P;
     case R_BATT: return &BATT_P;
@@ -350,6 +362,8 @@ static int pref_get(pref_t r)
     case R_OUTLOUD: return proj.set.out_loud;
     case R_USBFULL: return proj.set.usb_full;
     case R_CORES: return proj.set.one_core;
+    case R_CCOUT: return proj.set.cc_out <= CC_OUT_ALL ? proj.set.cc_out : CC_OUT_OFF;
+    case R_MIXCH: return !proj.set.mix_ch ? 1 : proj.set.mix_ch > 16 ? 0 : proj.set.mix_ch;
     case R_FREEPLAY: return ui.freeplay[r.a];
     case R_SREP: return ui.song_sel < song()->len ? song()->bar[ui.song_sel].mute >> 5 : 0;
     case R_BATT: return plat_battery() < 0 ? 5 : plat_battery();
@@ -430,6 +444,8 @@ static void pref_set(pref_t r, int v)
         proj.set.one_core = (uint8_t)v;
         say("AT THE NEXT POWER-ON", 0);
         break;
+    case R_CCOUT: proj.set.cc_out = (uint8_t)v; project_apply_cc(); break;
+    case R_MIXCH: proj.set.mix_ch = (uint8_t)(v ? v : 17); project_apply_cc(); break;
     case R_FREEPLAY:
         ui.freeplay[r.a] = (uint8_t)v;
         if (!v && kbd_held_note[r.a]) {                /* a key still down: let it go */
@@ -469,6 +485,7 @@ static void pref_set(pref_t r, int v)
         break;
     default: break;
     }
+    cc_out_pref(r);
 }
 
 /* a name in capitals (the engines' own are mixed case): two at a time */
@@ -665,7 +682,8 @@ static void pref_value_of(pref_t r, int v, char *num, char *unit)
     case R_TEMPO: put_i(num, v + 20); put_s(unit, "bpm"); return;
     case R_SBAR: put_i(num, v + 1); return;
     case R_SPAT: num[0] = 'P'; put_i(num + 1, v + 1); return;
-    case R_MIDICH: if (v) put_i(num, v); else put_s(num, "OFF"); return;
+    case R_MIDICH:
+    case R_MIXCH: if (v) put_i(num, v); else put_s(num, "OFF"); return;
     case R_SREP: num[0] = 'x'; put_i(num + 1, v + 1); return;
     case R_SLEN: put_i(num, v); put_s(unit, "bar"); return;
     default: put_i(num, v); return;
@@ -989,6 +1007,8 @@ static void open_global(void)
     list_add(PR(R_NOTEOUT, 0, 0, 0));
     for (int p = 0; p < NPARTS; p++)
         list_add(PR(R_MIDICH, p, 0, 0));
+    list_add(PR(R_CCOUT, 0, 0, 0));
+    list_add(PR(R_MIXCH, 0, 0, 0));
     list_rows[ui.list_n++] = PR(R_HDR, GR_AUDIO, 0, 0);
     list_add(PR(R_OUTLOUD, 0, 0, 0));
     list_add(PR(R_USBFULL, 0, 0, 0));
@@ -1314,6 +1334,7 @@ static void do_undo(int redo)
         ui.song_sel = song()->len;
     build_pages();
     mark_dirty();
+    cc_snapshot();                                   /* a controller's rings: the values as they are now */
     undo_name(lo, hi, t);
     say(redo ? "REDO " : "UNDO ", t);
 }
@@ -1627,6 +1648,7 @@ static void run_action(int act, int arg)
         palette_set(proj.set.palette);
         mark_dirty();
         ui.outline_ok = 0;
+        cc_snapshot();
         say("FACTORY SOUND + PATTERNS", 0);
         break;
     case ACT_PERF:
@@ -1894,7 +1916,9 @@ static void turn_ref(pref_t r, int e, int knob)
         e = e > 0 ? 1 : -1;                          /* a switch: one detent, one position */
     else
         e = accel(knob, e, d->max);
+    cc_hand = 1;
     pref_set(r, pref_get(r) + e);
+    cc_hand = 0;
     motion_touch(r);
 }
 
@@ -2484,6 +2508,7 @@ static void input(void)
 {
     uint32_t btn = plat_buttons(), keys = plat_keys(), ch, i;
     int e;
+    cc_in_drain();                                     /* MIDI in's CCs: as their knobs (midicc.c) */
     ch = btn ^ ui.btn;
     for (i = 0; i < NB; i++) {
         uint32_t m = 1u << i;
@@ -2607,7 +2632,9 @@ static void input(void)
             const x0x_param_t *d = pref_desc(r);
             ui.btn_used |= 1u << B_ENV;
             if (d && r.kind != R_ACT && pref_get(r) != d->def) {
+                cc_hand = 1;
                 pref_set(r, d->def);
+                cc_hand = 0;
                 motion_touch(r);
             }
         } else
@@ -4602,6 +4629,8 @@ static void speak_dump(void)
 }
 #endif
 
+#include "midicc.c"
+
 void ui_init(void)
 {
     int i;
@@ -4627,6 +4656,7 @@ void ui_init(void)
         blit_hash[i] = 0;
     build_pages();
     undo_start();                                   /* the project as loaded is where undo stops */
+    cc_snapshot();                                  /* (loaded: a controller's rings catch up) */
 }
 
 /* AUTOSAVE: changes are saved by themselves while the pattern is stopped and nothing has been touched
@@ -4682,6 +4712,7 @@ void ui_frame(void)
     leds();
     speak();
     ann_tick(plat_ms());
+    cc_snap_tick();
     ui.frame++;
 }
 
