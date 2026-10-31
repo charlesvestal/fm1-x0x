@@ -632,7 +632,7 @@ int engine_cc_send(int t, int v, int i, int val)
 
 /* ALL: the lanes' CCs, at most CC_LANES_BLOCK a block and only with room for the notes left; the last
  * CC_ECHO_N sent, so a DAW sending them back is not taken for a hand on the knob */
-#define CC_LANES_BLOCK 8
+#define CC_LANES_BLOCK 4
 #define CC_ECHO_N 16u
 static uint8_t cc_lanes_sent POOL;
 static volatile uint32_t cc_echo[CC_ECHO_N] POOL;

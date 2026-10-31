@@ -805,7 +805,7 @@ X0X sends CCs when CC OUT (GLO) is on. KNOBS sends a knob's CC each time you cha
 with a knob, a row in a SEL list, or ENV and a knob. A CC that came in is never sent back, so a DAW
 that echoes MIDI doesn't loop. A part's level goes out twice, as CC 7 on the part's channel and as
 102–106 on MIX MIDI CH. ALL also sends what knob motion and p-locks play, for driving other synths
-with X0X's lanes. The lanes send at most 8 CCs every 6 ms, and only while there is room left for the
+with X0X's lanes. The lanes send at most 4 CCs every 6 ms, and only while there is room left for the
 notes, so a busy pattern never loses a note to its CCs. In ALL, a CC that comes back with the value a
 lane just sent is ignored.
 

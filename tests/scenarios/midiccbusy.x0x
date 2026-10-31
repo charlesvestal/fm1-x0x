@@ -1,5 +1,5 @@
 # CC OUT ALL under load (fm1-x0x#15): two dozen lanes changing every block want far more CCs than USB
-# takes; the lanes get at most 8 a block, and only while the out queue keeps room for the notes, so no note
+# takes; the lanes get at most 4 a block, and only while the out queue keeps room for the notes, so no note
 # is lost. The computer here takes 300 packets a second (a slow host).
 wait 300
 tap GLO
@@ -68,4 +68,4 @@ wait 500
 expect notedrops 0
 expect noteons >20
 expect ccouts >100
-expect ccblockmax <9
+expect ccblockmax <5
