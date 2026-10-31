@@ -75,6 +75,10 @@ The second core follows what keremimo's [Melodee](https://github.com/keremimo/me
 device (how to start it, the jobs done kept in a register), with zednaked's
 [Jangada](https://github.com/zednaked/jangada) measurements and mailbox layout.
 
+The 303's render in passes, the 909's sample voices past their end and the 808's metal bank by
+blocks are after [Optimist](https://github.com/w0ts/optimist) (henri), a fork of X0X: the same
+sound, bit for bit, for less of the CPU.
+
 Felucca's own assets that aren't under its GPL (the icon set, the panel photo and the Hügelton
 drum pack) aren't part of this fork.
 
