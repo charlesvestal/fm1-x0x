@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
+/* d8_bank_t dt (the metal bank keeps its step): after Optimist (github.com/w0ts/optimist e96d27bc, GPL-3.0-only). */
 /* X0X 808 drum part: the 8W8 TR-808 engine (athousanddetails and Gustavo Lima,
  * github.com/athousanddetails/schwung-8W8, GPL-3.0; the rim shot is Yoshinosuke Horiuchi's sc808, MIT) ported to
  * the FM-1.
@@ -120,6 +121,7 @@ typedef struct {
 
 typedef struct {                    /* six Schmitt squares, 0.32 fixed-point phases */
     uint32_t ph[6], inc[6];
+    uint32_t dt[6];                 /* Optimist: this sample's step, inc (1 + drift)(1 + jm1); changes with them only */
     float drift[6], jm1[6];         /* jitter is 1 + jm1 */
     d8_rng_t rng;
     int32_t drift_cnt;

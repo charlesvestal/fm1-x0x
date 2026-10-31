@@ -1,4 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
+/* The metal bank's kept step, its edge-free samples and bank_block: after Optimist (github.com/w0ts/optimist
+ * e96d27bc, 9f71feec, GPL-3.0-only), cheaper per-sample code, the same samples (the comments marked Optimist). */
 /* X0X 808 drum part: a C99 / float / no-libm port of 8W8 (see drum808.h).
  *
  * Every voice below is the 8W8 circuit class of the same name (sc808_*_circuit.h,
@@ -823,12 +825,23 @@ static const d8ff_t k_bank_inc[6] = {             /* oscHz / sr * 2^32 */
     {7.821515200e+07f, 7.305577993e-01f}, {5.275700000e+07f, 1.910276651e+00f}};
 #define BANK_DUTY 2060725309u                     /* phase < 0.4798 */
 
+/* Optimist: oscillator i's step, inc (1 + drift)(1 + jm1) rounded; the tick keeps it in dt[i] and works it out again
+ * only when inc, drift or jm1 change (a ratio, every 256 samples, a wrap): the same value every sample */
+static inline uint32_t bank_dt(const d8_bank_t *b, int i)
+{
+    float fm1 = b->drift[i] + b->jm1[i] + b->drift[i] * b->jm1[i];
+    float p = (float)b->inc[i] * fm1;
+    return b->inc[i] + (uint32_t)(int32_t)(p + (p >= 0.0f ? 0.5f : -0.5f));
+}
+
 static void bank_ratio(d8_bank_t *b, float r)
 {
     int i;
     r = r < 0.25f ? 0.25f : (r > 4.0f ? 4.0f : r);
-    for (i = 0; i < 6; i++)
+    for (i = 0; i < 6; i++) {
         b->inc[i] = ff_to_u32(ff_mulf(k_bank_inc[i], r));
+        b->dt[i] = bank_dt(b, i);
+    }
 }
 
 /* the two-sample polyBLEP edge correction, on fixed-point phases */
@@ -848,6 +861,8 @@ static inline float blep_fix(uint32_t t, uint32_t dt)
     return 0.0f;
 }
 
+#ifdef D8_BANK_CHECK
+/* the bank sample by sample, as 8W8 runs it: bank_block's reference (tests/host/drum808_bank_test.c) */
 D8_TICK float bank_tick(d8_bank_t *b)
 {
     float sum = 0.0f;
@@ -857,24 +872,129 @@ D8_TICK float bank_tick(d8_bank_t *b)
         for (i = 0; i < 6; i++) {
             b->drift[i] += 2.5e-4f * rng_frand2(&b->rng);
             b->drift[i] *= 0.98f;
+            b->dt[i] = bank_dt(b, i);
         }
     }
     for (i = 0; i < 6; i++) {
-        float fm1 = b->drift[i] + b->jm1[i] + b->drift[i] * b->jm1[i];
-        float p = (float)b->inc[i] * fm1, v;
-        uint32_t dt = b->inc[i] + (uint32_t)(int32_t)(p + (p >= 0.0f ? 0.5f : -0.5f));
-        uint32_t old = b->ph[i];
-        b->ph[i] = old + dt;
-        if (b->ph[i] < old || (b->pend_wrap & (1u << i))) {
-            b->pend_wrap &= (uint8_t)~(1u << i);
-            b->jm1[i] = 0.0052f * rng_frand2(&b->rng);
+        const uint32_t dt = b->dt[i], old = b->ph[i], ph = old + dt, pd = ph - BANK_DUTY;
+        b->ph[i] = ph;
+        if (ph < old || b->pend_wrap) {
+            if (ph < old || (b->pend_wrap & (1u << i))) {
+                b->pend_wrap &= (uint8_t)~(1u << i);
+                b->jm1[i] = 0.0052f * rng_frand2(&b->rng);
+                b->dt[i] = bank_dt(b, i);        /* (from the next sample) */
+            }
         }
-        v = b->ph[i] < BANK_DUTY ? 1.0f : -1.0f;
-        v += blep_fix(b->ph[i], dt);
-        v -= blep_fix(b->ph[i] - BANK_DUTY, dt);
-        sum += v * 2.5f;
+        /* Optimist: away from an edge (most samples) v is +-1 and both corrections are 0: +-2.5 exactly */
+        if (ph < dt || 0u - ph < dt || pd < dt || 0u - pd < dt) {
+            float v = ph < BANK_DUTY ? 1.0f : -1.0f;
+            v += blep_fix(ph, dt);
+            v -= blep_fix(pd, dt);
+            sum += v * 2.5f;
+        } else
+            sum += ph < BANK_DUTY ? 2.5f : -2.5f;
     }
     return sum * (1.0f / 21.0f);
+}
+#endif
+
+/* Optimist: bank_tick over a block, square by square. Each square runs on (its phase and step in registers) up to
+ * its next wrap, where 8W8 draws its jitter; the draws are made in bank_tick's order (by sample, then square; the
+ * drift's six before the squares of its sample), so every square gets the same numbers on the same samples. The
+ * squares' parts are summed per sample in bank_tick's order: the same bus. pair: the CB pair, (o5 + o6) / 2. */
+#define BANK_NONE 0x7FFF
+typedef struct { float c[6][CHUNK]; float sq[2][CHUNK]; } d8_bank_buf_t;
+
+/* square i, samples [from, lim) on its present step: its part into c, and returns the sample it wraps on (its
+ * jitter is due after it), or BANK_NONE */
+static int bank_run(d8_bank_t *b, int i, int from, int lim, d8_bank_buf_t *w)
+{
+    const uint32_t dt = b->dt[i], dt2 = dt + dt;
+    uint32_t ph = b->ph[i];
+    float *c = w->c[i], *sq = i >= 4 ? w->sq[i - 4] : 0;
+    int k = from, ev = BANK_NONE, pend = (b->pend_wrap >> i) & 1u;
+    while (k < lim) {
+        const uint32_t old = ph;
+        uint32_t pd;
+        ph = old + dt;
+        pd = ph - BANK_DUTY;
+        if (ph + dt < dt2 || pd + dt < dt2 || pend) {   /* within a step of an edge (a superset of blep_fix's != 0) */
+            float v = ph < BANK_DUTY ? 1.0f : -1.0f;
+            v += blep_fix(ph, dt);
+            v -= blep_fix(pd, dt);
+            c[k] = v * 2.5f;
+            if (sq)
+                sq[k] = ph < BANK_DUTY ? 2.5f : -2.5f;
+            if (ph < old || pend) {               /* (a wrap is always near an edge) */
+                ev = k;
+                break;
+            }
+            k++;
+        } else {
+            /* a run of samples away from the edges: +-2.5 until the step that comes within dt of the next edge
+             * e (the duty edge, or the wrap at 2^32); ph + r dt < e - dt for the r samples. dt > 0: inc >= 5e6
+             * (k_bank_inc x 0.25), 1 + drift and 1 + jm1 near 1 */
+            const uint32_t e = ph < BANK_DUTY ? BANK_DUTY : 0u;
+            const float s = ph < BANK_DUTY ? 2.5f : -2.5f;
+            uint32_t r = (e - dt - ph - 1u) / dt + 1u;
+            int j;
+            if (r > (uint32_t)(lim - k))
+                r = (uint32_t)(lim - k);
+            for (j = 0; j < (int)r; j++)
+                c[k + j] = s;
+            if (sq)
+                for (j = 0; j < (int)r; j++)
+                    sq[k + j] = s;
+            ph = old + r * dt;
+            k += (int)r;
+        }
+    }
+    b->ph[i] = ph;
+    return ev;
+}
+
+static void bank_block(d8_bank_t *b, float *bus, float *pair, int n)
+{
+    d8_bank_buf_t w;
+    int ev[6], i, k, sd = b->drift_cnt - 1;
+    if (sd < 0)
+        sd = 0;
+    if (sd >= n)
+        sd = BANK_NONE;                           /* no drift step in this block */
+    for (i = 0; i < 6; i++)
+        ev[i] = bank_run(b, i, 0, sd < n ? sd : n, &w);
+    for (;;) {
+        int j = -1;
+        for (i = 0; i < 6; i++)                   /* the earliest jitter due (by sample, then square) */
+            if (ev[i] != BANK_NONE && (j < 0 || ev[i] < ev[j]))
+                j = i;
+        if (j >= 0) {
+            b->pend_wrap &= (uint8_t)~(1u << j);
+            b->jm1[j] = 0.0052f * rng_frand2(&b->rng);
+            b->dt[j] = bank_dt(b, j);
+            ev[j] = bank_run(b, j, ev[j] + 1, sd < n ? sd : n, &w);
+            continue;
+        }
+        if (sd >= n)
+            break;
+        for (i = 0; i < 6; i++) {                 /* the drift, at the start of sample sd */
+            b->drift[i] += 2.5e-4f * rng_frand2(&b->rng);
+            b->drift[i] *= 0.98f;
+            b->dt[i] = bank_dt(b, i);
+        }
+        for (i = 0; i < 6; i++)
+            ev[i] = bank_run(b, i, sd, n, &w);
+        b->drift_cnt = 256 + 1 + sd;              /* (less the n below: 256 - (n - 1 - sd)) */
+        sd = BANK_NONE;
+    }
+    b->drift_cnt -= n;
+    for (k = 0; k < n; k++) {
+        float sum = 0.0f;
+        for (i = 0; i < 6; i++)
+            sum += w.c[i][k];
+        bus[k] = sum * (1.0f / 21.0f);
+        pair[k] = (w.sq[0][k] + w.sq[1][k]) * 0.5f;
+    }
 }
 
 /* ---- metal envelope ---- */
@@ -1713,14 +1833,8 @@ static void d8_render(drum808_t *d, float *dry, float *rev, float *dly, int n)
                 d->pan_dr[l] = x0x_glide_block(&d->pan_rc[l], d->pan_r[l], m);
             }
         /* the shared bank runs only while a metal voice sounds */
-        if (cb_on || lane_on(d, L_CH) || lane_on(d, L_OH) || lane_on(d, L_CY)) {
-            d8_bank_t *b = &d->bank;
-            for (i = 0; i < m; i++) {
-                bus[i] = bank_tick(b);
-                if (cb_on)
-                    pair[i] = ((b->ph[4] < BANK_DUTY ? 2.5f : -2.5f) + (b->ph[5] < BANK_DUTY ? 2.5f : -2.5f)) * 0.5f;
-            }
-        }
+        if (cb_on || lane_on(d, L_CH) || lane_on(d, L_OH) || lane_on(d, L_CY))
+            bank_block(&d->bank, bus, pair, m);   /* Optimist: bank_tick m times, by blocks */
         for (l = 0; l < L_NUM; l++) {
             d8_lane_t *ln = &d->lane[l];
             int mm = m, got;
