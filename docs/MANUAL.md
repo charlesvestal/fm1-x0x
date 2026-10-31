@@ -541,11 +541,7 @@ There is one reverb and one delay, and every part can send to both: each part's 
 mixer's PARTS page (LFO), each drum track's on 909 MIX and 808 MIX. FX shows how much every part
 sends, and has two pages:
 
-- REVERB: DECAY and TONE. The reverb is stereo: whatever you send it comes back wide. It comes in two
-  types, REV TYPE in SEL's list: CLASSIC (a new project's, and every project's saved before REV TYPE
-  existed) is the original one, grainier and more metallic, an early digital rack's sound; ROOM is
-  smoother and denser, and takes a little more of the processor. DECAY and TONE do the same on both,
-  as near as two different reverbs allow; changing the type cuts off the tail that is ringing.
+- REVERB: DECAY and TONE. The reverb is a smooth stereo reverb: whatever you send it comes back wide.
 - DELAY: TIME (in note values from 1/32 to a dotted half note), FEEDBACK, TONE and TAPE. TAPE at
   the far left (DIGI) is a clean 12-bit digital delay; turned up, it is a tape delay that wobbles,
   saturates and wears more the further you turn it, and can feed back on itself at high feedback.
@@ -915,7 +911,7 @@ in SEL's list; the rest are its sound pages.
 
 | Effect page | Settings |
 |---|---|
-| REVERB | Decay, Tone; in the list: low cut, type (CLASSIC or ROOM), return level |
+| REVERB | Decay, Tone; in the list: low cut, return level |
 | DELAY | Time (1/32, 1/16T, 1/16, 1/8T, 1/16., 1/8, 1/4T, 1/8., 1/4, 1/2T, 1/4., 1/2, 1/2.), Feedback, Tone, Tape (DIGI, then tape and its wear); in the list: low cut, return level, ping-pong |
 | MASTER | Drive, Comp, Pump, Filter; in the list: the compressor's details, pump by, resonance, limiter, the drive's type, glue and volume |
 
@@ -938,6 +934,7 @@ firmware, you must also share its source code.
 - The 909 is from **9W9** by athousanddetails, which is based on **ER-99** by Matthew
   Cieplak. Its hat and cymbal samples are ER-99's.
 - The 808 is from **8W8** by athousanddetails.
+- The reverb is by **luchak**.
 - The 303 is from **schwung-303**, built on Open303 by Robin Schmidt (MIT licence), with
   extensions based on jc303 and dm-Rat.
 - TB-3PO is from **schwung-tb3po**, which comes from the Phazerville Hemisphere Suite.

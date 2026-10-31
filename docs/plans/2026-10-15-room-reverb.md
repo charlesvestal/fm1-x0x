@@ -1,5 +1,9 @@
 # ROOM: the second reverb type
 
+ROOM replaced CLASSIC on 2026-10-31: it is X0X's only reverb, and REV TYPE is gone. The knob mapping
+below was fitted against CLASSIC with `tools/fit_room.py`, which was removed with CLASSIC (it is in
+the history before that commit).
+
 ROOM is X0X's second reverb type (REV TYPE), alongside CLASSIC (9W9's four combs and two allpasses).
 It is an 8-line feedback delay network. Its tail is denser than CLASSIC's and has no metallic ring,
 and for the same knob settings it has CLASSIC's decay time and loudness. The code is in

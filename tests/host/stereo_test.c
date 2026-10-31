@@ -3,7 +3,7 @@
  * ones (themselves held to 9W9 and Open303 references elsewhere):
  *  - master_process_st with l == r is master_process, bit for bit, compressor, PUMP, filter, limiter;
  *  - fxbus_process_st with dry l == r and no reverb is fxbus_process on both sides, bit for bit;
- *  - with reverb, the left is 9W9's mono reverb exactly and the right is a different (decorrelated) one;
+ *  - with reverb, the left is the mono reverb exactly and the right is a different (decorrelated) one;
  *  - PING: an impulse into the delay comes back on the left one time later, on the right two.
  *  - WIDTH: at 0 every echo is centred (left and right the same), and at any width each echo keeps
  *    its power. */
@@ -110,7 +110,7 @@ int main(void)
     }
     check(same, "fx: centred stereo, no reverb == mono, bit for bit (dist, delay, glue comp)");
 
-    {   /* the reverb: left = 9W9's, right = its own */
+    {   /* the reverb: left = the mono one, right = its own */
         double sl = 0, sr = 0, slr = 0;
         fxbus_init(&f1, dl1, 88200);
         fxbus_init(&f2, dl2, 88200);
@@ -129,7 +129,7 @@ int main(void)
                 slr += (double)l[i] * r[i];
             }
         }
-        check(same, "reverb: the left is 9W9's mono reverb exactly");
+        check(same, "reverb: the left is the mono reverb exactly");
         printf("       L/R correlation %.2f, R/L level %.2f dB\n", slr / sqrt(sl * sr), 10 * log10(sr / sl));
         check(fabs(slr / sqrt(sl * sr)) < 0.5 && fabs(10 * log10(sr / sl)) < 3.0, "reverb: the right is decorrelated, as loud");
     }

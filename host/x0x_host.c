@@ -800,8 +800,6 @@ static int expect(const char *what, const char *val)
         got = seq.ppat[atoi(what + 4) % NPARTS] + 1;
     else if (!strcmp(what, "dlwb"))                /* ping-pong: an echo's share on the other side, x 1000 */
         got = (int)(engine_fx_dl_wb() * 1000.0f + 0.5f);
-    else if (!strcmp(what, "rvtype"))              /* the reverb's type in the engine: 0 CLASSIC, 1 ROOM */
-        got = engine_fx_rv_type();
     else if (!strcmp(what, "perftest"))            /* -1 idle, 0..2 running, 3 done */
         got = perf.test;
     else if (!strncmp(what, "perfres", 7))         /* perfresK: scenario K's share of the CPU x 10 */

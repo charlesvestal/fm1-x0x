@@ -1,16 +1,14 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* X0X send FX and master, shared by the drum and bass parts. A port of 9W9's
- * (GPL-3.0) send reverb, tempo-synced delay and master stage:
+/* X0X send FX and master, shared by the drum and bass parts: a send reverb, and a
+ * port of 9W9's (GPL-3.0) tempo-synced delay and master stage:
  *
  *   out = volume * glue( dist( dry + reverb(rev) + delay(dly) ) )
  *
- *  - Reverb, two types (FX_RV_TYPE; RvDec, RvTone, RvHPF and RvLvl serve both):
- *    CLASSIC is 9W9's: four combs + two allpasses, the comb loop quantised to 12 bits
- *    (the early-rack grain), damping in the loop, HPF on the send. ROOM (X0X) is
- *    smoother: the HPF, four allpass diffusers, then an 8-line feedback delay network
- *    (Hadamard mixing, a one-pole damper per line) whose lines are kept block-float:
- *    8-bit mantissas sharing an exponent per 16 samples (headroom without clipping,
- *    precision that follows the tail down, in CLASSIC's memory).
+ *  - Reverb: ROOM (luchak's, X0X): the HPF on the send, four allpass diffusers, then an
+ *    8-line feedback delay network (Hadamard mixing, a one-pole damper per line) whose
+ *    lines are kept block-float: 8-bit mantissas sharing an exponent per 16 samples
+ *    (headroom without clipping, precision that follows the tail down). It replaced 9W9's
+ *    combs and allpasses; its knobs were fitted to their decay, so settings carry over.
  *  - Delay: a note division of the tempo, slewed so time changes warp instead of
  *    clicking, feedback through a darkening one-pole, 12-bit write, HPF on the
  *    send. TYPE = DIGI is 9W9's delay exactly. TYPE = TAPE (an X0X addition, for
@@ -22,20 +20,14 @@
  *
  * The delay line is int16 (9W9 writes it at 12 bits, so nothing is lost; values
  * past +-16 full scale saturate) and is passed in by the caller (.pool). The reverb's
- * lines are inside the struct (fx_rv_buf_t, shared by the two types: switching clears
- * it). Both effects go idle (no per-sample work) once their input and their lines are
- * silent. */
+ * lines are inside the struct (fx_room_t). Both effects go idle (no per-sample work)
+ * once their input and their lines are silent. */
 #pragma once
 #include <stdint.h>
 #include "x0x_param.h"
 #include "drum909_dsp.h"
 
-#define FX_RV_COMB_TOTAL (1116 + 1188 + 1277 + 1356)
-#define FX_RV_AP_TOTAL (556 + 441)
-#define FX_RV_APR_TOTAL (579 + 457)   /* X0X: the right side's allpasses */
-/* ROOM's state (fx_room_t) shares the reverb's buffer with CLASSIC's lines (fx_rv_buf_t), so the two
- * types cost the larger of the two, not the sum. The design and the block format:
- * docs/plans/2026-10-15-room-reverb.md.
+/* ROOM's state (fx_room_t). The design and the block format: docs/plans/2026-10-15-room-reverb.md.
  *
  * Each of the 8 lines is a ring of 16-sample blocks. A block is 16 8-bit mantissas and one exponent
  * byte. A line of length L has L / 16 + 1 blocks, the fewest that hold its L samples: at the start of
@@ -82,16 +74,16 @@ typedef struct {
     /* the emphasis around the lines' storage (fxbus.c, FX_RM_EMPH): the last diffused input, and the
      * last L and R outputs */
     float emph_x, emph_l, emph_r;
-    /* the output gain, the energy match to CLASSIC (fx_room_coeffs); the blocks committed silent
-     * (input and lines) in a row; and the place in the blocks being filled (all lines together) */
+    /* the output gain (fx_room_coeffs); the blocks committed silent (input and lines) in a row; and
+     * the place in the blocks being filled (all lines together) */
     float out_gain;
     int32_t quiet;
     uint8_t pos;
     /* each line's ring: its first block in exp / man, its number of blocks, and the block being
      * written (the read's first block too: see above) */
     uint16_t base[FX_RM_N], nblk[FX_RM_N], wblk[FX_RM_N];
-    /* the input diffusers: each one's place, and their lines, x2048: CLASSIC's combs' step and range
-     * (+-16), which the loudest send X0X can make (every part at level 127 with its send up) leaves
+    /* the input diffusers: each one's place, and their lines, x2048: a step of 1/2048 and a range
+     * of +-16, which the loudest send X0X can make (every part at level 127 with its send up) leaves
      * about half of */
     int16_t dif_pos[4];
     int16_t dif[FX_RM_DIF_TOTAL];
@@ -102,38 +94,18 @@ typedef struct {
 _Static_assert(FX_RM_BLOCKS <= 65535, "ROOM's rings: their blocks are numbered in uint16_t");
 _Static_assert(FX_RM_D0 <= 32767 && FX_RM_D1 <= 32767 && FX_RM_D2 <= 32767 && FX_RM_D3 <= 32767,
                "ROOM's diffusers: their places are int16_t");
-/* The reverb's buffer (fxbus_t rv): either type's lines, one type at a time. Each is reached through
- * its own member, and a change of FX_RV_TYPE clears the buffer between them. */
-typedef union {
-    struct {
-        float ap[FX_RV_AP_TOTAL];     /* the left's allpasses (9W9's) */
-        float apr[FX_RV_APR_TOTAL];   /* the right's */
-        int16_t comb[FX_RV_COMB_TOTAL];
-    } classic;
-    fx_room_t room;
-} fx_rv_buf_t;
-_Static_assert(sizeof(fx_room_t) <= sizeof(((fx_rv_buf_t *)0)->classic),
-               "ROOM's state must fit in CLASSIC's lines, so that ROOM adds no memory");
-enum { FX_RV_CLASSIC, FX_RV_ROOM };   /* FX_RV_TYPE's values (CLASSIC: fxbus_init's); a change cuts the tail */
-
 /* FX parameters. A sound keeps 16 a voice, so the engine stores parameter k at FX's voice k / 16,
  * index k % 16 (engine.h). */
 enum { FX_VOLUME, FX_DIST, FX_DRIVE, FX_COMP,
        FX_RV_DECAY, FX_RV_TONE, FX_RV_HPF, FX_RV_LEVEL,
        FX_DL_TIME, FX_DL_FDBK, FX_DL_TONE, FX_DL_LEVEL,
        FX_DL_HPF, FX_DL_TYPE, FX_DL_WEAR, FX_DL_PING,
-       FX_DL_TAPE, FX_DL_WIDTH, FX_RV_TYPE, FX_NPARAMS };
+       FX_DL_TAPE, FX_DL_WIDTH, FX_NPARAMS };
 
 struct fxbus {
     /* reverb */
-    float rv_decay, rv_tone, rv_level;
+    float rv_level;
     d9_biquad_t rv_hp;
-    int32_t cpos[4], apos[2];
-    float cdmp[4];
-    int32_t rv_quiet;
-    int32_t aposr[2];                 /* X0X stereo: the right side reads the combs with alternating
-                                       * signs through its own allpasses (the left is 9W9's) */
-    int32_t rv_type;                  /* FX_RV_CLASSIC / FX_RV_ROOM */
     /* delay */
     float dl_time_ms, dl_fdbk, dl_tone, dl_level, bpm, wear;
     int32_t dl_div, dl_type;
@@ -152,8 +124,7 @@ struct fxbus {
     float crush_st[2], crush_str[2];
     float comp_env_db, comp_det, c_thr, c_slope, c_makeup, c_drel, c_atk, c_rel;
     uint8_t pots[FX_NPARAMS];
-    fx_rv_buf_t rv;                   /* the reverb's lines, CLASSIC's or ROOM's (last, so that the fields
-                                       * above, and the code that reaches them, stay as they were) */
+    fx_room_t room;                   /* the reverb's lines and state */
 };
 typedef struct fxbus fxbus_t;
 

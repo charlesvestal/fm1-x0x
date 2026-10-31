@@ -1,13 +1,10 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* Send reverb, synced delay and master stage: a port of 9W9's er99_verb_tick,
- * er99_dly_tick, master distortion and master_glue (GPL-3.0). See fxbus.h. */
+/* Send reverb (ROOM, X0X's own), synced delay and master stage. The delay and the master are a port
+ * of 9W9's er99_dly_tick, master distortion and master_glue (GPL-3.0). See fxbus.h. */
 #include "fxbus.h"
 
-static const int32_t fx_cl[4] = { 1116, 1188, 1277, 1356 };
-static const int32_t fx_al[2] = { 556, 441 };
-static const int32_t fx_alr[2] = { 579, 457 };
-#define FX_RV_QUIET (1356 + 8192)          /* combs silent this long: the allpass tail is < -140 dB */
 static void fx_room_coeffs(fxbus_t *f);
+static void fx_room_reset(fxbus_t *f);
 
 /* 1/32 1/16T 1/16 1/8T 1/16. 1/8 1/4T 1/8. 1/4 1/2T 1/4. 1/2 1/2. (in beats) */
 static const float fx_beats[13] = {
@@ -29,7 +26,6 @@ static const char *const fx_div_names[13] = {
 };
 static const char *const fx_type_names[2] = { "DIGI", "TAPE" };
 static const char *const fx_onoff_names[2] = { "OFF", "ON" };
-static const char *const fx_rv_type_names[2] = { "CLASSIC", "ROOM" };
 
 /* pot defaults: the positions 9W9 seeds from its defaults (the engine itself
  * starts on the exact defaults) */
@@ -54,7 +50,6 @@ static const fx_pspec_t fx_p[FX_NPARAMS] = {
      * left. It sets DlType and Wear, which are what the delay plays; it plays nothing itself. */
     [FX_DL_TAPE]  = { { "Tape", 127, 72, 0 }, CV_SW, 0, 0.0f, 0.0f },
     [FX_DL_WIDTH] = { { "Width", 127, 127, 0 }, CV_LIN, 0, 0.0f, 1.0f },   /* X0X: ping-pong's */
-    [FX_RV_TYPE]  = { { "RvType", 1, 0, fx_rv_type_names }, CV_SW, 0, 0.0f, 0.0f },   /* X0X */
 };
 
 int fxbus_nparams(void) { return FX_NPARAMS; }
@@ -105,7 +100,6 @@ static void fx_dl_width(fxbus_t *f, float w)
         f->dl_wb = fm_sqrtf(0.5f - 0.5f * w);
     }
 }
-static void fx_rv_type(fxbus_t *f, int type);
 
 static void fx_apply(fxbus_t *f, int i, float v)
 {
@@ -114,8 +108,8 @@ static void fx_apply(fxbus_t *f, int i, float v)
     case FX_DIST: f->dist_mode = (int32_t)v; break;
     case FX_DRIVE: f->drive = v; break;
     case FX_COMP: f->comp = v < 0.0f ? 0.0f : (v > 1.0f ? 1.0f : v); fx_comp_prep(f); break;
-    case FX_RV_DECAY: f->rv_decay = v; fx_room_coeffs(f); break;
-    case FX_RV_TONE: f->rv_tone = v; fx_room_coeffs(f); break;
+    case FX_RV_DECAY:
+    case FX_RV_TONE: fx_room_coeffs(f); break;   /* from the pots (fx_room_coeffs) */
     case FX_RV_HPF: d9_biquad_set(&f->rv_hp, D9_HP, v, 0.7071f); break;
     case FX_RV_LEVEL: f->rv_level = v; break;
     case FX_DL_TIME: f->dl_div = (int32_t)v; fx_retime(f); break;
@@ -127,7 +121,6 @@ static void fx_apply(fxbus_t *f, int i, float v)
     case FX_DL_WEAR: f->wear = v; break;
     case FX_DL_PING: f->dl_ping = (int32_t)v; break;
     case FX_DL_WIDTH: fx_dl_width(f, v); break;
-    case FX_RV_TYPE: fx_rv_type(f, (int)v); break;
     default: break;
     }
     if (i == FX_DIST || i == FX_DRIVE)
@@ -160,17 +153,6 @@ void fxbus_set_bpm(fxbus_t *f, float bpm)
     }
 }
 
-/* Clear the reverb's buffer, whichever type's lines it holds: in words that may alias either (it runs
- * in the audio interrupt when the type changes, so unrolled: about 7k cycles, not 40k). */
-static void fx_rv_clear(fx_rv_buf_t *b)
-{
-    typedef uint32_t D9_MAY_ALIAS fx_word_t;
-    fx_word_t *w = (fx_word_t *)(void *)b;
-    D9_UNROLL(8)
-    for (unsigned i = 0; i < sizeof *b / sizeof *w; ++i)
-        w[i] = 0;
-}
-
 void fxbus_init(fxbus_t *f, int16_t *dly_buf, int dly_len)
 {
     uint8_t *p = (uint8_t *)f;
@@ -180,11 +162,10 @@ void fxbus_init(fxbus_t *f, int16_t *dly_buf, int dly_len)
         dly_buf[i] = 0;
     f->dbuf = dly_buf;
     f->dlen = dly_len;
-    f->rv_type = FX_RV_CLASSIC;
 
-    f->rv_decay = 0.62f; f->rv_tone = 0.45f; f->rv_level = 0.8f;
+    f->rv_level = 0.8f;
     d9_biquad_set(&f->rv_hp, D9_HP, 150.0f, 0.7071f);
-    f->rv_quiet = FX_RV_QUIET;
+    fx_room_reset(f);
 
     f->dl_div = 7;
     f->bpm = 120.0f;
@@ -209,84 +190,7 @@ void fxbus_init(fxbus_t *f, int16_t *dly_buf, int dly_len)
 
     for (int i = 0; i < FX_NPARAMS; ++i)
         f->pots[i] = fx_p[i].ui.def;
-}
-
-/* ===================================================================== */
-/* Reverb (er99_verb_tick), adds its return into out                      */
-/* ===================================================================== */
-static void fx_reverb(fxbus_t *f, const float *in, float *out, float *out_r, int n)
-{
-    if (f->rv_quiet >= FX_RV_QUIET) {
-        int any = 0;
-        for (int i = 0; i < n; ++i)
-            any |= in[i] != 0.0f;
-        if (!any)
-            return;                         /* silent in, silent lines: 0 out */
-    }
-    const float damp = 0.75f - f->rv_tone * 0.55f;
-    const float fb = f->rv_decay;
-    const float lvl = f->rv_level;
-    float *const ap = f->rv.classic.ap, *const apr = f->rv.classic.apr;
-    int16_t *cb[4];
-    cb[0] = f->rv.classic.comb;
-    cb[1] = cb[0] + fx_cl[0];
-    cb[2] = cb[1] + fx_cl[1];
-    cb[3] = cb[2] + fx_cl[2];
-    float *ab0 = ap, *ab1 = ap + fx_al[0];
-    float *ar0 = apr, *ar1 = apr + fx_alr[0];
-    int32_t quiet = f->rv_quiet;
-    for (int i = 0; i < n; ++i) {
-        const float x = d9_biquad_tick(&f->rv_hp, in[i]);
-        float acc = 0.0f, acc_r = 0.0f;
-        int32_t wr = 0;
-        for (int c = 0; c < 4; ++c) {
-            int16_t *b = cb[c];
-            const int32_t p = f->cpos[c];
-            const float y = (float)b[p] * (1.0f / 2048.0f);
-            acc += y;
-            acc_r += (c & 1) ? -y : y;
-            f->cdmp[c] = y + (f->cdmp[c] - y) * damp;
-            /* the loop runs at 12 bits, truncated toward zero (no DC) */
-            int32_t k = (int32_t)((x + f->cdmp[c] * fb) * 2048.0f);
-            if (k > 32767) k = 32767;
-            if (k < -32767) k = -32767;
-            b[p] = (int16_t)k;
-            wr |= k;
-            f->cpos[c] = p + 1 >= fx_cl[c] ? 0 : p + 1;
-        }
-        float y = acc * 0.25f;
-        {
-            const int32_t p = f->apos[0];
-            const float bo = ab0[p];
-            ab0[p] = y + bo * 0.5f;
-            y = bo - y * 0.5f;
-            f->apos[0] = p + 1 >= fx_al[0] ? 0 : p + 1;
-        }
-        {
-            const int32_t p = f->apos[1];
-            const float bo = ab1[p];
-            ab1[p] = y + bo * 0.5f;
-            y = bo - y * 0.5f;
-            f->apos[1] = p + 1 >= fx_al[1] ? 0 : p + 1;
-        }
-        out[i] += y * lvl;
-        if (out_r) {                        /* the right: the combs, alternate signs, its own allpasses */
-            float yr = acc_r * 0.25f;
-            int32_t p = f->aposr[0];
-            float bo = ar0[p];
-            ar0[p] = yr + bo * 0.5f;
-            yr = bo - yr * 0.5f;
-            f->aposr[0] = p + 1 >= fx_alr[0] ? 0 : p + 1;
-            p = f->aposr[1];
-            bo = ar1[p];
-            ar1[p] = yr + bo * 0.5f;
-            yr = bo - yr * 0.5f;
-            f->aposr[1] = p + 1 >= fx_alr[1] ? 0 : p + 1;
-            out_r[i] += yr * lvl;
-        }
-        quiet = (wr == 0 && in[i] == 0.0f) ? quiet + 1 : 0;
-    }
-    f->rv_quiet = quiet;
+    fx_room_coeffs(f);                    /* from the pots */
 }
 
 /* ===================================================================== */
@@ -304,9 +208,9 @@ static inline float fx_psin(uint32_t ph)                 /* parabolic sine of a 
 /* The design, its storage format and its measured costs: docs/plans/2026-10-15-room-reverb.md. */
 
 /* The lines' lengths (fxbus.h). Primes, so no two lines have a resonance in common below the sample
- * rate, spread over about an octave (25.5 .. 50.9 ms); the shortest is just above CLASSIC's shortest
- * comb, so the room sounds the same size. All are equal modulo 16, so every line's read starts at
- * the same place in a block (fx_rm_fetch_all).
+ * rate, spread over about an octave (25.5 .. 50.9 ms); the shortest is just above the shortest comb
+ * of the former CLASSIC reverb (9W9's), so the room sounds the same size. All are equal modulo 16, so
+ * every line's read starts at the same place in a block (fx_rm_fetch_all).
  *
  * Their order, and the input's signs (fx_rm_net), decide which lines the mix adds and subtracts at
  * each stage, and so how echoes that took different paths of about the same length add up. That sets
@@ -320,7 +224,7 @@ _Static_assert(FX_RM_L0 <= FX_RM_LMAX && FX_RM_L1 <= FX_RM_LMAX && FX_RM_L2 <= F
 /* The input diffusers (fxbus.h): allpasses in series, which fill in the first 100 ms. */
 static const int32_t fx_rm_dif_len[4] = { FX_RM_D0, FX_RM_D1, FX_RM_D2, FX_RM_D3 };
 static const float fx_rm_dif_gain[4] = { FX_RM_G0, FX_RM_G1, FX_RM_G2, FX_RM_G3 };
-#define FX_RM_DSCALE 2048.0f                /* the diffusers' int16 units: 1.0 is 2048 (CLASSIC's combs') */
+#define FX_RM_DSCALE 2048.0f                /* the diffusers' int16 units: 1.0 is 2048 */
 /* Emphasis around the lines' storage: the network's input is pre-emphasized after the diffusers,
  * x - FX_RM_EMPH x[-1], and its outputs are de-emphasized, y + FX_RM_EMPH y[-1]. The network is linear,
  * so the two cancel, except on the lines' rounding noise, which only the de-emphasis filters: the
@@ -331,7 +235,7 @@ static const float fx_rm_dif_gain[4] = { FX_RM_G0, FX_RM_G1, FX_RM_G2, FX_RM_G3 
  * the lines' low frequencies, where a tail ends, by 1 - FX_RM_EMPH. */
 #define FX_RM_TINY (1e-6f * (1.0f - FX_RM_EMPH))
 
-static inline fx_room_t *fx_rm(fxbus_t *f) { return &f->rv.room; }
+static inline fx_room_t *fx_rm(fxbus_t *f) { return &f->room; }
 
 /* Return 2^e as a float (e within the normal range). */
 static inline float fx_pow2i(int32_t e)
@@ -503,13 +407,11 @@ static void fx_room_times(fx_room_t *rm, float t_dc, float t_ny)
 }
 
 /* Set ROOM's decay and output gain from RvDec and RvTone. The knobs map to the decay times t_dc and
- * t_ny, and to the output gain out_gain, by polynomials fitted to CLASSIC's decay as heard and to its
- * loudness over the knobs' range (tools/fit_room.py, which prints them; the design doc has the
- * method). Do nothing unless ROOM is selected: otherwise the buffer is CLASSIC's. */
+ * t_ny, and to the output gain out_gain, by polynomials fitted to the decay as heard of the former
+ * CLASSIC reverb (9W9's) and to its loudness over the knobs' range, so that settings carry over (the
+ * design doc has the method). */
 static void fx_room_coeffs(fxbus_t *f)
 {
-    if (f->rv_type != FX_RV_ROOM)
-        return;
     const float x = (float)f->pots[FX_RV_DECAY] * (1.0f / 127.0f);
     const float y = (float)f->pots[FX_RV_TONE] * (1.0f / 127.0f);
     const float t_dc = fm_expf(-1.7984f + x * (1.1228f + x * (-0.6857f + x * 2.1048f)) + 0.0597f * y);
@@ -520,7 +422,7 @@ static void fx_room_coeffs(fxbus_t *f)
     rm->out_gain = 1.8963f + 0.3712f * x + 0.1889f * y;
 }
 
-/* Set ROOM's state as at power-on, in a cleared buffer: lay out the rings, and start each line's read
+/* Set ROOM's state as at power-on, in a cleared struct: lay out the rings, and start each line's read
  * L samples behind its write. */
 static void fx_room_reset(fxbus_t *f)
 {
@@ -734,26 +636,6 @@ static void fx_room(fxbus_t *f, const float *in, float *out, float *out_r, int n
     rm->quiet = quiet;
 }
 
-/* Set the reverb's type (FX_RV_TYPE): the two share the buffer, so a change clears it, cutting the tail. */
-static void fx_rv_type(fxbus_t *f, int type)
-{
-    type = type ? FX_RV_ROOM : FX_RV_CLASSIC;
-    if (type == f->rv_type)
-        return;
-    f->rv_type = type;
-    fx_rv_clear(&f->rv);
-    for (int c = 0; c < 4; ++c) {
-        f->cpos[c] = 0;
-        f->cdmp[c] = 0.0f;
-    }
-    f->apos[0] = f->apos[1] = f->aposr[0] = f->aposr[1] = 0;
-    f->rv_quiet = FX_RV_QUIET;
-    if (type == FX_RV_ROOM) {
-        fx_room_reset(f);
-        fx_room_coeffs(f);
-    }
-}
-
 /* the line at d samples behind w, interpolated (X0X: the ping-pong tap) */
 static inline float dl_tap(const int16_t *buf, int32_t len, float flen, int32_t w, float d)
 {
@@ -908,16 +790,12 @@ void fxbus_process(fxbus_t *f, const float *dry, const float *rev, const float *
 {
     if (n > 256)
         n = 256;
-    for (int i = 0; i < n; ++i)
+    float discard[256];                           /* ROOM's right side, unused in mono */
+    for (int i = 0; i < n; ++i) {
         out[i] = dry[i];
-    if (f->rv_type == FX_RV_ROOM) {
-        float discard[256];                       /* ROOM's right side, unused in mono */
-        for (int i = 0; i < n; ++i)
-            discard[i] = 0.0f;
-        fx_room(f, rev, out, discard, n);
-    } else {
-        fx_reverb(f, rev, out, 0, n);
+        discard[i] = 0.0f;
     }
+    fx_room(f, rev, out, discard, n);
     fx_delay(f, dly, out, 0, n);
 
     if (f->dist_mode >= 1) {
@@ -964,10 +842,7 @@ void fxbus_process_st(fxbus_t *f, const float *dry_l, const float *dry_r, const 
         out_l[i] = dry_l[i];
         out_r[i] = dry_r[i];
     }
-    if (f->rv_type == FX_RV_ROOM)
-        fx_room(f, rev, out_l, out_r, n);
-    else
-        fx_reverb(f, rev, out_l, out_r, n);
+    fx_room(f, rev, out_l, out_r, n);
     fx_delay(f, dly, out_l, out_r, n);
     if (f->dist_mode >= 1) {
         const float k = f->drive;

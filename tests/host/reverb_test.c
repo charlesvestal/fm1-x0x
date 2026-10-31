@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
-/* The reverb's ROOM type (fxbus.c).
+/* The reverb, ROOM (fxbus.c).
  *
  * Most of this compares ROOM's output with a float reference written out here: the same network (the
  * high-pass, the diffusers, eight lines with their dampers, the mix and the output filter), with plain
@@ -9,8 +9,7 @@
  * allows 30 (REF_DB). Anything else that differs in ROOM's signal path fails it: a read or write in the
  * wrong place, a wrong sign, a wrong damper or filter, even a diffuser's gain 2 % off. A wrong
  * coefficient passes, since both sides use the same ones (the loop gains, the dampers, the knob
- * mapping); a separate, coarse check holds ROOM's decay to CLASSIC's, and tools/fit_room.py --check
- * measures it closely.
+ * mapping); a separate check holds ROOM's decay times to those measured when they were set.
  *
  * Checked:
  *  - a block of a line comes back from storage (fx_rm_commit, fx_rm_unpack) within half a step, at
@@ -19,14 +18,14 @@
  *    irregular sizes, as the engine's are (split at sequencer events);
  *  - the tail sounds until the reference's is under -105 dB (no gate above ROOM's own, FX_RM_TINY),
  *    then reaches exact silence, and ROOM goes idle;
- *  - ROOM's decay time is roughly CLASSIC's, at settings across the knobs and in three bands;
+ *  - ROOM's decay times at settings across the knobs, in three bands, are as measured when the knob
+ *    mapping was last changed (within 10 %);
  *  - L and R are uncorrelated and as loud;
  *  - RvLvl 0 is silent;
  *  - a full-scale send at the longest decay stays finite;
- *  - switching type cuts the tail cleanly;
  *  - turning RvDec or RvTone while ROOM plays sets the coefficients of a fresh ROOM;
  *  - mono is the stereo left.
- * Last, it prints the host time per sample against CLASSIC's (information only).
+ * Last, it prints the host time per sample (information only).
  *
  * The sends and the test blocks are pseudo-random from a fixed seed for each check, so every run is
  * the same. fxbus.c is included, not linked, for the block format's static functions. */
@@ -54,7 +53,7 @@ static int16_t dl1[88200], dl2[88200];
 static const float zero[N];
 
 /* ---- the lines' block format (fx_rm_commit, fx_rm_unpack) ---- */
-static fx_rv_buf_t rvb;                                     /* line 0's ring starts at block 0 */
+static fx_room_t rvb;                                       /* line 0's ring starts at block 0 */
 
 /* Store v[0 .. 16) as a block of line 0, decode it into out (at gain 1) and check it. A block whose peak
  * is under FX_RM_TINY must come back as zeros. Any other must come back within half a step of v, at
@@ -62,7 +61,7 @@ static fx_rv_buf_t rvb;                                     /* line 0's ring sta
  * mantissa's range). Return whether the block passed. */
 static int block_ok(const float *v, float *out)
 {
-    fx_room_t *rm = &rvb.room;
+    fx_room_t *rm = &rvb;
     float peak = 0;
     int ok;
     for (int k = 0; k < FX_RM_BLK; k++) {
@@ -100,7 +99,7 @@ static void test_block_format(void)
     const float EDGE[] = {127.5f / 128, nextafterf(127.5f / 128, 0.0f), 1.0f, -127.5f / 128, -1.0f, 15.9f,
                           FX_RM_TINY};
     const float WHOLE[] = {nextafterf(FX_RM_TINY, 0.0f), 0.0f, -0.0f};
-    const fx_room_t *rm = &rvb.room;
+    const fx_room_t *rm = &rvb;
     const int32_t off = FX_RM_OFF(FX_RM_L0);
     float v[FX_RM_BLK], out[FX_RM_BLK], part[FX_RM_BLK];
     int bad = 0, same = 1;
@@ -157,11 +156,10 @@ typedef struct {
 } ref_t;
 static ref_t R;
 
-/* Run the reference over in[0 .. n) into ol and orr, with the coefficients and output gain of f (a
- * ROOM). */
+/* Run the reference over in[0 .. n) into ol and orr, with the coefficients and output gain of f. */
 static void ref_run(ref_t *r, const fxbus_t *f, const float *in, float *ol, float *orr, int n)
 {
-    const fx_room_t *rm = &f->rv.room;
+    const fx_room_t *rm = &f->room;
     const float lvl = f->rv_level * rm->out_gain * 0.35355339f * rm->tap_k;
     for (int i = 0; i < n; i++) {
         float x = d9_biquad_tick(&r->hp, in[i]), s[8];
@@ -196,9 +194,9 @@ static void ref_run(ref_t *r, const fxbus_t *f, const float *in, float *ol, floa
     }
 }
 
-/* Set f up fresh, with only the reverb heard (no distortion or glue, full volume): the given type, RvDec
- * and RvTone, and every other knob at its default. */
-static void setup(fxbus_t *f, int16_t *dl, int type, int dec, int tone)
+/* Set f up fresh, with only the reverb heard (no distortion or glue, full volume): the given RvDec and
+ * RvTone, and every other knob at its default. */
+static void setup(fxbus_t *f, int16_t *dl, int dec, int tone)
 {
     fxbus_init(f, dl, 88200);
     fxbus_set(f, FX_DIST, 0);
@@ -206,7 +204,6 @@ static void setup(fxbus_t *f, int16_t *dl, int type, int dec, int tone)
     fxbus_set(f, FX_VOLUME, 127);
     fxbus_set(f, FX_RV_DECAY, dec);
     fxbus_set(f, FX_RV_TONE, tone);
-    fxbus_set(f, FX_RV_TYPE, type);
 }
 
 /* Fill x with samples [t0, t0 + n) of the send: noise bursts (snare-like, 50 ms at RMS about 0.5)
@@ -252,7 +249,7 @@ static void test_against_reference(void)
         const int on = 520 * N;                              /* 3 s of bursts, then the tail: 14 s in all */
         char what[160];
 
-        setup(&F, dl1, FX_RV_ROOM, SET[c][0], SET[c][1]);
+        setup(&F, dl1, SET[c][0], SET[c][1]);
         if (SET[c][2] >= 0)
             fxbus_set(&F, FX_RV_HPF, SET[c][2]);
         if (SET[c][3] >= 0)
@@ -286,7 +283,7 @@ static void test_against_reference(void)
                 }
             }
             t0 += n;
-            if (idle_at < 0 && t0 >= on && F.rv.room.quiet >= FX_RM_QUIET)
+            if (idle_at < 0 && t0 >= on && F.room.quiet >= FX_RM_QUIET)
                 idle_at = t0;
         }
 
@@ -330,8 +327,8 @@ static double bp_tick(bp_t *f, double x)
 #define DBURST (FS / 50)                                    /* its burst: 20 ms */
 
 /* Return a decay time, in seconds, of h[0 .. n) in the band around fc: band-pass it (two passes), then
- * take the time from -3 to -23 dB of its backward-integrated energy, times 3 (as tools/fit_room.py
- * measures it). */
+ * take the time from -3 to -23 dB of its backward-integrated energy, times 3 (as the knob
+ * mapping was fitted). */
 static double band_t60(const float *h, int n, double fc)
 {
     static double e[DLEN];
@@ -357,11 +354,11 @@ static double band_t60(const float *h, int n, double fc)
 }
 
 /* Fill l and r with the reverb's response, wet only, to a 20 ms white-noise burst at RMS 0.6 (a
- * snare's send level), from a fixed seed: the decay check's material (tools/fit_room_render.c's). */
-static void burst_response(int type, int dec, int tone, float *l, float *r)
+ * snare's send level), from a fixed seed: the decay check's material. */
+static void burst_response(int dec, int tone, float *l, float *r)
 {
     uint32_t rng = 12345u;
-    setup(&F, dl1, type, dec, tone);
+    setup(&F, dl1, dec, tone);
     for (int b = 0; b < DLEN; b += N) {
         const int n = DLEN - b < N ? DLEN - b : N;
         float in[N];
@@ -373,47 +370,36 @@ static void burst_response(int type, int dec, int tone, float *l, float *r)
     }
 }
 
-/* Check that ROOM decays about as CLASSIC does at the same RvDec and RvTone, so that a grossly wrong
- * knob mapping (fx_room_coeffs) or coefficients (fx_room_times) fail, which the comparison with the
+/* Check ROOM's decay times against those it had when its knob mapping (fx_room_coeffs) was last set,
+ * so that a broken mapping or broken coefficients (fx_room_times) fail, which the comparison with the
  * reference can't see.
  *
- * At six settings across the knobs, measure both types' decay times in three bands (350, 1400 and
- * 4500 Hz) on the same burst. The tolerances are loose on purpose, well outside the fit's own error
- * (ROOM is within 0.88 to 1.35 of CLASSIC here, at worst at low RvDec), so that only a real fault
- * fails:
- *  - every band at every setting within half and twice CLASSIC's time;
- *  - all of them together (the geometric mean of the ratios) within 0.85 and 1.2: a t_dc off by a
- *    third either way fails this. */
-static void test_decay_like_classic(void)
+ * At six settings across the knobs, measure the decay time in three bands (350, 1400 and 4500 Hz) on
+ * the same burst, L and R averaged. Each must be within 10 % of its value in DECAY_T. */
+static void test_decay_times(void)
 {
     static const int SET[][2] = {{0, 0}, {20, 60}, {73, 57}, {100, 30}, {127, 15}, {127, 115}};
     static const double FC[] = {350.0, 1400.0, 4500.0};
+    /* the times (s) at each setting in SET, in each band in FC, measured when ROOM became X0X's only
+     * reverb (2026-10-31) */
+    static const double DECAY_T[][3] = {{0.181, 0.200, 0.210}, {0.191, 0.212, 0.220}, {0.383, 0.370, 0.282},
+                                        {0.763, 0.542, 0.303}, {1.876, 0.967, 0.324}, {2.169, 1.995, 1.224}};
     static float l[DLEN], r[DLEN];
-    double lsum = 0, lo = 1e9, hi = 0;
-    int nr = 0;
+    double worst = 0;
     char what[160];
     for (unsigned c = 0; c < sizeof SET / sizeof SET[0]; c++) {
-        double t[2][3];
-        for (int type = 0; type < 2; type++) {
-            burst_response(type ? FX_RV_ROOM : FX_RV_CLASSIC, SET[c][0], SET[c][1], l, r);
-            for (unsigned k = 0; k < 3; k++)
-                t[type][k] = (band_t60(l + DBURST, DLEN - DBURST, FC[k]) +
-                              band_t60(r + DBURST, DLEN - DBURST, FC[k])) / 2;
-        }
+        double t[3];
+        burst_response(SET[c][0], SET[c][1], l, r);
         for (unsigned k = 0; k < 3; k++) {
-            const double q = t[0][k] > 0 && t[1][k] > 0 ? t[1][k] / t[0][k] : 0.0;   /* 0: no decay measured */
-            lo = fmin(lo, q);
-            hi = fmax(hi, q);
-            lsum += log(q > 0 ? q : 1e-9);
-            nr++;
+            t[k] = (band_t60(l + DBURST, DLEN - DBURST, FC[k]) + band_t60(r + DBURST, DLEN - DBURST, FC[k])) / 2;
+            worst = fmax(worst, fabs(t[k] / DECAY_T[c][k] - 1));
         }
-        printf("       Decay %3d Tone %3d: ROOM's decay against CLASSIC's %.2f, %.2f, %.2f (350, 1400, 4500 Hz)\n",
-               SET[c][0], SET[c][1], t[1][0] / t[0][0], t[1][1] / t[0][1], t[1][2] / t[0][2]);
+        printf("       Decay %3d Tone %3d: decay %.3f, %.3f, %.3f s (350, 1400, 4500 Hz)\n", SET[c][0], SET[c][1],
+               t[0], t[1], t[2]);
     }
-    snprintf(what, sizeof what, "decay like CLASSIC's: every band within 0.5 .. 2 (%.2f .. %.2f)", lo, hi);
-    check(lo >= 0.5 && hi <= 2.0, what);
-    snprintf(what, sizeof what, "decay like CLASSIC's: all together within 0.85 .. 1.2 (%.2f)", exp(lsum / nr));
-    check(exp(lsum / nr) >= 0.85 && exp(lsum / nr) <= 1.2, what);
+    snprintf(what, sizeof what, "decay times as when the knobs were set: every band within 10 %% (worst %.1f %%)",
+             100 * worst);
+    check(worst <= 0.10, what);
 }
 
 /* Check that with RvLvl at 0, ROOM puts out nothing at all, exactly. */
@@ -421,7 +407,7 @@ static void test_level_zero(void)
 {
     float x[N], l[N], r[N];
     int silent = 1;
-    setup(&F, dl1, FX_RV_ROOM, 100, 70);
+    setup(&F, dl1, 100, 70);
     fxbus_set(&F, FX_RV_LEVEL, 0);
     rs = 4u;
     for (int b = 0; b < 400; b++) {
@@ -436,7 +422,7 @@ static void test_level_zero(void)
 /* Return how many of ROOM's diffuser cells hold the clamp's value (+-32767). */
 static int diffusers_clamped(const fxbus_t *f)
 {
-    const fx_room_t *rm = &f->rv.room;
+    const fx_room_t *rm = &f->room;
     int k = 0;
     for (int i = 0; i < FX_RM_DIF_TOTAL; i++)
         k += rm->dif[i] == 32767 || rm->dif[i] == -32767;
@@ -462,7 +448,7 @@ static void test_hot_send(void)
     char what[120];
 
     /* The sine sweep. */
-    setup(&F, dl1, FX_RV_ROOM, 127, 115);
+    setup(&F, dl1, 127, 115);
     fxbus_set(&F, FX_RV_HPF, 0);
     for (int b = 0; b < 1200; b++) {
         for (int i = 0; i < N; i++) {
@@ -482,7 +468,7 @@ static void test_hot_send(void)
     /* The bursts, at the loudest send and then past it. */
     for (int k = 0; k < 2; k++) {
         const float amp = k ? 12.0f : 3.0f;
-        setup(&F, dl1, FX_RV_ROOM, 127, 115);
+        setup(&F, dl1, 127, 115);
         fxbus_set(&F, FX_RV_HPF, 0);
         rs = 11u;
         finite = 1;
@@ -509,34 +495,6 @@ static void test_hot_send(void)
     }
 }
 
-/* Check that switching the reverb from type `from` to type `to` cuts the tail cleanly: from the switch
- * on, the bus plays exactly as a fresh bus of type `to` does.
- *
- * Play 200 blocks of bursts (from seed) through a bus of type `from`, switch it, then play another
- * burst sequence through it and through a fresh bus of type `to` side by side. */
-static void check_switch(int from, int to, unsigned seed, const char *what)
-{
-    float x[N], l[N], r[N], rl[N], rr[N];
-    int same = 1;
-    setup(&F, dl1, from, 120, 90);
-    setup(&G, dl2, to, 120, 90);
-    rs = seed;
-    for (int b = 0; b < 200; b++) {
-        send(x, b * N, N, 200 * N);
-        fxbus_process_st(&F, zero, zero, x, zero, l, r, N);
-    }
-    fxbus_set(&F, FX_RV_TYPE, to);
-    F.rv_hp = G.rv_hp;                                       /* (the high-passes' state is not the tail's) */
-    F.dl_hp = G.dl_hp;
-    for (int b = 0; b < 400; b++) {
-        send(x, b * N, N, 300 * N);
-        fxbus_process_st(&F, zero, zero, x, zero, l, r, N);
-        fxbus_process_st(&G, zero, zero, x, zero, rl, rr, N);
-        same &= !memcmp(l, rl, sizeof l) && !memcmp(r, rr, sizeof r);
-    }
-    check(same, what);
-}
-
 /* Check that turning RvDec, then RvTone, while ROOM plays gives the coefficients of a fresh ROOM at the
  * new setting.
  *
@@ -545,7 +503,7 @@ static void test_knobs_while_playing(void)
 {
     static const int TURN[2][2] = {{30, 70}, {30, 110}};    /* RvDec and RvTone after each turn */
     float x[N], l[N], r[N];
-    setup(&F, dl1, FX_RV_ROOM, 100, 70);
+    setup(&F, dl1, 100, 70);
     rs = 6u;
     for (int b = 0; b < 50; b++) {
         send(x, b * N, N, 50 * N);
@@ -553,8 +511,8 @@ static void test_knobs_while_playing(void)
     }
     for (int k = 0; k < 2; k++) {
         fxbus_set(&F, k ? FX_RV_TONE : FX_RV_DECAY, TURN[k][k]);
-        setup(&G, dl2, FX_RV_ROOM, TURN[k][0], TURN[k][1]);
-        const fx_room_t *a = &F.rv.room, *g = &G.rv.room;
+        setup(&G, dl2, TURN[k][0], TURN[k][1]);
+        const fx_room_t *a = &F.room, *g = &G.room;
         check(!memcmp(a->a, g->a, sizeof a->a) && !memcmp(a->c, g->c, sizeof a->c) && a->tap_a == g->tap_a &&
                   a->tap_k == g->tap_k && a->out_gain == g->out_gain,
               k ? "RvTone turned while ROOM plays: its coefficients follow"
@@ -567,8 +525,8 @@ static void test_mono(void)
 {
     float x[N], l[N], r[N], m[N];
     int same = 1;
-    setup(&F, dl1, FX_RV_ROOM, 100, 70);
-    setup(&G, dl2, FX_RV_ROOM, 100, 70);
+    setup(&F, dl1, 100, 70);
+    setup(&G, dl2, 100, 70);
     rs = 5u;
     for (int b = 0; b < 400; b++) {
         send(x, b * N, N, 300 * N);
@@ -579,24 +537,21 @@ static void test_mono(void)
     check(same, "mono: the stereo left, bit for bit");
 }
 
-/* Print the whole bus's host time per sample with each type at its busiest (information: not
- * checked). */
+/* Print the whole bus's host time per sample with ROOM at its busiest (information: not checked). */
 static void info_host_time(void)
 {
     float x[N], l[N], r[N];
-    for (int t = 0; t < 2; t++) {
-        struct timespec a, b;
-        setup(&F, dl1, t ? FX_RV_ROOM : FX_RV_CLASSIC, 127, 115);
-        rs = 3u;
-        clock_gettime(CLOCK_MONOTONIC, &a);
-        for (int k = 0; k < 4000; k++) {
-            send(x, (k % 100) * N, N, 100 * N);
-            fxbus_process_st(&F, zero, zero, x, zero, l, r, N);
-        }
-        clock_gettime(CLOCK_MONOTONIC, &b);
-        printf("  info %s: %.1f ns per sample (the whole fxbus, host)\n", t ? "ROOM   " : "CLASSIC",
-               ((b.tv_sec - a.tv_sec) * 1e9 + (b.tv_nsec - a.tv_nsec)) / (4000.0 * N));
+    struct timespec a, b;
+    setup(&F, dl1, 127, 115);
+    rs = 3u;
+    clock_gettime(CLOCK_MONOTONIC, &a);
+    for (int k = 0; k < 4000; k++) {
+        send(x, (k % 100) * N, N, 100 * N);
+        fxbus_process_st(&F, zero, zero, x, zero, l, r, N);
     }
+    clock_gettime(CLOCK_MONOTONIC, &b);
+    printf("  info ROOM: %.1f ns per sample (the whole fxbus, host)\n",
+           ((b.tv_sec - a.tv_sec) * 1e9 + (b.tv_nsec - a.tv_nsec)) / (4000.0 * N));
 }
 
 int main(void)
@@ -604,11 +559,9 @@ int main(void)
     printf("reverb (ROOM):\n");
     test_block_format();
     test_against_reference();
-    test_decay_like_classic();
+    test_decay_times();
     test_level_zero();
     test_hot_send();
-    check_switch(FX_RV_ROOM, FX_RV_CLASSIC, 99u, "ROOM -> CLASSIC: the tail is cut, then CLASSIC exactly as fresh");
-    check_switch(FX_RV_CLASSIC, FX_RV_ROOM, 98u, "CLASSIC -> ROOM: the tail is cut, then ROOM exactly as fresh");
     test_knobs_while_playing();
     test_mono();
     info_host_time();

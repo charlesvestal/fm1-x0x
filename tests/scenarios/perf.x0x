@@ -1,6 +1,5 @@
-# PERF: the performance screen, and PERF TEST (three patterns of its own on the factory sound, the worst
-# case with the ROOM reverb), which must put back everything it changed: the patterns, the sound (the
-# project's reverb type too, CLASSIC or ROOM), the tempo, the mutes, the song mode.
+# PERF: the performance screen, and PERF TEST (three patterns of its own on the factory sound), which
+# must put back everything it changed: the patterns, the sound, the tempo, the mutes, the song mode.
 wait 300
 tapkey b0
 tapkey w0
@@ -28,13 +27,9 @@ tap SEL
 wait 300
 expect perftest 0
 expect patptr 0
-expect rvtype 0
 wait 7000
 shot p02_running.png
-wait 3000
-expect perftest 2
-expect rvtype 1
-wait 6000
+wait 9000
 expect perftest 3
 expect perfres0 >0
 expect perfres1 >0
@@ -47,29 +42,6 @@ expect tempo 120
 expect mute 4194304
 expect hit0.0.8 1
 expect sound2.0.0 48
-expect rvtype 0
-# a project with ROOM: the test's first two patterns are CLASSIC (the factory sound's), the worst case
-# ROOM, and after it the project's ROOM again
-param 4 1 1 1
-wait 50
-expect rvtype 1
-expect view 7
-tap SEL
-turn SELECT 1
-tap SEL
-wait 300
-expect perftest 0
-expect rvtype 0
-wait 7000
-expect perftest 1
-expect rvtype 0
-wait 3000
-expect perftest 2
-expect rvtype 1
-wait 6000
-expect perftest 3
-expect sound4.1.1 1
-expect rvtype 1
 # run it again and stop it halfway with HOME: everything back as well
 expect view 7
 tap SEL
@@ -82,7 +54,6 @@ expect patptr 0
 tap HOME
 wait 300
 expect perftest -1
-expect rvtype 1
 expect patptr 1
 expect playing 0
 expect tempo 120

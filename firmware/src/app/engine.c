@@ -60,7 +60,6 @@ volatile uint32_t eng_guard_count;
 void engine_guard_enable(int on) { guard_enabled = (uint8_t)(on != 0); }
 int engine_guard_active(void) { return guard_on; }
 float engine_fx_dl_wb(void) { return fx.dl_wb; }
-int engine_fx_rv_type(void) { return fx.rv_type; }
 void engine_load(uint32_t pct, uint32_t frames)
 {
     guard_avg_q8 = (guard_avg_q8 * 15u + pct * 256u) / 16u;
