@@ -440,7 +440,8 @@ static int prev_pos(seq_t *s, int t, int p)
  * goes back as much time as the 909 is into it (in its own steps); in its second half (early), on
  * to the next one, the steps between left out. The step there fires at once. Back at its first step
  * a part starts again (not a wrap: no bar end, no cue, no pass counted twice); on, the 909 wraps
- * as it would have, cues and the song with it. The 303s let go first: the quarter's note plays fresh. */
+ * as it would have, cues and the song with it. The 303s let go first: the quarter's note plays fresh.
+ * The tap is the step's grid slot (swing_delay 0, see Swing), so the parts keep their grid from it. */
 static void do_sync(seq_t *s, const seq_sink_t *o)
 {
     seq_track_t *d = &s->t[TRK_DRUM];
@@ -471,6 +472,7 @@ static void do_sync(seq_t *s, const seq_sink_t *o)
             }
             tr->pos = (uint8_t)p;
             tr->to_next = 0;
+            tr->swing_delay = 0;
             continue;
         }
         while (j-- > 0)
@@ -481,6 +483,7 @@ static void do_sync(seq_t *s, const seq_sink_t *o)
         } else
             tr->pos = (uint8_t)prev_pos(s, t, p);
         tr->to_next = 0;
+        tr->swing_delay = 0;
     }
 }
 

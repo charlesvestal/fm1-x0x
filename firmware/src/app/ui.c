@@ -2441,9 +2441,11 @@ static void button_tap(int b)
     }
 }
 
-/* HOME + SEQ tapped in time: the tempo, from the last four gaps (two taps set it); a pause of two
- * seconds starts over. Playing, each tap also takes every part to the nearest quarter (seq_sync),
- * so the beat lands on the tap. Acts on the press, for timing. */
+/* HOME + SEQ tapped in time: from the third tap in a row, the tempo, from the last four gaps; a pause
+ * of two seconds starts over. Playing, each of those taps also takes every part to the nearest
+ * quarter (seq_sync), so the beat lands on the tap. One or two taps change nothing: a stray press, or
+ * the first two of a count-in, leave the tempo and the beat alone. Acts on the press, for timing. */
+#define TAP_MIN 3
 #define TAP_RESET 2000u
 #define TAP_N 5
 static void tap_tempo(void)
@@ -2464,11 +2466,13 @@ static void tap_tempo(void)
         n--;
     }
     t[n++] = now;
-    if (seq.playing)
-        seq_sync(&seq);
     ui.touched = 4;                                   /* the TEMPO readout */
     ui.touch_until = now + 900u;
-    if (n >= 2 && now > t[0]) {
+    if (n < TAP_MIN)
+        return;
+    if (seq.playing)
+        seq_sync(&seq);
+    if (now > t[0]) {
         float bpm = 60000.0f * (float)(n - 1) / (float)(now - t[0]);
         bpm = bpm < 20.0f ? 20.0f : bpm > 275.0f ? 275.0f : bpm;
         seq.bpm = (float)(int)(bpm + 0.5f);

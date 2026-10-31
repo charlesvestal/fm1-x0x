@@ -544,7 +544,30 @@ static void test_sync(void)
     run(16);
     CHECK(at_once(E_DRUM, 2, t0) && S.t[TRK_DRUM].pos == 0, "early sync, short bar: step 1 at once (pos %d)",
           S.t[TRK_DRUM].pos);
-    printf("  sync (tap): the nearest quarter, back or on, the cue on the bar: checked\n");
+    /* swung: the tap is the grid. The pending step (8, odd) was due late; the sync puts the 909 on step 9
+     * at once, and from there odd steps are late by the swing, even ones on time (swing_delay reset) */
+    reset();
+    S.bpm = 120.0f;
+    P[0].swing = 100;                                       /* 75 %: odd 16ths half a step late */
+    P[0].drum[0].hit[7][0] = 0xFFFFu;
+    seq_start(&S);
+    run((uint32_t)(step * 6.5));
+    nev = 0;
+    t0 = now;
+    seq_sync(&S);
+    run((uint32_t)(step * 4));
+    {
+        static const double WANT[4] = { 0.0, 1.5, 2.0, 3.5 };   /* steps 9 (now), 10 (late), 11, 12 (late) */
+        int k;
+        for (i = 0, k = 0; k < 4; i++, k++) {
+            i = find(E_DRUM, 7, i);
+            CHECK(i >= 0 && abs((int)evs[i].t - (int)(t0 + WANT[k] * step + 0.5)) <= 1,
+                  "swung sync: CH %d at %u, want %.1f steps after the tap", k, i >= 0 ? evs[i].t : 0, WANT[k]);
+            if (i < 0)
+                break;
+        }
+    }
+    printf("  sync (tap): the nearest quarter, back or on, the cue on the bar, swung: checked\n");
 }
 
 /* one part's cue: it switches on the bar and restarts; the others keep their place */

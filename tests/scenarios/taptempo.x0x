@@ -1,5 +1,5 @@
-# Tap tempo: hold HOME and tap SEQ in time. Two taps set it, the last four gaps average; a pause of
-# two seconds starts over. SEQ's release does nothing (the steps screen doesn't open), nor HOME's.
+# Tap tempo: hold HOME and tap SEQ in time. From the third tap it sets the tempo (one or two taps
+# change nothing), the last four gaps average; a pause of two seconds starts over. SEQ's release does nothing (the steps screen doesn't open), nor HOME's.
 # (The simulator reads the buttons once a block: a tap lands a few ms late, so the tempo is a bound.)
 wait 300
 expect tempo 125
@@ -17,11 +17,12 @@ press SEQ
 wait 30
 release SEQ
 wait 470
-expect tempo >147
-expect tempo <152
+expect tempo 125
 press SEQ
 wait 30
 release SEQ
+expect tempo >130
+expect tempo <136
 wait 470
 press SEQ
 wait 30

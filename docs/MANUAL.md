@@ -431,9 +431,10 @@ every part. Swing delays every second 16th note: 50% is straight, 75% the most.
 HOME's knobs are for playing live: TEMPO, SWING, and the master's FILTER and PUMP.
 
 **Tap tempo.** Hold HOME and tap SEQ in time with the beat, from any screen, playing or stopped.
-Two taps set the tempo; keep tapping and it follows the last four. A pause of two seconds starts
-over. While playing, each tap also puts the beat on your tap: every part jumps to the nearest quarter
-note and plays on from there (a single tap just moves the beat). A tap a little late goes back to
+From the third tap in a row it sets the tempo; keep tapping and it follows the last four. One or two
+taps change nothing, so a stray press does no harm. A pause of two seconds starts over. While playing,
+from the third tap on, each tap also puts the beat on your tap: every part jumps to the nearest quarter
+note and plays on from there. A tap a little late goes back to
 the beat just passed; a tap a little early skips ahead to the coming one, and just before the bar
 line the bar ends on your tap, bringing in the next pattern or the song's next bar. The TEMPO readout shows the result. While X0X follows an external MIDI clock, the clock
 sets the tempo and tapping does nothing.
