@@ -54,6 +54,9 @@ jobs:
       build: |
         set -euo pipefail
         export X0X_JOBS=2
+        # the fonts' tabular figures (tools/gen_font.py, OpenType tnum): Pillow's raqm, which loads the system's FriBiDi
+        sudo apt-get install -y -qq libfribidi0
+        python3 -c "from PIL import features; assert features.check('raqm'), 'Pillow without raqm'"
         test "$(git -C "$AC79_SDK" rev-parse HEAD)" = d179b4484759423312073f5fbb232501aa491047
         mkdir -p build/release-assets
         if [[ "$GITHUB_REF" == refs/tags/* ]]; then
@@ -71,23 +74,39 @@ jobs:
         set -euo pipefail
         # The engine comparison tests need the original sources. Pin them so a
         # later upstream change cannot silently change a release's test inputs.
+        # fetch_ref DIR COMMIT REPO...: the commit pins the content; it comes from the first repository
+        # that still serves it.
         fetch_ref() {
-          git init "build/refs/$2"
-          git -C "build/refs/$2" fetch --depth 1 "https://github.com/$1.git" "$3"
-          git -C "build/refs/$2" checkout --detach FETCH_HEAD
+          local name="$1" dir="build/refs/$1" sha="$2" repo
+          shift 2
+          git init -q "$dir"
+          for repo in "$@"; do
+            if GIT_TERMINAL_PROMPT=0 git -C "$dir" fetch -q --depth 1 "https://github.com/$repo.git" "$sha"; then
+              git -C "$dir" checkout -q --detach FETCH_HEAD
+              test "$(git -C "$dir" rev-parse HEAD)" = "$sha"
+              echo "$name: $sha from $repo"
+              return 0
+            fi
+          done
+          echo "$name: $sha not found in: $*"
+          return 1
         }
         # Use the versions before the er99/sc808 filenames changed: the X0X
         # comparison harnesses include those original headers and source files.
-        fetch_ref athousanddetails/schwung-9W9 schwung-9W9 10cbe5c1e1c9e65b0818bb34644ab1a13092082c
-        fetch_ref athousanddetails/schwung-8W8 schwung-8W8 94aa2716d4c2e5851fc7c5dbb4c17adfd133c997
-        fetch_ref charlesvestal/schwung-303 schwung-303 7680578cdecd91e512cfddb9c9eb07b287fb64f4
-        fetch_ref charlesvestal/schwung-tb3po schwung-tb3po f49d81d05d1e29ae37728a08e30f193892be3bc9
+        # athousanddetails/schwung-9W9 and -8W8 were re-created with a new history
+        # on 2026-10-27, without these commits: they come from copies that kept them.
+        fetch_ref schwung-9W9 10cbe5c1e1c9e65b0818bb34644ab1a13092082c \
+          charlesvestal/schwung-9W9 synthfr/schwung-9W9
+        fetch_ref schwung-8W8 94aa2716d4c2e5851fc7c5dbb4c17adfd133c997 \
+          charlesvestal/schwung-8W8 DimaDake/schwung-8W8 michaelmenesescs/schwung-8W8
+        fetch_ref schwung-303 7680578cdecd91e512cfddb9c9eb07b287fb64f4 charlesvestal/schwung-303
+        fetch_ref schwung-tb3po f49d81d05d1e29ae37728a08e30f193892be3bc9 charlesvestal/schwung-tb3po
         export NINEW9_DIR="$PWD/build/refs/schwung-9W9"
         export EIGHTW8_DIR="$PWD/build/refs/schwung-8W8"
         export SCHWUNG303="$PWD/build/refs/schwung-303"
         export TB3PO_REF="$PWD/build/refs/schwung-tb3po/src/dsp/tb3po.c"
         test -f "$TB3PO_REF"
-        tests/run_tests.sh
+        sh tests/run_tests.sh
       packages: build/release-assets/*
 
   verify:
