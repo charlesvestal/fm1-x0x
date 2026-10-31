@@ -3,7 +3,7 @@
  * ones (themselves held to 9W9 and Open303 references elsewhere):
  *  - master_process_st with l == r is master_process, bit for bit, compressor, PUMP, filter, limiter;
  *  - fxbus_process_st with dry l == r and no reverb is fxbus_process on both sides, bit for bit;
- *  - with reverb, the left is 9W9's mono reverb exactly and the right is a different (decorrelated) one;
+ *  - with reverb, the left is the mono reverb exactly and the right is a different (decorrelated) one;
  *  - PING: an impulse into the delay comes back on the left one time later, on the right two.
  *  - WIDTH: at 0 every echo is centred (left and right the same), and at any width each echo keeps
  *    its power. */
@@ -38,7 +38,6 @@ static double ping_energy(int width, int *same)
     double e = 0.0;
     int b, i;
     fxbus_init(&f2, dl2, 88200);
-    fxbus_set(&f2, FX_DL_PING, 1);
     fxbus_set(&f2, FX_DL_FDBK, 0);
     fxbus_set(&f2, FX_DL_HPF, 0);
     fxbus_set(&f2, FX_DL_WIDTH, width);
@@ -110,7 +109,7 @@ int main(void)
     }
     check(same, "fx: centred stereo, no reverb == mono, bit for bit (dist, delay, glue comp)");
 
-    {   /* the reverb: left = 9W9's, right = its own */
+    {   /* the reverb: left = the mono one, right = its own */
         double sl = 0, sr = 0, slr = 0;
         fxbus_init(&f1, dl1, 88200);
         fxbus_init(&f2, dl2, 88200);
@@ -129,14 +128,14 @@ int main(void)
                 slr += (double)l[i] * r[i];
             }
         }
-        check(same, "reverb: the left is 9W9's mono reverb exactly");
+        check(same, "reverb: the left is the mono reverb exactly");
         printf("       L/R correlation %.2f, R/L level %.2f dB\n", slr / sqrt(sl * sr), 10 * log10(sr / sl));
         check(fabs(slr / sqrt(sl * sr)) < 0.5 && fabs(10 * log10(sr / sl)) < 3.0, "reverb: the right is decorrelated, as loud");
     }
     {   /* PING: one impulse, echoes at T (left) and 2T (right) */
         int first_l = -1, first_r = -1, t;
         fxbus_init(&f2, dl2, 88200);
-        fxbus_set(&f2, FX_DL_PING, 1);
+        fxbus_set(&f2, FX_DL_WIDTH, 127);               /* (PING WIDTH above 0: ping-pong) */
         fxbus_set(&f2, FX_DL_FDBK, 0);
         fxbus_set(&f2, FX_DL_HPF, 0);
         fxbus_set_bpm(&f2, 120.0f);
@@ -156,13 +155,13 @@ int main(void)
                (double)(f2.dl_time_ms * 0.001f * 44100.0f));
         check(first_l > 0 && first_r > first_l && abs(first_r - 2 * first_l) < 8, "ping: left at T, right at 2T");
     }
-    {   /* WIDTH: centred at 0; the same power at every width */
-        int same_full, same_half, same_none;
+    {   /* WIDTH: 0 is no ping-pong (the echoes centred); above it, the same power at every width */
+        int same_full, same_half, same_one, same_none;
         double e_full = ping_energy(127, &same_full), e_half = ping_energy(64, &same_half),
-               e_none = ping_energy(0, &same_none);
-        printf("       echo energy: width 127 %.4f, 64 %.4f, 0 %.4f\n", e_full, e_half, e_none);
-        check(same_none && !same_half && !same_full, "width: 0 centres the echoes, 64 and 127 don't");
-        check(fabs(e_half / e_full - 1.0) < 1e-4 && fabs(e_none / e_full - 1.0) < 1e-4,
+               e_one = ping_energy(1, &same_one), e_none = ping_energy(0, &same_none);
+        printf("       echo energy: width 127 %.4f, 64 %.4f, 1 %.4f, 0 (off) %.4f\n", e_full, e_half, e_one, e_none);
+        check(same_none && !same_half && !same_full, "width: 0 is off (the echoes centred), 64 and 127 aren't");
+        check(fabs(e_half / e_full - 1.0) < 1e-4 && fabs(e_one / e_full - 1.0) < 1e-4,
               "width: each echo keeps its power");
     }
     printf(fails ? "stereo: %d FAILED\n" : "stereo: ok\n", fails);

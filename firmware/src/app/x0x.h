@@ -23,7 +23,8 @@
                                           * 3: the 909 BD has sends (REV, DLY at 8, 9; PAN moved to 10);
                                           * 4: the 808 BD too (REV, DLY at 7, 8; PAN moved to 9);
                                           * 5: the break's FILTER (pot 2, 64 = off; was unused, 0);
-                                          * 6: ping-pong's WIDTH (FX_DL_WIDTH; was unused, 0) */
+                                          * 6: PING WIDTH (FX_DL_WIDTH; was unused, 0) replaces
+                                          *    PING-PONG's switch (FX_DL_PING): on = 127, off = 0 */
 
 typedef struct {
     uint32_t magic, format;

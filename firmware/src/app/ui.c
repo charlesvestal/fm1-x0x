@@ -527,7 +527,6 @@ static const char *pref_name(pref_t r)
         case FX_DL_HPF: return "DLY LOW CUT";
         case FX_RV_LEVEL: return "REV RETURN";
         case FX_DL_LEVEL: return "DLY RETURN";
-        case FX_DL_PING: return "PING-PONG";
         case FX_DL_WIDTH: return "PING WIDTH";
         case FX_COMP: return "GLUE";
         default: break;
@@ -565,8 +564,9 @@ static void pref_value_of(pref_t r, int v, char *num, char *unit)
     *num = *unit = 0;
     if (!d || r.kind == R_ACT)
         return;
-    if (d->names) {
-        put_s(num, d->names[v]);
+    if (d->names) {                                      /* (a value past the list, from a damaged or newer
+                                                          * save, shows as the list's last) */
+        put_s(num, d->names[v < 0 ? 0 : v > d->max ? d->max : v]);
         return;
     }
     if (r.kind == R_TAPE) {
@@ -848,7 +848,6 @@ static void build_pages(void)
         more(PR(R_ENG, T_FX, 0, FX_RV_LEVEL));
         more(PR(R_ENG, T_FX, 0, FX_DL_HPF));
         more(PR(R_ENG, T_FX, 0, FX_DL_LEVEL));
-        more(PR(R_ENG, T_FX, 0, FX_DL_PING));
         more(PR(R_ENG, T_FX, FX_VOICE(FX_DL_WIDTH), FX_INDEX(FX_DL_WIDTH)));
         break;
     case V_MIX:                                        /* a channel picked with a black key, its four knobs */

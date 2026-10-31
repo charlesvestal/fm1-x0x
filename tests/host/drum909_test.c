@@ -7,6 +7,8 @@
  * sends, master). The port renders in 256-frame blocks like the device; 9W9 in
  * one call. Reported per case: reference peak / RMS, max |diff|, RMS(diff) /
  * RMS(ref), and the worst 10 ms envelope difference in dB (windows above -60 dB).
+ * The reverb is X0X's own (ROOM: tests/host/reverb_test.c), not 9W9's, so every
+ * comparison turns its return off on both sides (the sends still play).
  *
  *   drum909_test <9w9 module dir (has samples/)> [demo.wav]
  * Exit status is non-zero if any check fails. Diagnostics for the pattern
@@ -42,8 +44,8 @@ void refd_render(void *e, float *out, int n);
 
 static const char *g_dir;
 static drum909_t D;
-static fxbus_t F;
-static int16_t DLY[DLY_LEN];
+static fxbus_t F, FW;                  /* FW: the demo's own bus, its reverb on */
+static int16_t DLY[DLY_LEN], DLYW[DLY_LEN];
 static float bufp[NLEN * 2], bufr[NLEN * 2], bufd[NLEN * 2];
 static int fails;
 
@@ -134,6 +136,15 @@ static metrics_t measure(const float *p, const float *r, int n)
     return m;
 }
 
+/* Turn the reverb's return off in the port and in the references (refd may be 0). */
+static void no_reverb(void *ref, void *refd)
+{
+    fxbus_set(&F, FX_RV_LEVEL, 0);
+    ref_set(ref, "rev_level", 0.0f);
+    if (refd)
+        refd_set(refd, "rev_level", 0.0f);
+}
+
 /* Pass: RMS(diff)/RMS(ref) < 1e-3. Otherwise the case passes only if the port is
  * within 9W9's own float noise -- rel(port, 9W9) <= 2 x rel(9W9, 9W9 with double
  * biquads) -- with the 10 ms envelope within 0.1 dB. `self` is that second
@@ -156,6 +167,7 @@ static double run_case(const char *label, const int *trig, int ntrig, int vel, c
             fails++;
         }
     }
+    no_reverb(ref, refd);
     for (int t = 0; t < ntrig; ++t) {
         drum909_trigger(&D, trig[t], (float)vel * (1.0f / 127.0f));
         ref_trigger(ref, ref_trig[trig[t]], vel);
@@ -265,15 +277,6 @@ static void fx_cases(void)
     char lab[80];
     static const int pots[3] = { 0, 64, 127 };
     const int sd = DR_SD, rs = DR_RS;
-    printf("\n== send reverb (SD and CP sends 127; each reverb pot 0/64/127) ==\n");
-    for (int i = FX_RV_DECAY; i <= FX_RV_LEVEL; ++i)
-        for (int k = 0; k < 3; ++k) {
-            const set_t s[3] = { { 0, DR_SD, pidx(DR_SD, "Rev"), 127 }, { 0, DR_CP, pidx(DR_CP, "Rev"), 127 },
-                                 { 1, 0, i, pots[k] } };
-            static const int tr[2] = { DR_SD, DR_CP };
-            snprintf(lab, sizeof lab, "REV %s=%d", fxbus_param(i)->name, pots[k]);
-            run_case(lab, tr, 2, 127, s, 3, 1, NLEN);
-        }
     printf("\n== send delay (RS send 127; each delay pot 0/64/127, every division) ==\n");
     for (int i = FX_DL_FDBK; i <= FX_DL_HPF; ++i)
         for (int k = 0; k < 3; ++k) {
@@ -410,10 +413,10 @@ static void tape_checks(void)
 }
 
 /* ---------------------------------------------------------------------- */
-/* 4-bar house pattern. Rendered by the port (written to the WAV) and by 9W9
- * with the same hits, velocities and settings, and compared like any case:
+/* 4-bar house pattern. Rendered by the port and by 9W9 with the same hits,
+ * velocities and settings, and compared like any case, the reverb's return off:
  * this is the one that exercises retriggers, the hat choke, overlapping tails,
- * both sends and the glue together. */
+ * the delay and the glue together. The WAV is the port's with the reverb on. */
 static void wr16(FILE *f, uint16_t v) { fwrite(&v, 2, 1, f); }
 static void wr32(FILE *f, uint32_t v) { fwrite(&v, 4, 1, f); }
 
@@ -424,10 +427,13 @@ static int demo(const char *path)
     const int steps = 64, total = (int)(steps * spstep) + SR * 2;  /* + 2 s of tails */
     float *mono = (float *)calloc((size_t)total, sizeof(float));
     float *rmono = (float *)calloc((size_t)total, sizeof(float));
+    float *wet = (float *)calloc((size_t)total, sizeof(float));
     void *ref = ref_new(g_dir);
     drum909_init(&D);
     fxbus_init(&F, DLY, DLY_LEN);
     fxbus_set_bpm(&F, bpm);
+    fxbus_init(&FW, DLYW, DLY_LEN);
+    fxbus_set_bpm(&FW, bpm);
     ref_set_raw(ref, "dly_bpm", bpm);
     /* a little reverb on the clap (and snare fills), delay on the rim, a touch
      * of glue, and the volume pulled back from 9W9's 0.35 so nothing clips */
@@ -436,12 +442,14 @@ static int demo(const char *path)
     for (int i = 0; i < 5; ++i) {
         if (sets[i].fx) {
             fxbus_set(&F, sets[i].idx, sets[i].value);
+            fxbus_set(&FW, sets[i].idx, sets[i].value);
             ref_set(ref, fkeys[sets[i].idx], (float)sets[i].value);
         } else {
             drum909_set(&D, sets[i].voice, sets[i].idx, sets[i].value);
             ref_set(ref, dkeys[sets[i].voice][sets[i].idx], (float)sets[i].value);
         }
     }
+    no_reverb(ref, 0);                                 /* (compared without it; FW keeps it, for the WAV) */
     /* x = hit, X = accent */
     static const char *const pat[DR_NUM][4] = {
         /* BD */ { "X...x...X...x...", "X...x...X...x...", "X...x...X...x...", "X...x...X...x.x." },
@@ -465,6 +473,7 @@ static int demo(const char *path)
                 const int m = at - pos < 256 ? at - pos : 256;
                 float dry[256] = { 0 }, rev[256] = { 0 }, dly[256] = { 0 };
                 drum909_render(&D, dry, rev, dly, m);
+                fxbus_process(&FW, dry, rev, dly, wet + pos, m);
                 fxbus_process(&F, dry, rev, dly, mono + pos, m);
                 pos += m;
             }
@@ -486,7 +495,7 @@ static int demo(const char *path)
     {
         const metrics_t m = measure(mono, rmono, total);
         const int ok = m.rel < 1e-3;
-        printf("\n== the demo pattern, port vs 9W9 (4 bars + 2 s tails, sends, choke, glue) ==\n");
+        printf("\n== the demo pattern, port vs 9W9 (4 bars + 2 s tails, delay send, choke, glue) ==\n");
         printf("%-26s peak %.4f rms %.5f | port %.4f | maxdiff %.1e rel %.2e (%6.1f dB) env %.4f dB %s\n",
                "demo pattern", m.peak, m.rms, m.pport, m.maxd, m.rel, 20.0 * log10(m.rel + 1e-30), m.envdb,
                ok ? "ok" : "FAIL");
@@ -515,7 +524,7 @@ static int demo(const char *path)
     float peak = 0;
     int clip = 0;
     for (int i = 0; i < total; ++i) {
-        float v = mono[i];
+        float v = wet[i];
         if (fabsf(v) > peak) peak = fabsf(v);
         if (v > 1.0f) { v = 1.0f; clip++; }
         if (v < -1.0f) { v = -1.0f; clip++; }
@@ -528,6 +537,7 @@ static int demo(const char *path)
            path, total, (double)total / SR, (double)peak, clip);
     free(mono);
     free(rmono);
+    free(wet);
     return 0;
 }
 

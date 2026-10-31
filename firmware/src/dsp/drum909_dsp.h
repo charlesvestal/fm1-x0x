@@ -25,9 +25,25 @@
 #if defined(__GNUC__) || defined(__clang__)
 #define D9_INLINE static inline __attribute__((always_inline))
 #define D9_NOINLINE static __attribute__((noinline, unused))   /* not every includer uses every helper */
+#define D9_UNLIKELY(x) __builtin_expect(!!(x), 0)   /* the branch's other side falls through */
+#define D9_MAY_ALIAS __attribute__((may_alias))      /* a type whose accesses may alias any object */
 #else
 #define D9_INLINE static inline
 #define D9_NOINLINE static
+#define D9_UNLIKELY(x) (x)
+#define D9_MAY_ALIAS
+#endif
+/* Loop unrolling, for the loop that follows: by n, completely, or not at all. Clang's pragmas; other
+ * compilers unroll as they choose. On the FM-1's core a taken branch costs about 8 cycles. */
+#if defined(__clang__)
+#define D9_PRAGMA(x) _Pragma(#x)
+#define D9_UNROLL(n) D9_PRAGMA(clang loop unroll_count(n))
+#define D9_UNROLL_ALL D9_PRAGMA(clang loop unroll(full))
+#define D9_NO_UNROLL D9_PRAGMA(clang loop unroll(disable))
+#else
+#define D9_UNROLL(n)
+#define D9_UNROLL_ALL
+#define D9_NO_UNROLL
 #endif
 
 #define D9_SR 44100.0f

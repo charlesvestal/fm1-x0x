@@ -541,14 +541,14 @@ There is one reverb and one delay, and every part can send to both: each part's 
 mixer's PARTS page (LFO), each drum track's on 909 MIX and 808 MIX. FX shows how much every part
 sends, and has two pages:
 
-- REVERB: DECAY and TONE. The reverb is stereo: whatever you send it comes back wide.
+- REVERB: DECAY and TONE. The reverb is a smooth stereo reverb: whatever you send it comes back wide.
 - DELAY: TIME (in note values from 1/32 to a dotted half note), FEEDBACK, TONE and TAPE. TAPE at
   the far left (DIGI) is a clean 12-bit digital delay; turned up, it is a tape delay that wobbles,
   saturates and wears more the further you turn it, and can feed back on itself at high feedback.
 
-In SEL's list, under MORE: each effect's low cut and return level, PING-PONG, which bounces the
-echoes between left and right, and PING WIDTH, how far apart: 127 puts them hard left and right, 0
-in the centre.
+In SEL's list, under MORE: each effect's low cut and return level, and PING WIDTH, which bounces the
+echoes between left and right: 0 is off, 127 puts them hard left and right, and between, closer
+together.
 
 ---
 
@@ -912,7 +912,7 @@ in SEL's list; the rest are its sound pages.
 | Effect page | Settings |
 |---|---|
 | REVERB | Decay, Tone; in the list: low cut, return level |
-| DELAY | Time (1/32, 1/16T, 1/16, 1/8T, 1/16., 1/8, 1/4T, 1/8., 1/4, 1/2T, 1/4., 1/2, 1/2.), Feedback, Tone, Tape (DIGI, then tape and its wear); in the list: low cut, return level, ping-pong |
+| DELAY | Time (1/32, 1/16T, 1/16, 1/8T, 1/16., 1/8, 1/4T, 1/8., 1/4, 1/2T, 1/4., 1/2, 1/2.), Feedback, Tone, Tape (DIGI, then tape and its wear); in the list: low cut, return level, ping width (0 = off) |
 | MASTER | Drive, Comp, Pump, Filter; in the list: the compressor's details, pump by, resonance, limiter, the drive's type, glue and volume |
 
 The delay follows the tempo, including an external MIDI clock. A delay longer than two seconds
@@ -934,6 +934,7 @@ firmware, you must also share its source code.
 - The 909 is from **9W9** by athousanddetails, which is based on **ER-99** by Matthew
   Cieplak. Its hat and cymbal samples are ER-99's.
 - The 808 is from **8W8** by athousanddetails.
+- The reverb is by **luchak**.
 - The 303 is from **schwung-303**, built on Open303 by Robin Schmidt (MIT licence), with
   extensions based on jc303 and dm-Rat.
 - TB-3PO is from **schwung-tb3po**, which comes from the Phazerville Hemisphere Suite.
