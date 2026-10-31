@@ -2032,6 +2032,112 @@ static void bass_kbd(int key, int down)
     }
 }
 
+/* how many steps the note at step s lasts: itself and the TIEs after it */
+static int bass_note_len(const bpart_t *bp, int s)
+{
+    int len = bp->len ? bp->len : 16, n = 1;
+    while (n < len && bstep_gate(&bp->step[(s + n) % len]) == G_TIE)
+        n++;
+    return n;
+}
+
+/* a step held, another pressed after it: the note lasts up to and including that one (TIEs in
+ * between, the TIEs after it rests). Pressing its current last step again: back to one step. Only
+ * forward, within the pattern. */
+static void bass_tie_to(bpart_t *bp, int from, int to)
+{
+    int len = bp->len ? bp->len : 16, s, n;
+    if (to <= from || to >= len || bstep_gate(&bp->step[from]) == G_REST)
+        return;
+    n = bass_note_len(bp, from);
+    if (from + n - 1 == to)                           /* already ends there: one step */
+        to = from;
+    for (s = from + 1; s <= to; s++)
+        bp->step[s].flags = G_TIE;
+    for (; s < len && bstep_gate(&bp->step[s]) == G_TIE; s++)
+        bp->step[s].flags = G_REST;
+    ui.step_edited = 1;                               /* (releasing the held step keeps it) */
+    mark_dirty();
+    {
+        char t[16];
+        put_i(put_s(t, "LENGTH "), bass_note_len(bp, from));
+        say(t, 0);
+    }
+}
+
+/* the held step's GATE knob walks REST, NOTE, a note 2, 3, ... steps long, TIE, and wraps.
+ * State k: 0 REST, 1 NOTE, 2 and up a note k steps long, BASS_GS_TIE a tie. A length that would reach the
+ * next note instead ties up to the step before it and sets SLIDE there, so it glides into that note
+ * (the last length offered; a lower one clears that slide). Lengths stop at the pattern's end; TIE is
+ * offered only after a step that sounds (a NOTE or a TIE) to tie to. */
+#define BASS_GS_TIE 1000                              /* above any length */
+
+/* steps from s to the next NOTE after it, or a large number when none is left in the pattern */
+static int bass_next_note(const bpart_t *bp, int s)
+{
+    int len = bp->len ? bp->len : 16, d;
+    for (d = 1; s + d < len; d++)
+        if (bstep_gate(&bp->step[s + d]) == G_NOTE)
+            return d;
+    return 99;
+}
+
+/* the note at s, a NOTE, slides into the next note at its tail's end */
+static int bass_slides_on(const bpart_t *bp, int s)
+{
+    int n = bass_note_len(bp, s);
+    return bass_next_note(bp, s) == n && (bp->step[s + n - 1].flags & BS_SLIDE);
+}
+
+/* the states step s may take, in knob order; returns how many */
+static int bass_gate_states(const bpart_t *bp, int s, int *k)
+{
+    int len = bp->len ? bp->len : 16, m = 0, n, d = bass_next_note(bp, s);
+    k[m++] = 0;
+    k[m++] = 1;
+    for (n = 2; n <= d + 1 && (n <= d ? s + n - 1 < len : 1); n++)
+        k[m++] = n;                                   /* n == d + 1: the slide into the next note */
+    if (s > 0 && bstep_gate(&bp->step[s - 1]) != G_REST)
+        k[m++] = BASS_GS_TIE;
+    return m;
+}
+
+static int bass_gate_state(const bpart_t *bp, int s)
+{
+    int g = bstep_gate(&bp->step[s]);
+    if (g == G_TIE)
+        return BASS_GS_TIE;
+    if (g == G_REST)
+        return 0;
+    return bass_note_len(bp, s) + bass_slides_on(bp, s);
+}
+
+static void bass_set_gate_state(bpart_t *bp, int s, int k)
+{
+    int len = bp->len ? bp->len : 16, i, n = k >= 2 && k != BASS_GS_TIE ? k : 1, d;
+    bstep_t *st = &bp->step[s];
+    if (bstep_gate(st) == G_NOTE && bass_slides_on(bp, s))      /* its old slide into the next note */
+        bp->step[s + bass_note_len(bp, s) - 1].flags &= (uint8_t)~BS_SLIDE;
+    for (i = s + 1; i < len && bstep_gate(&bp->step[i]) == G_TIE; i++)   /* its old tail: rests */
+        bp->step[i].flags = G_REST;
+    st->flags = (uint8_t)((st->flags & ~BS_GATE_MASK) | (k == BASS_GS_TIE ? G_TIE : k == 0 ? G_REST : G_NOTE));
+    d = bass_next_note(bp, s);
+    for (i = 1; i < n && i < d && s + i < len; i++)
+        bp->step[s + i].flags = G_TIE;
+    if (n > d)                                        /* reaches the next note: glide into it */
+        bp->step[s + d - 1].flags |= BS_SLIDE;
+}
+
+/* the GATE knob turned by e on step s */
+static void bass_gate_turn(bpart_t *bp, int s, int e)
+{
+    int k[NSTEPS + 3], m =bass_gate_states(bp, s, k), cur = bass_gate_state(bp, s), j = 0, i;
+    for (i = 0; i < m; i++)                           /* its place in the list, or the last one below it */
+        if (k[i] <= cur)
+            j = i;
+    bass_set_gate_state(bp, s, k[(j + (e > 0 ? 1 : m - 1)) % m]);
+}
+
 /* an edit sounds as the drum keys do (KEY SOUND): while stopped or recording, or always */
 static int key_sounds(void) { return proj.set.keysound || !seq.playing || ui.rec; }
 static void bass_step_key(int white, int down)
@@ -2040,6 +2146,10 @@ static void bass_step_key(int white, int down)
     bpart_t *bp = &cur_pat()->bass[b];
     if (s >= NSTEPS)
         return;
+    if (down && ui.view == V_SEQ && ui.held_step >= 0 && ui.held_step != s) {   /* a later step: the note's length */
+        bass_tie_to(bp, ui.held_step, s);
+        return;
+    }
     if (down) {                                       /* an empty step is on at once: hold it to edit it */
         ui.held_step = (int8_t)s;
         ui.step_edited = 0;
@@ -2614,7 +2724,7 @@ static void input(void)
             if (i == 0) {
                 held_note_by(e);
             } else if (i == 1) {
-                st->flags = (uint8_t)((st->flags & ~BS_GATE_MASK) | (bstep_gate(st) + (e > 0 ? 1 : 2)) % 3);
+                bass_gate_turn(bp, ui.held_step, e);
             } else if (i == 2) {
                 st->flags ^= BS_ACCENT;
             } else {
@@ -3201,6 +3311,8 @@ static void draw_303(int band, int gen)
         q = put_note(q, held_note_of(bp, s) + bp->transpose - 24);
         if (bstep_gate(st) == G_TIE)
             q = put_s(q, " TIE");
+        else if (bstep_gate(st) == G_NOTE && bass_note_len(bp, s) > 1)
+            q = put_i(put_s(q, " LEN "), bass_note_len(bp, s));
         if (st->flags & BS_ACCENT)
             q = put_s(q, " ACC");
         if (st->flags & BS_SLIDE)
@@ -4056,6 +4168,10 @@ static void draw_knobs(void)
                 cv_rect(i * 60, 14, 1, 50, C_LINE);
             if (i == 0)
                 put_note(v, held_note_of(bp, ui.held_step) + bp->transpose - 24);
+            else if (i == 1 && bstep_gate(st) == G_NOTE && bass_slides_on(bp, ui.held_step))
+                put_s(v, "SLIDE");
+            else if (i == 1 && bstep_gate(st) == G_NOTE && bass_note_len(bp, ui.held_step) > 1)
+                put_i(put_s(v, "LEN"), bass_note_len(bp, ui.held_step));
             else if (i == 1)
                 put_s(v, G[bstep_gate(st)]);
             else
