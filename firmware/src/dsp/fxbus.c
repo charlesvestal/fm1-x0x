@@ -45,11 +45,13 @@ static const fx_pspec_t fx_p[FX_NPARAMS] = {
     [FX_DL_HPF]   = { { "DlHPF", 127, 62, 0 }, CV_EXP, X0X_EXP_FX_HPF, 0.0f, 0.0f },
     [FX_DL_TYPE]  = { { "DlType", 1, 0, fx_type_names }, CV_SW, 0, 0.0f, 0.0f },
     [FX_DL_WEAR]  = { { "Wear", 127, 64, 0 }, CV_LIN, 0, 0.0f, 1.0f },
+    /* X0X: PING-PONG's old switch. PING WIDTH replaced it (above 0: ping-pong); kept so the saved sounds'
+     * layout stays, and read only by project.c's sound revision 6 */
     [FX_DL_PING]  = { { "Ping", 1, 0, fx_onoff_names }, CV_SW, 0, 0.0f, 0.0f },
     /* X0X: the one-knob TAPE (ui.c R_TAPE), kept with the sound so the knob reads back where it was
      * left. It sets DlType and Wear, which are what the delay plays; it plays nothing itself. */
     [FX_DL_TAPE]  = { { "Tape", 127, 72, 0 }, CV_SW, 0, 0.0f, 0.0f },
-    [FX_DL_WIDTH] = { { "Width", 127, 127, 0 }, CV_LIN, 0, 0.0f, 1.0f },   /* X0X: ping-pong's */
+    [FX_DL_WIDTH] = { { "Width", 127, 0, 0 }, CV_LIN, 0, 0.0f, 1.0f },   /* X0X: ping-pong, 0 = off */
 };
 
 int fxbus_nparams(void) { return FX_NPARAMS; }
@@ -91,6 +93,7 @@ static void fx_comp_prep(fxbus_t *f)
  * centre. At full width they are exactly 1 and 0, so the delay sounds as it did before WIDTH. */
 static void fx_dl_width(fxbus_t *f, float w)
 {
+    f->dl_ping = w > 0.0f;                            /* 0: no ping-pong, the echoes centred as 9W9's */
     if (w >= 1.0f) {
         f->dl_wa = 1.0f;
         f->dl_wb = 0.0f;
@@ -119,7 +122,6 @@ static void fx_apply(fxbus_t *f, int i, float v)
     case FX_DL_HPF: d9_biquad_set(&f->dl_hp, D9_HP, v, 0.7071f); break;
     case FX_DL_TYPE: f->dl_type = (int32_t)v; break;
     case FX_DL_WEAR: f->wear = v; break;
-    case FX_DL_PING: f->dl_ping = (int32_t)v; break;
     case FX_DL_WIDTH: fx_dl_width(f, v); break;
     default: break;
     }
@@ -176,7 +178,7 @@ void fxbus_init(fxbus_t *f, int16_t *dly_buf, int dly_len)
     f->dl_quiet = dly_len;
     f->dl_type = 0;
     f->wear = 64.0f / 127.0f;
-    fx_dl_width(f, 1.0f);
+    fx_dl_width(f, 0.0f);
 
     f->comp = 0.0f;
     f->drive = 2.0f;

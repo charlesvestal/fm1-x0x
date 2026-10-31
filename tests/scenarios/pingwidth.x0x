@@ -1,37 +1,38 @@
-# FX > SEL list > PING WIDTH: a new project's is the full width; down to centred from the list; undo
-# and redo carry it to the engine; saved at half width, it loads at half width; a project saved before
-# the setting (sound revision 5: its slot held a 0) loads at the full width it played at
+# FX > SEL list > PING WIDTH: a new project's is 0 (no ping-pong); up to full and down to off from the
+# list; undo and redo carry it to the engine; saved at half width, it loads at half width; a project
+# saved before the setting (sound revision 5) loads with PING-PONG's switch as the width: on 127, off 0
 wait 300
-expect sound4.1.1 127
-expect dlwb 0
+expect sound4.1.1 0
+expect dlping 0
 listen
 tap FX
 tap SEL
 turn SELECT 20
 wait 600
-said PING WIDTH 127, 12 OF 12
+said PING WIDTH 0, 11 OF 11
 shot pingwidth_list.png
-turn ALGO -127
-expect sound4.1.1 0
-expect dlwb 707
-shot pingwidth_centred.png
-# undo (HOME + REC): full width again, in the engine too; redo (HOME + PLAY): centred
+turn ALGO 127
+expect sound4.1.1 127
+expect dlping 1
+expect dlwb 0
+shot pingwidth_full.png
+# undo (HOME + REC): off again, in the engine too; redo (HOME + PLAY): full
 wait 600
 press HOME
 tap REC
 release HOME
 wait 100
-expect sound4.1.1 127
-expect dlwb 0
+expect sound4.1.1 0
+expect dlping 0
 press HOME
 tap PLAY
 release HOME
 wait 100
-expect sound4.1.1 0
-expect dlwb 707
+expect sound4.1.1 127
+expect dlping 1
 # half width, saved: loads at half width
 wait 600
-turn ALGO 64
+turn ALGO -63
 expect sound4.1.1 64
 expect dlwb 498
 tap HOME
@@ -40,13 +41,26 @@ wait 300
 reboot
 wait 300
 expect sound4.1.1 64
+expect dlping 1
 expect dlwb 498
-# saved by a firmware before PING WIDTH (its slot 0): full width
+# saved by a firmware before PING WIDTH, PING-PONG on: full width
 param 4 1 1 0
+param 4 0 15 1
 sndrev 5
 tap SAVE
 wait 300
 reboot
 wait 300
 expect sound4.1.1 127
+expect dlping 1
 expect dlwb 0
+# the same with PING-PONG off: off
+param 4 1 1 33
+param 4 0 15 0
+sndrev 5
+tap SAVE
+wait 300
+reboot
+wait 300
+expect sound4.1.1 0
+expect dlping 0

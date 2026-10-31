@@ -546,9 +546,9 @@ sends, and has two pages:
   the far left (DIGI) is a clean 12-bit digital delay; turned up, it is a tape delay that wobbles,
   saturates and wears more the further you turn it, and can feed back on itself at high feedback.
 
-In SEL's list, under MORE: each effect's low cut and return level, PING-PONG, which bounces the
-echoes between left and right, and PING WIDTH, how far apart: 127 puts them hard left and right, 0
-in the centre.
+In SEL's list, under MORE: each effect's low cut and return level, and PING WIDTH, which bounces the
+echoes between left and right: 0 is off, 127 puts them hard left and right, and between, closer
+together.
 
 ---
 
@@ -912,7 +912,7 @@ in SEL's list; the rest are its sound pages.
 | Effect page | Settings |
 |---|---|
 | REVERB | Decay, Tone; in the list: low cut, return level |
-| DELAY | Time (1/32, 1/16T, 1/16, 1/8T, 1/16., 1/8, 1/4T, 1/8., 1/4, 1/2T, 1/4., 1/2, 1/2.), Feedback, Tone, Tape (DIGI, then tape and its wear); in the list: low cut, return level, ping-pong |
+| DELAY | Time (1/32, 1/16T, 1/16, 1/8T, 1/16., 1/8, 1/4T, 1/8., 1/4, 1/2T, 1/4., 1/2, 1/2.), Feedback, Tone, Tape (DIGI, then tape and its wear); in the list: low cut, return level, ping width (0 = off) |
 | MASTER | Drive, Comp, Pump, Filter; in the list: the compressor's details, pump by, resonance, limiter, the drive's type, glue and volume |
 
 The delay follows the tempo, including an external MIDI clock. A delay longer than two seconds

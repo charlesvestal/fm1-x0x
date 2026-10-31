@@ -114,7 +114,7 @@ struct fxbus {
     int32_t dlen, w, dl_quiet;
     float dcur, lp, tape_hp;
     uint32_t wow_ph, flut_ph;
-    int32_t dl_ping;                  /* X0X: ping-pong, a second tap at twice the time */
+    int32_t dl_ping;                  /* X0X: ping-pong (PING WIDTH above 0), a second tap at twice the time */
     float dl_wa, dl_wb;               /* X0X: ping-pong's width: each echo goes to its own side at dl_wa
                                        * and to the other at dl_wb (FX_DL_WIDTH) */
     /* master */
