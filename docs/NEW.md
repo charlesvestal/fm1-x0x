@@ -3,6 +3,30 @@
 The newest version first. Install it with the [web installer](../install/); the
 [manual](../manual/) covers everything in detail.
 
+## 1.2.0 · 1 November 2026
+
+- Tap tempo. Hold HOME and tap SEQ in time, from any screen, playing or stopped. From the third tap
+  in a row it sets the tempo and follows the last four taps; playing, each tap also puts the beat on
+  your tap. One or two stray taps change nothing. Thanks @TomPeak.
+- MIDI CC in and out. A controller turns X0X's knobs: each part on its own channel, the mixer, the
+  effects and the master on MIX MIDI CH (1). The map is fixed and matches CTL-1's, so CTL-1 plays
+  X0X as it comes. GLO > CC OUT sends the knobs you turn (KNOBS), or also what knob motion and p-locks
+  play (ALL), never at the cost of a note. Section 16 of the manual has the map.
+- A new reverb, ROOM: smoother and wider, with less fizz on low tails such as a tom's. It replaces the
+  old one; your DECAY and TONE settings carry over. Thanks @luchak.
+- PING WIDTH (FX, in SEL's list) sets how far apart ping-pong's echoes sit: 0 is off, 127 hard left
+  and right, and between, closer together. It replaces the PING-PONG switch. Thanks @luchak.
+- Turning SWING while playing no longer pushes parts off the beat, and a random or reverse 303 with
+  swing stays on its grid. Thanks @luchak.
+- A BD's pan motion in a project from before 9 October now stays on the pan when it loads, instead of
+  moving to the reverb send. Thanks @luchak.
+- The 303, 909 and 808 use less of the processor for exactly the same sound, after Optimist's
+  speed-ups (henri): the busiest test pattern's peak went from 102% to 99%.
+- The installer takes M-VAVE's stock firmware V16 as well as V15.
+- The emulator and the site's pages work with a screen reader and the keyboard.
+- Releases are now built and signed on GitHub, so the Firmware Hub can check where a package came
+  from. Thanks @keremimo.
+
 ## 1.1.0 · 15 October 2026
 
 - X0X works with a screen reader. Plug the FM-1 into a computer and open the
