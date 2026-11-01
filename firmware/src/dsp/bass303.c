@@ -55,6 +55,53 @@ static const x0x_param_t params[BASS303_NPARAMS] = {
     { "AccDec", 127, 7, 0 },         /* 30 .. 3000 ms (Devilfish); 7 = 194 ms, stock is 200 */
 };
 
+/* ---- drive scaling (X0X; not in drive.h) ------------------------------------------------
+ * The drive always sees the voice at one level, DRV_REF, and Volume is applied after it, so
+ * Volume no longer sets how hard the drive is hit. A makeup gain per Drive pot keeps the
+ * loudness level with Drive 0 (K-weighted, ITU-R BS.1770, measured on an acid line: cutoff 45,
+ * reso 95, envmod 85, decay 45, accent 90, saw), and a deliberate rise on top of it, linear in
+ * dB, reaches +3 dB at full Drive. Drive 0 is still a bypass. */
+#define DRV_REF 0.18620871f              /* -14.6 dB: about Volume 96's level (-14.65 dB) */
+#define DRV_RISE 3.0f
+#define RAT_TONE_HZ 936.48098f           /* the stock tone: 1 / (2 pi (0.5 * 100k + 1.5k) 3.3n) */
+
+static const float makeup_soft[128] = {
+    1.0000f, 1.0262f, 1.0275f, 1.0289f, 1.0303f, 1.0319f, 1.0335f, 1.0354f,
+    1.0372f, 1.0393f, 1.0414f, 1.0438f, 1.0462f, 1.0491f, 1.0520f, 1.0548f,
+    1.0577f, 1.0613f, 1.0649f, 1.0685f, 1.0721f, 1.0766f, 1.0810f, 1.0854f,
+    1.0899f, 1.0957f, 1.1015f, 1.1074f, 1.1133f, 1.1192f, 1.1252f, 1.1312f,
+    1.1372f, 1.1452f, 1.1533f, 1.1614f, 1.1696f, 1.1778f, 1.1861f, 1.1945f,
+    1.2029f, 1.2135f, 1.2243f, 1.2351f, 1.2460f, 1.2570f, 1.2681f, 1.2793f,
+    1.2906f, 1.3044f, 1.3183f, 1.3323f, 1.3465f, 1.3608f, 1.3753f, 1.3899f,
+    1.4047f, 1.4222f, 1.4400f, 1.4579f, 1.4761f, 1.4945f, 1.5132f, 1.5320f,
+    1.5511f, 1.5733f, 1.5958f, 1.6186f, 1.6418f, 1.6652f, 1.6891f, 1.7132f,
+    1.7377f, 1.7657f, 1.7941f, 1.8230f, 1.8524f, 1.8822f, 1.9125f, 1.9433f,
+    1.9746f, 2.0098f, 2.0456f, 2.0821f, 2.1192f, 2.1570f, 2.1954f, 2.2345f,
+    2.2744f, 2.3186f, 2.3637f, 2.4096f, 2.4565f, 2.5042f, 2.5529f, 2.6026f,
+    2.6532f, 2.7087f, 2.7653f, 2.8232f, 2.8822f, 2.9425f, 3.0041f, 3.0669f,
+    3.1311f, 3.2007f, 3.2720f, 3.3447f, 3.4192f, 3.4952f, 3.5730f, 3.6525f,
+    3.7337f, 3.8212f, 3.9106f, 4.0022f, 4.0959f, 4.1917f, 4.2899f, 4.3903f,
+    4.4931f, 4.6024f, 4.7144f, 4.8291f, 4.9467f, 5.0670f, 5.1903f, 5.3166f,
+};
+static const float makeup_rat[128] = {
+    1.0000f, 1.6276f, 1.6302f, 1.6332f, 1.5906f, 1.5451f, 1.5002f, 1.4562f,
+    1.4136f, 1.3730f, 1.3335f, 1.2973f, 1.2621f, 1.2332f, 1.2050f, 1.1775f,
+    1.1506f, 1.1342f, 1.1181f, 1.1022f, 1.0865f, 1.0826f, 1.0788f, 1.0750f,
+    1.0712f, 1.0785f, 1.0859f, 1.0934f, 1.1009f, 1.1171f, 1.1335f, 1.1502f,
+    1.1671f, 1.1631f, 1.1350f, 1.1077f, 1.0810f, 1.0554f, 1.0304f, 1.0059f,
+    0.9821f, 0.9603f, 0.9389f, 0.9180f, 0.8976f, 0.8776f, 0.8581f, 0.8390f,
+    0.8204f, 0.8041f, 0.7882f, 0.7726f, 0.7573f, 0.7423f, 0.7276f, 0.7132f,
+    0.6990f, 0.6868f, 0.6747f, 0.6629f, 0.6512f, 0.6398f, 0.6286f, 0.6176f,
+    0.6067f, 0.5972f, 0.5878f, 0.5785f, 0.5694f, 0.5604f, 0.5516f, 0.5429f,
+    0.5344f, 0.5269f, 0.5196f, 0.5123f, 0.5052f, 0.4981f, 0.4912f, 0.4843f,
+    0.4776f, 0.4717f, 0.4660f, 0.4603f, 0.4547f, 0.4492f, 0.4437f, 0.4383f,
+    0.4330f, 0.4284f, 0.4239f, 0.4195f, 0.4151f, 0.4107f, 0.4064f, 0.4021f,
+    0.3979f, 0.3945f, 0.3912f, 0.3880f, 0.3847f, 0.3815f, 0.3783f, 0.3751f,
+    0.3720f, 0.3696f, 0.3672f, 0.3648f, 0.3624f, 0.3600f, 0.3576f, 0.3553f,
+    0.3530f, 0.3508f, 0.3487f, 0.3466f, 0.3446f, 0.3425f, 0.3404f, 0.3384f,
+    0.3363f, 0.3340f, 0.3318f, 0.3295f, 0.3272f, 0.3250f, 0.3228f, 0.3206f,
+};
+
 int bass303_nparams(void) { return BASS303_NPARAMS; }
 
 const x0x_param_t *bass303_param(int i)
@@ -132,13 +179,61 @@ static void bq_low_shelf(bass303_bq_t *q, float fc, float gain_db, float fs)
     q->a2 = ((A + 1.0f) + (A - 1.0f) * cs - s2) / a0;
 }
 
+/* Return Volume pot v's gain in dB (the voice's level; with the drive on, after it). */
+static float vol_db(int v) { return -60.0f + 60.0f * ((float)v * (1.0f / 127.0f)); }
+
+/* Return Soft's input gain in dB at Drive pot d, at the drive's fixed input level DRV_REF. */
+static float soft_db(int d) { return -2.0f + 32.0f * (float)d * (1.0f / 127.0f); }
+
+/* Return where Drive pot `pot` is on the RAT's taper, 0..1 over pots 1..127. */
+static float rat_t(int pot)
+{
+    return fm_clampf((float)(pot - 1) * (1.0f / 126.0f), 0.0f, 1.0f);
+}
+
+/* Return the RAT's distortion resistance, 0..1 (drive.h's dist), at Drive pot `pot`. drive.h maps
+ * the pot to it linearly, so the op-amp's gain at 1 kHz, 1 + dist * 100k / |Z1| (|Z1| ~ 81 ohm), is
+ * already +21 dB at the first step and most of the knob is used up in its first tenth. Here the knob
+ * is linear in that gain in dB, up to drive.h's maximum (dist = 1, ~61.8 dB). */
+static float rat_dist(int pot)
+{
+    float t = rat_t(pot);
+    if (t <= 0.0f)
+        return 0.0f;
+    return fm_minf((c_db2lin(61.8f * t) - 1.0f) * 81e-5f, 1.0f);
+}
+
+/* Set the RAT's tone one-pole (drive.h: fixed at the stock 936 Hz) for the Drive pot: open to 12 kHz
+ * at the bottom of the taper, closing, log-interpolated, to the stock tone a quarter of the way up
+ * (Drive ~33), about where the distortion's harmonics make up for it. So low Drive brightens the
+ * voice, as the distortion would, instead of dulling it before the distortion arrives; open for
+ * longer, it leaves the op-amp's mid boost unchecked and the voice hollow. */
+static void rat_tone(bass303_t *b)
+{
+    float u = fm_minf(4.0f * rat_t(b->pot[BASS303_DRIVE]), 1.0f);
+    float fc = RAT_TONE_HZ * c_exp2f((1.0f - u) * 3.6796409f);   /* log2(12000 / RAT_TONE_HZ) */
+    b->r_tone_b1 = c_expf(-FM_TWO_PI / BASS303_SR * fc);
+}
+
+/* Set the gain after the drive for the Drive pot: the makeup with its rise. */
+static void drv_gains(bass303_t *b)
+{
+    int p = b->pot[BASS303_DRIVE], rat = b->drv_type == BASS303_DRV_RAT;
+    float rise = DRV_RISE * (float)p * (1.0f / 127.0f);
+    b->drv_makeup = (rat ? makeup_rat : makeup_soft)[p] * c_db2lin(rise);
+}
+
+/* Return whether the drive is on (a type, and Drive above 0). */
+static int drive_on(const bass303_t *b) { return b->drv_type != BASS303_DRV_OFF && b->pot[BASS303_DRIVE] > 0; }
+
+
 /* RAT op-amp: drive.h rat::State::update_op_amp_coeffs + the correction one-pole cutoff */
 static void rat_coeffs(bass303_t *b)
 {
     const float R1 = 100000.0f, C1 = 1e-10f, Z1_B0 = 2.72149e-7f, Z1_B1 = 0.0027354f;
     const float Z1_A0 = 6.27638e-9f, Z1_A1 = 0.0000069f;
     const float t = 1.0f / BASS303_SR, s0 = t * 0.5f, s1 = t * t * 0.25f, s2 = t * t * t * 0.125f;
-    float dist = fm_maxf(b->drv_amt, 0.001f);
+    float dist = fm_maxf(rat_dist(b->pot[BASS303_DRIVE]), 0.0001f);
     float z2_b0 = fm_maxf(dist * R1, 1.0f), z2_a0 = z2_b0 * C1;
     float a0 = Z1_B0 * z2_a0, a1 = Z1_B0 + Z1_B1 * z2_a0, a2 = Z1_B1 + z2_a0;
     float num[4], den[4], nz[4], dz[4], inv;
@@ -163,9 +258,19 @@ static void rat_coeffs(bass303_t *b)
     b->r_corr_b1 = c_expf(-FM_TWO_PI / BASS303_SR * 1119360.558f / (dist * 2306.231003f + 1.0f));
 }
 
+/* Clear the drive's filter and DC-blocker state: a fresh start (drive.h set_model). */
+static void clear_drive_state(bass303_t *b)
+{
+    b->s_pre.z1 = b->s_pre.z2 = b->s_post.z1 = b->s_post.z2 = 0.0f;
+    b->up_lp.z1 = b->up_lp.z2 = b->down_lp.z1 = b->down_lp.z2 = 0.0f;
+    b->r_z[0] = b->r_z[1] = b->r_z[2] = b->r_corr_z = b->r_tone_z = 0.0f;
+    b->dcb_x1 = b->dcb_y1 = 0.0f;
+}
+
 void bass303_set(bass303_t *b, int i, int v)
 {
     float n;
+    int was_on = drive_on(b);
     if (i < 0 || i >= BASS303_NPARAMS)
         return;
     if (v < 0)
@@ -174,6 +279,10 @@ void bass303_set(bass303_t *b, int i, int v)
         v = params[i].max;
     b->pot[i] = (uint8_t)v;
     n = (float)v * (1.0f / 127.0f);
+    /* the drive coming on (from Drive 0, or from Off): start it fresh, not from the state it was
+     * left in when it went off, which its output gain would bring out as a click */
+    if (!was_on && drive_on(b))
+        clear_drive_state(b);
     switch (i) {
     case BASS303_CUTOFF:
         b->cutoff = 314.0f * c_exp2f(n * 2.930586688f);       /* log2(2394/314) */
@@ -201,26 +310,24 @@ void bass303_set(bass303_t *b, int i, int v)
         b->tuning = 440.0f + (float)(v - 64) * 0.625f;
         break;
     case BASS303_VOLUME:
-        b->amp_scaler = c_db2lin(-60.0f + 60.0f * n);
+        b->amp_scaler = c_db2lin(vol_db(v));
         break;
     case BASS303_SLIDE:                                        /* slew tau = 0.2 * slide time */
         b->slew_c = rc_coeff(0.2f * (2.0f + 358.0f * n), BASS303_SR);
         powers(b->slew_pw, b->slew_c);
         break;
     case BASS303_DRIVE:
-        b->drv_amt = n;
-        b->s_gain = c_db2lin(24.0f * n);
+        b->s_gain = c_db2lin(soft_db(v));                     /* drive.h: 24 n dB (at the Volume's level) */
         b->s_inv = 1.0f / b->s_gain;
         rat_coeffs(b);
+        rat_tone(b);
+        drv_gains(b);
         break;
     case BASS303_DRVTYPE:
-        if (v != b->drv_type) {                                /* drive.h set_model: fresh state */
-            b->s_pre.z1 = b->s_pre.z2 = b->s_post.z1 = b->s_post.z2 = 0.0f;
-            b->up_lp.z1 = b->up_lp.z2 = b->down_lp.z1 = b->down_lp.z2 = 0.0f;
-            b->r_z[0] = b->r_z[1] = b->r_z[2] = b->r_corr_z = b->r_tone_z = 0.0f;
-            b->dcb_x1 = b->dcb_y1 = 0.0f;
-        }
+        if (v != b->drv_type)                                  /* drive.h set_model: fresh state */
+            clear_drive_state(b);
         b->drv_type = v;
+        drv_gains(b);
         break;
     }
 }
@@ -228,7 +335,9 @@ void bass303_set(bass303_t *b, int i, int v)
 /* clear everything that only matters while sound is running (Open303::triggerNote after idle) */
 static void clear_audio_state(bass303_t *b)
 {
+#if BASS303_OS >= 2
     int i;
+#endif
     b->dc.x1 = b->dc.x2 = b->dc.y1 = b->dc.y2 = 0.0f;
     b->hp1_x1 = b->hp1_y1 = 0.0f;
     b->f_y1 = b->f_y2 = b->f_y3 = b->f_y4 = b->fb_x1 = b->fb_y1 = 0.0f;
@@ -242,12 +351,7 @@ static void clear_audio_state(bass303_t *b)
 #endif
     b->ap_x1 = b->ap_y1 = b->hp2_x1 = b->hp2_y1 = 0.0f;
     b->nt.x1 = b->nt.x2 = b->nt.y1 = b->nt.y2 = 0.0f;
-    b->s_pre.z1 = b->s_pre.z2 = b->s_post.z1 = b->s_post.z2 = 0.0f;
-    b->up_lp.z1 = b->up_lp.z2 = b->down_lp.z1 = b->down_lp.z2 = 0.0f;
-    for (i = 0; i < 3; i++)
-        b->r_z[i] = 0.0f;
-    b->r_corr_z = b->r_tone_z = 0.0f;
-    b->dcb_x1 = b->dcb_y1 = 0.0f;
+    clear_drive_state(b);
     b->amp_y = 0.0f;
 }
 
@@ -319,8 +423,7 @@ static void fixed_init(void)
     bq_low_shelf(&bass303_k.s_post, 400.0f, -6.0f, BASS303_SR);
     bq_lowpass(&bass303_k.up_lp, 19000.0f, 2.0f * BASS303_SR);
     bq_lowpass(&bass303_k.down_lp, 19000.0f, 2.0f * BASS303_SR);
-    /* tone fixed at 0.5: 1 / (2 pi (0.5 * 100k + 1.5k) 3.3n) */
-    bass303_k.r_tone_b1 = c_expf(-FM_TWO_PI / BASS303_SR / (FM_TWO_PI * 51500.0f * 3.3e-9f));
+    /* (the RAT's tone: rat_tone, with Drive) */
     bass303_k.ready = 1;
 }
 
@@ -542,8 +645,8 @@ static void down_pass(bass303_t *b, const float *u, float *y, int n, float g)
     bq_put(&l, &b->down_lp);
 }
 
-/* the DC blocker (0.9996) in place */
-static void dcb_pass(bass303_t *b, float *x, int n)
+/* the DC blocker (0.9996) in place, times g */
+static void dcb_pass(bass303_t *b, float *x, int n, float g)
 {
     float x1 = b->dcb_x1, y1 = b->dcb_y1;
     int i;
@@ -551,14 +654,15 @@ static void dcb_pass(bass303_t *b, float *x, int n)
         float y = x[i], yh = y - x1 + 0.9996f * y1;
         x1 = y;
         y1 = yh;
-        x[i] = yh;
+        x[i] = g * yh;
     }
     b->dcb_x1 = x1;
     b->dcb_y1 = y1;
 }
 
-/* Soft: pre shelf x gain, 2x up, tanh(u + 0.15) - its value at 0, 2x down, x 1/gain, post shelf, DC blocker */
-static BASS303_PASS void drive_soft(bass303_t *b, float *out, int n)
+/* Soft: pre shelf x gain, 2x up, tanh(u + 0.15) - its value at 0, 2x down, x 1/gain, post shelf, DC blocker,
+ * x wg */
+static BASS303_PASS void drive_soft(bass303_t *b, float *out, int n, float wg)
 {
     float u[2 * BASS303_DSUB];
     int i;
@@ -568,12 +672,12 @@ static BASS303_PASS void drive_soft(bass303_t *b, float *out, int n)
         u[i] = fm_tanhf(u[i] + 0.15f) - 0.14888503f;
     down_pass(b, u, out, n, b->s_inv);
     bq_pass(&bass303_k.s_post, &b->s_post, out, n, 1.0f);
-    dcb_pass(b, out, n);
+    dcb_pass(b, out, n, wg);
 }
 
 /* RAT: op-amp (3rd-order TDF-II), the correction one-pole x 1.877, 2x up, the clipper, 2x down x 0.3204805,
- * the tone one-pole, DC blocker */
-static BASS303_PASS void drive_rat(bass303_t *b, float *out, int n)
+ * the tone one-pole, DC blocker, x wg */
+static BASS303_PASS void drive_rat(bass303_t *b, float *out, int n, float wg)
 {
     float u[2 * BASS303_DSUB];
     int i;
@@ -606,7 +710,7 @@ static BASS303_PASS void drive_rat(bass303_t *b, float *out, int n)
     }
     down_pass(b, u, out, n, 0.3204805f);
     {
-        const float tb1 = bass303_k.r_tone_b1, tb0 = 1.0f - tb1;
+        const float tb1 = b->r_tone_b1, tb0 = 1.0f - tb1;
         float z = b->r_tone_z;
         for (i = 0; i < n; i++) {
             z = out[i] * tb0 + z * tb1;
@@ -614,18 +718,20 @@ static BASS303_PASS void drive_rat(bass303_t *b, float *out, int n)
         }
         b->r_tone_z = z;
     }
-    dcb_pass(b, out, n);
+    dcb_pass(b, out, n, wg);
 }
 
 static void drive_block(bass303_t *b, float *out, int n)
 {
+    /* Volume and the makeup, after the drive */
+    const float wg = b->amp_scaler * (1.0f / DRV_REF) * b->drv_makeup;
     int i, ns;
     for (i = 0; i < n; i += ns) {
         ns = n - i < BASS303_DSUB ? n - i : BASS303_DSUB;
         if (b->drv_type == BASS303_DRV_SOFT)
-            drive_soft(b, out + i, ns);
+            drive_soft(b, out + i, ns, wg);
         else
-            drive_rat(b, out + i, ns);
+            drive_rat(b, out + i, ns, wg);
     }
 }
 
@@ -831,10 +937,12 @@ static void run_voice(bass303_t *b, float *ab, float *osb, int n, int nos)
     }
 }
 
-/* pass 2: the amp de-clicked (200 Hz Butterworth), times the volume, in place */
+/* pass 2: the amp de-clicked (200 Hz Butterworth), times the volume (driven: the drive's level, the volume after
+ * it), in place */
 static BASS303_PASS void run_amp(bass303_t *b, float *ab, int n)
 {
-    const float b0 = bass303_k.dc_b0, b1 = bass303_k.dc_b1, a1 = bass303_k.dc_a1, a2 = bass303_k.dc_a2, g = b->amp_scaler;
+    const float b0 = bass303_k.dc_b0, b1 = bass303_k.dc_b1, a1 = bass303_k.dc_a1, a2 = bass303_k.dc_a2;
+    const float g = drive_on(b) ? DRV_REF : b->amp_scaler;
     float x1 = b->dc.x1, x2 = b->dc.x2, y1 = b->dc.y1, y2 = b->dc.y2;
     int i;
     _Pragma("clang loop unroll_count(2)")   /* (no register moves for the state between samples) */
@@ -959,7 +1067,7 @@ void bass303_render(bass303_t *b, float *out, int n)
     }
     run(b, out, n);
 
-    if (b->drv_type != BASS303_DRV_OFF && b->drv_amt > 0.0f)
+    if (drive_on(b))
         drive_block(b, out, n);
 
     /* states that decay toward zero while the engine still runs (the idle hold-off, where the
@@ -985,9 +1093,10 @@ void bass303_render(bass303_t *b, float *out, int n)
     b->dcb_y1 = fm_flush(b->dcb_y1);
 
     /* idle: gate off, amp envelope and de-clicker below -120 dB and the drive's DC blocker
-     * settled, for BASS303_IDLE_HOLD samples in a row (see bass303.h) */
+     * settled (below -120 dB at the output: its state is at DRV_REF, scaled after it), for
+     * BASS303_IDLE_HOLD samples in a row (see bass303.h) */
     if (!b->gate && b->amp_y < 1e-6f && fm_fabsf(b->dc.y1) < 1e-6f && fm_fabsf(b->dc.y2) < 1e-6f
-        && fm_fabsf(b->dcb_y1) < 1e-6f) {
+        && fm_fabsf(b->dcb_y1) * (b->amp_scaler * (1.0f / DRV_REF) * b->drv_makeup) < 1e-6f) {
         b->quiet += n;
         if (b->quiet >= BASS303_IDLE_HOLD) {
             clear_audio_state(b);

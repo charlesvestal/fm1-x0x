@@ -3,7 +3,7 @@
  * (github.com/w0ts/optimist 3b695372, a64ca03b, GPL-3.0-only). */
 /* X0X TB-303 bass engine: a C99 / float / no-libm port of Open303 (Robin Schmidt, MIT) with
  * the Devilfish ranges and the Soft / RAT drive of schwung-303 (GPL-3.0; the RAT model is
- * from davemollen/dm-Rat, GPL-3.0).
+ * from davemollen/dm-Rat, GPL-3.0), the drive rescaled (below).
  *
  * What is the same as schwung-303's engine: the signal path and every constant of Open303's
  * getSample() - pitch slew, the decay envelope with its two RC followers, the measured
@@ -29,6 +29,13 @@
  *    in, as Open303's own triggerNote() does after idle (schwung-303 never idles).
  *  - Only the four Devilfish controls that fit the panel are exposed (slide time, accent
  *    decay); the others stay at the stock values plugin.cpp uses with Devilfish off.
+ *  - Drive (drive.h's models, rescaled): drive.h applies Volume before the drive, so Volume
+ *    also set how hard it was hit, and Soft lost level as Drive rose while RAT was fully on
+ *    from its first step. Here the voice reaches the drive at one level (Volume 96's) and
+ *    Volume comes after it; a makeup gain per Drive pot keeps the level (with a small
+ *    deliberate rise); Soft's input gain is -2 + 32 n dB; RAT's knob is linear in its
+ *    op-amp's gain in dB, from its minimum at Drive 1, and its tone one-pole (drive.h:
+ *    fixed at 936 Hz) opens at low Drive. Drive 0 is a bypass, as in drive.h.
  *
  * Every instance is self-contained (no mutable static state): two can run side by side. */
 #pragma once
@@ -98,7 +105,7 @@ typedef struct bass303 {
     float slew_c;            /* pitch slew-limiter coefficient */
     int wave;                /* 0 saw, 1 square */
     int drv_type;
-    float drv_amt;
+    float drv_makeup;        /* after the drive: makeup gain */
 
     int lite, lite_cur;      /* X0X overload guard: render without oversampling (bass303_set_lite) */
 
@@ -135,11 +142,11 @@ typedef struct bass303 {
     float ap_x1, ap_y1, hp2_x1, hp2_y1;
     bass303_df1_t nt;
 
-    /* drive (schwung-303 drive.h) */
+    /* drive (schwung-303 drive.h, rescaled: bass303.c) */
     bass303_bqz_t s_pre, s_post, up_lp, down_lp;   /* (their coefficients: bass303_fixed_t) */
     float s_gain, s_inv;
     float r_b[4], r_a[4], r_z[3];        /* RAT op-amp, 3rd-order TDF-II */
-    float r_corr_b1, r_corr_z, r_tone_z;
+    float r_corr_b1, r_corr_z, r_tone_b1, r_tone_z;
     float dcb_x1, dcb_y1;
 } bass303_t;
 
@@ -158,7 +165,6 @@ typedef struct {
     float nt_b0, nt_b1, nt_a1, nt_a2;   /* 7.5 Hz notch (b2 = b0) */
     float sq_dc, sq_h;                  /* 303 square: mean, hard-edge height */
     bass303_bq_t s_pre, s_post, up_lp, down_lp;   /* drive: Soft shelves, the 2x resampler's lowpasses */
-    float r_tone_b1;                    /* RAT tone one-pole */
     int ready;
 } bass303_fixed_t;
 
