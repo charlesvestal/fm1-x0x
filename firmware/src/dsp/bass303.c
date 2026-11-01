@@ -60,7 +60,8 @@ static const x0x_param_t params[BASS303_NPARAMS] = {
  * Volume no longer sets how hard the drive is hit. A makeup gain per Drive pot keeps the
  * loudness level with Drive 0 (K-weighted, ITU-R BS.1770, measured on an acid line: cutoff 45,
  * reso 95, envmod 85, decay 45, accent 90, saw), and a deliberate rise on top of it, linear in
- * dB, reaches +3 dB at full Drive. Drive 0 is still a bypass. */
+ * dB, reaches +3 dB at full Drive. Drive 0 is still a bypass. tools/measure_drive_makeup.py
+ * measures the tables; re-measure them after changing what the drive does to the level. */
 #define DRV_REF 0.18620871f              /* -14.6 dB: about Volume 96's level (-14.65 dB) */
 #define DRV_RISE 3.0f
 #define RAT_TONE_HZ 936.48098f           /* the stock tone: 1 / (2 pi (0.5 * 100k + 1.5k) 3.3n) */
@@ -226,6 +227,113 @@ static void drv_gains(bass303_t *b)
 /* Return whether the drive is on (a type, and Drive above 0). */
 static int drive_on(const bass303_t *b) { return b->drv_type != BASS303_DRV_OFF && b->pot[BASS303_DRIVE] > 0; }
 
+/* The migration of a project saved before the drive was rescaled (project.c, sound revision 7):
+ * the new Drive and Volume that sound as an old setting did.
+ *
+ * Soft: the same level into its shaper, so its output is the old one times the makeup, which the
+ * Volume takes back out: exact, within the new range. Past its top (old Volume above about 106,
+ * with Drive high) the new maximum saturates less than the old setting did; the Volume still
+ * matches the level, to within about 1 dB. (tools/fit_drive_migration.py --check measures both
+ * types.)
+ *
+ * RAT: drive.h's dist sets the op-amp's tone as well as its gain, so no rule in its gain matches
+ * the sound. tools/fit_drive_migration.py measures it instead: for each old (Volume, Drive), the
+ * new Drive closest in spectral shape and the Volume that matches its loudness, at a grid of
+ * nodes (Volume every 8; Drive denser low down, where the old gain rose fastest), interpolated
+ * between them. The Drive table is monotone, so a lane sweeping either pot moves it one way, and
+ * smooth: where the old knob hardly changed the sound, nor does the mapping. */
+static const uint8_t rat_mig_vn[17] = {0, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 127};
+static const uint8_t rat_mig_dn[20] = {1, 2, 4, 8, 12, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 127};
+/* tools/fit_drive_migration.py */
+static const uint8_t rat_mig_drive[17][20] = {
+    { 45,  45,  45,  45,  45,  46,  50,  58,  77,  85,  94, 103, 109, 114, 118, 121, 123, 124, 125, 126},
+    { 45,  45,  45,  45,  45,  46,  50,  58,  77,  85,  94, 103, 109, 114, 118, 121, 123, 124, 125, 126},
+    { 45,  45,  45,  45,  45,  46,  51,  59,  77,  85,  95, 104, 110, 114, 118, 121, 123, 124, 125, 126},
+    { 45,  45,  45,  45,  45,  47,  53,  63,  77,  85,  95, 105, 111, 115, 119, 121, 123, 124, 125, 126},
+    { 45,  45,  45,  45,  45,  48,  56,  69,  78,  86,  96, 106, 112, 116, 119, 121, 123, 124, 125, 126},
+    { 45,  45,  45,  45,  48,  52,  62,  74,  83,  92, 100, 107, 112, 116, 119, 121, 123, 124, 125, 126},
+    { 45,  45,  45,  45,  49,  55,  69,  80,  89,  97, 103, 109, 113, 116, 119, 121, 123, 124, 125, 126},
+    { 45,  45,  45,  49,  55,  62,  76,  86,  94, 101, 106, 111, 114, 117, 119, 121, 123, 124, 125, 126},
+    { 47,  47,  47,  55,  63,  70,  82,  91,  98, 104, 108, 112, 115, 117, 119, 121, 123, 124, 125, 126},
+    { 50,  50,  52,  63,  71,  78,  88,  95, 101, 106, 110, 113, 116, 118, 120, 122, 123, 124, 125, 126},
+    { 54,  54,  59,  70,  78,  84,  93,  99, 104, 108, 111, 114, 116, 118, 120, 122, 123, 124, 125, 126},
+    { 60,  60,  67,  77,  84,  89,  96, 102, 106, 109, 112, 115, 117, 119, 121, 122, 123, 124, 125, 126},
+    { 66,  67,  74,  83,  88,  93,  99, 103, 107, 110, 113, 115, 117, 119, 121, 122, 123, 124, 125, 126},
+    { 72,  74,  80,  87,  92,  96, 101, 105, 108, 111, 113, 115, 117, 119, 121, 122, 123, 124, 125, 126},
+    { 78,  80,  85,  91,  95,  98, 102, 105, 108, 111, 113, 115, 117, 119, 121, 122, 123, 124, 125, 126},
+    { 83,  85,  89,  94,  97,  99, 103, 106, 109, 111, 113, 115, 117, 119, 121, 122, 123, 124, 125, 126},
+    { 86,  87,  91,  95,  98, 100, 103, 106, 109, 111, 113, 115, 117, 119, 121, 122, 123, 124, 125, 126},
+};
+static const uint8_t rat_mig_volume[17][20] = {
+    { 12,  23,  35,  47,  53,  58,  64,  67,  68,  69,  70,  71,  72,  73,  74,  75,  76,  77,  78,  79},
+    { 20,  31,  43,  55,  61,  65,  71,  74,  75,  76,  77,  78,  79,  80,  81,  82,  83,  84,  85,  85},
+    { 28,  39,  51,  62,  68,  72,  78,  81,  81,  82,  83,  84,  85,  86,  87,  88,  88,  89,  90,  91},
+    { 36,  47,  58,  69,  75,  79,  84,  86,  87,  88,  88,  89,  90,  91,  92,  93,  93,  94,  95,  96},
+    { 44,  55,  66,  76,  81,  85,  89,  90,  91,  92,  93,  93,  94,  95,  96,  97,  98,  98,  99, 100},
+    { 51,  62,  73,  82,  87,  90,  93,  94,  95,  96,  97,  97,  98,  99, 100, 100, 101, 102, 102, 103},
+    { 59,  69,  79,  87,  91,  94,  96,  97,  98,  99, 100, 101, 101, 102, 103, 103, 104, 105, 105, 105},
+    { 66,  76,  85,  92,  95,  97,  99, 100, 101, 102, 103, 103, 104, 105, 105, 106, 106, 107, 107, 107},
+    { 73,  82,  90,  95,  98,  99, 101, 103, 104, 104, 105, 106, 106, 107, 107, 108, 108, 108, 108, 109},
+    { 79,  87,  94,  98, 100, 102, 104, 105, 106, 107, 107, 108, 108, 108, 109, 109, 109, 109, 109, 110},
+    { 85,  92,  97, 101, 103, 104, 106, 107, 108, 108, 108, 109, 109, 109, 109, 110, 110, 110, 110, 110},
+    { 90,  95,  99, 103, 105, 106, 107, 108, 109, 109, 109, 109, 110, 110, 110, 110, 110, 110, 110, 111},
+    { 93,  98, 101, 105, 106, 107, 108, 109, 109, 109, 110, 110, 110, 110, 110, 110, 110, 111, 111, 111},
+    { 96, 100, 104, 106, 107, 108, 109, 109, 110, 110, 110, 110, 110, 110, 110, 110, 111, 111, 111, 111},
+    { 99, 102, 105, 107, 108, 109, 110, 110, 110, 110, 110, 110, 110, 110, 110, 111, 111, 111, 111, 111},
+    {102, 105, 107, 108, 109, 109, 110, 110, 110, 110, 110, 110, 110, 110, 111, 111, 111, 111, 111, 111},
+    {103, 106, 108, 109, 109, 110, 110, 110, 110, 110, 110, 110, 110, 110, 111, 111, 111, 111, 111, 111},
+};
+
+/* Return the index of the node at or below x (the last but one at most), and in *off and *w how far
+ * x is from it and the distance to the next node. */
+static int mig_node(const uint8_t *nodes, int n, int x, int *off, int *w)
+{
+    int i = 0;
+    while (i < n - 2 && x >= nodes[i + 1])
+        i++;
+    *off = x - nodes[i];
+    *w = nodes[i + 1] - nodes[i];
+    return i;
+}
+
+/* Return table t at old (Volume, Drive), interpolated between its nodes and rounded to the nearest
+ * pot. In integers, so that a table monotone in either pot interpolates monotone: in floats a value
+ * on a half can round up at one setting and down at the next. */
+static int mig_lookup(const uint8_t t[17][20], int volume, int drive)
+{
+    int fv, wv, fd, wd;
+    int a = mig_node(rat_mig_vn, 17, volume, &fv, &wv), b = mig_node(rat_mig_dn, 20, drive, &fd, &wd);
+    int x = (t[a][b] * (wd - fd) + t[a][b + 1] * fd) * (wv - fv)
+            + (t[a + 1][b] * (wd - fd) + t[a + 1][b + 1] * fd) * fv;      /* the value x (wv wd) */
+    return (2 * x + wv * wd) / (2 * wv * wd);
+}
+
+void bass303_pre_rescale(int type, int volume, int drive, int *new_drive, int *new_volume)
+{
+    const float DB = 6.02059991f;                              /* 20 log10(2): dB from log2 */
+    const float OLD_SOFT_DB = 24.0f;                           /* drive.h's Soft: 24 n dB, at the Volume's level */
+    float vdb = vol_db(volume), want, over, mk;
+    int p;
+    *new_drive = drive;
+    *new_volume = volume;
+    if (drive <= 0 || type == BASS303_DRV_OFF)                 /* 0: a bypass, then and now */
+        return;
+    if (type == BASS303_DRV_RAT) {
+        *new_drive = mig_lookup(rat_mig_drive, volume, drive);
+        *new_volume = mig_lookup(rat_mig_volume, volume, drive);
+        return;
+    }
+    /* Soft: the gain the old shaper had, as one at the drive's level now (DRV_REF), and the pot
+     * that gives it */
+    want = OLD_SOFT_DB * (float)drive * (1.0f / 127.0f) + vdb - DB * c_log2f(DRV_REF);
+    p = (int)fm_clampf(127.0f * (want - soft_db(0)) / (soft_db(127) - soft_db(0)) + 0.5f, 1.0f, 127.0f);
+    /* past the new range's top the shaper is hit less hard than it was; deep in saturation its
+     * output goes as 1 / its input gain, so the old one was quieter by the gain the new one lacks */
+    over = fm_maxf(want - soft_db(127), 0.0f);
+    mk = DB * c_log2f(makeup_soft[p]) + DRV_RISE * (float)p * (1.0f / 127.0f);
+    *new_drive = p;
+    *new_volume = (int)fm_clampf((vdb - mk - over + 60.0f) * (127.0f / 60.0f) + 0.5f, 0.0f, 127.0f);
+}
 
 /* RAT op-amp: drive.h rat::State::update_op_amp_coeffs + the correction one-pole cutoff */
 static void rat_coeffs(bass303_t *b)

@@ -297,6 +297,10 @@ square, DRIVE, SLIDE time); TUNE, VOLUME, DRIVE TYPE (off, soft or RAT) and ACCE
 SEL's list. SEQ has the line's LENGTH (1–64 steps), RATE, DIRECTION (forward, reverse, ping-pong
 or random) and TRANSPOSE. Each 303's level, pan and sends are on the mixer (LFO).
 
+**Drive.** DRIVE at 0 is off. Turning it up keeps the 303 about as loud as without it, rising to
+3 dB louder at the top; RAT starts mild and distorts steadily more. VOLUME comes after the drive,
+so it sets the level without changing how hard the drive is hit.
+
 ---
 
 ## 7. TB-3PO

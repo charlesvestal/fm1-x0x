@@ -1,0 +1,70 @@
+# A project saved before the 303's drive was rescaled (sound revision 5, as 1.1.0 saves, or earlier)
+# loads with each 303's DRIVE moved to the pot that drives as it did and its VOLUME to the one that
+# keeps its level; a DRIVE lane's steps are mapped too, with a VOLUME lane made for them. Drive 0 is
+# left alone. (Values: bass303_pre_rescale; drive303lanes has a VOLUME lane.)
+wait 300
+# 303 A: RAT, Volume 96, Drive 10, and a p-lock of Drive 30 on step 1
+param 2 0 9 2
+param 2 0 7 96
+param 2 0 8 10
+turn ALGO 2
+expect part 2
+tap SEQ
+tapkey w0
+expect gate0.0 1
+tap EDIT
+turn SELECT 1
+key w0 down
+spin K3 20
+key w0 up
+expect lanes 1
+expect laneval2.0.8.0 30
+# 303 B: Soft, Volume 96, Drive 64
+param 2 1 9 1
+param 2 1 7 96
+param 2 1 8 64
+sndrev 5
+tap SAVE
+wait 300
+reboot
+wait 300
+expect lanes 2
+expect sound2.0.8 86
+expect sound2.0.7 106
+expect laneval2.0.8.0 102
+expect laneval2.0.7.0 109
+expect sound2.1.8 56
+expect sound2.1.7 87
+# saved again: now revision 7, nothing moves a second time
+tap SAVE
+wait 300
+reboot
+wait 300
+expect lanes 2
+expect sound2.0.8 86
+expect sound2.0.7 106
+expect laneval2.0.8.0 102
+expect laneval2.0.7.0 109
+# drive 0: the pots as they were
+param 2 1 8 0
+param 2 1 7 96
+sndrev 5
+tap SAVE
+wait 300
+reboot
+wait 300
+expect sound2.1.8 0
+expect sound2.1.7 96
+# from revision 4 (before the break's FILTER, its pot then an unused 0): both revisions apply, the
+# filter off and the 303's drive as before (303 B: Soft, Volume 96, Drive 64, as above)
+param 2 1 8 64
+param 2 1 7 96
+param 3 0 2 0
+sndrev 4
+tap SAVE
+wait 300
+reboot
+wait 300
+expect sound3.0.2 64
+expect sound2.1.8 56
+expect sound2.1.7 87

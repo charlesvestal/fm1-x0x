@@ -180,3 +180,6 @@ int bass303_nparams(void);
 const x0x_param_t *bass303_param(int i);
 void bass303_set(bass303_t *b, int i, int value);
 int bass303_get(const bass303_t *b, int i);
+/* Set *new_drive and *new_volume to the Drive and Volume that sound as (type, volume, drive) did
+ * before the drive was rescaled (a project saved before sound revision 7). */
+void bass303_pre_rescale(int type, int volume, int drive, int *new_drive, int *new_volume);

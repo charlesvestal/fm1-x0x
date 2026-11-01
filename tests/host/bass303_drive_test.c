@@ -8,7 +8,10 @@
  *    times one gain, sample for sample, on both types, and that gain is the two Volumes' (60/127 dB
  *    a step);
  *  - the drive coming on starts fresh: switched on mid-note after it ran at Drive 64 and then went
- *    off, its output is the output of one that never ran, sample for sample. */
+ *    off, its output is the output of one that never ran, sample for sample;
+ *  - the migration of every old setting (bass303_pre_rescale), Soft and RAT: Drive 0 left as it
+ *    was, the new pots in range, and the new Drive no lower for more old Drive or old Volume, so
+ *    that a lane sweeping either pot moves it one way. */
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,6 +33,28 @@ static bass303_t B;
 static float buf[TOTAL + BLK], ref[TOTAL + BLK];
 static int fails;
 #define CHECK(c, ...) do { if (!(c)) { printf("FAIL " __VA_ARGS__); printf("\n"); fails++; } } while (0)
+
+/* Check bass303_pre_rescale over every old setting of drive type `type`. */
+static void check_migration(int type, const char *name)
+{
+    static int nd[128][128], nv[128][128];
+    int bad_range = 0, bad_d = 0, bad_v = 0;
+    for (int v = 0; v < 128; v++)
+        for (int d = 0; d < 128; d++)
+            bass303_pre_rescale(type, v, d, &nd[v][d], &nv[v][d]);
+    for (int v = 0; v < 128; v++) {
+        CHECK(nd[v][0] == 0 && nv[v][0] == v, "%s: old Volume %d, Drive 0 moved (to %d, %d)", name, v,
+              nv[v][0], nd[v][0]);
+        for (int d = 1; d < 128; d++) {
+            bad_range += nd[v][d] < 1 || nd[v][d] > 127 || nv[v][d] < 0 || nv[v][d] > 127;
+            bad_d += d > 1 && nd[v][d] < nd[v][d - 1];
+            bad_v += v > 0 && nd[v][d] < nd[v - 1][d];
+        }
+    }
+    printf("  %-4s migration: %d settings out of range, %d where more old Drive lowers the new, %d where more"
+           " old Volume does\n", name, bad_range, bad_d, bad_v);
+    CHECK(bad_range == 0 && bad_d == 0 && bad_v == 0, "%s: the migration is in range and monotone", name);
+}
 
 /* Render the acid line at this drive type and Volume into out, with Drive drives[j] from sample
  * from[j] (from[0] = 0, then rising, on the 32-sample grid). */
@@ -161,6 +186,8 @@ int main(void)
         printf("  %-4s on again after Drive 64: %d samples differ from a fresh start\n", TYPES[k].name, diff);
         CHECK(diff == 0, "%s: the drive comes on fresh (%d samples differ)", TYPES[k].name, diff);
     }
+    check_migration(BASS303_DRV_SOFT, "Soft");
+    check_migration(BASS303_DRV_RAT, "RAT");
     printf(fails ? "bass303_drive: %d FAILED\n" : "bass303_drive: ok\n", fails);
     return fails != 0;
 }
