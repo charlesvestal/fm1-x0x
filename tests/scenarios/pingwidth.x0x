@@ -1,29 +1,31 @@
-# FX > SEL list > PING WIDTH: a new project's is 0 (no ping-pong); up to full and down to off from the
-# list; undo and redo carry it to the engine; saved at half width, it loads at half width; a project
+# FX > SEL list > PING WIDTH: a new project's is 20 (a narrow ping-pong); up to full from the list;
+# undo and redo carry it to the engine; saved at half width, it loads at half width; a project
 # saved before the setting (sound revision 5) loads with PING-PONG's switch as the width: on 127, off 0
 wait 300
-expect sound4.1.1 0
-expect dlping 0
+expect sound4.1.1 20
+expect dlping 1
+expect dlwb 649
 listen
 tap FX
 tap SEL
 turn SELECT 20
 wait 600
-said PING WIDTH 0, 11 OF 11
+said PING WIDTH 20, 11 OF 11
 shot pingwidth_list.png
 turn ALGO 127
 expect sound4.1.1 127
 expect dlping 1
 expect dlwb 0
 shot pingwidth_full.png
-# undo (HOME + REC): off again, in the engine too; redo (HOME + PLAY): full
+# undo (HOME + REC): 20 again, in the engine too; redo (HOME + PLAY): full
 wait 600
 press HOME
 tap REC
 release HOME
 wait 100
-expect sound4.1.1 0
-expect dlping 0
+expect sound4.1.1 20
+expect dlping 1
+expect dlwb 649
 press HOME
 tap PLAY
 release HOME

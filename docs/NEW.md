@@ -15,7 +15,8 @@ The newest version first. Install it with the [web installer](../install/); the
 - A new reverb, ROOM: smoother and wider, with less fizz on low tails such as a tom's. It replaces the
   old one; your DECAY and TONE settings carry over. Thanks @luchak.
 - PING WIDTH (FX, in SEL's list) sets how far apart ping-pong's echoes sit: 0 is off, 127 hard left
-  and right, and between, closer together. It replaces the PING-PONG switch. Thanks @luchak.
+  and right, and between, closer together. A new project starts at 20. It replaces the PING-PONG
+  switch. Thanks @luchak.
 - Turning SWING while playing no longer pushes parts off the beat, and a random or reverse 303 with
   swing stays on its grid. Thanks @luchak.
 - A BD's pan motion in a project from before 9 October now stays on the pan when it loads, instead of

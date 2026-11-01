@@ -90,7 +90,8 @@ int main(void)
     fxbus_init(&f1, dl1, 88200);
     fxbus_init(&f2, dl2, 88200);
     {
-        static const int P[][2] = {{FX_DIST, 2}, {FX_DRIVE, 70}, {FX_COMP, 90}, {FX_DL_FDBK, 100}, {FX_DL_LEVEL, 110}};
+        static const int P[][2] = {{FX_DIST, 2}, {FX_DRIVE, 70}, {FX_COMP, 90}, {FX_DL_FDBK, 100}, {FX_DL_LEVEL, 110},
+                                       {FX_DL_WIDTH, 0}};   /* (a new sound's width, 20, is ping-pong) */
         for (i = 0; i < (int)(sizeof P / sizeof P[0]); i++) {
             fxbus_set(&f1, P[i][0], P[i][1]);
             fxbus_set(&f2, P[i][0], P[i][1]);

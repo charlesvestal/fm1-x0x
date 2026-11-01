@@ -51,7 +51,7 @@ static const fx_pspec_t fx_p[FX_NPARAMS] = {
     /* X0X: the one-knob TAPE (ui.c R_TAPE), kept with the sound so the knob reads back where it was
      * left. It sets DlType and Wear, which are what the delay plays; it plays nothing itself. */
     [FX_DL_TAPE]  = { { "Tape", 127, 72, 0 }, CV_SW, 0, 0.0f, 0.0f },
-    [FX_DL_WIDTH] = { { "Width", 127, 0, 0 }, CV_LIN, 0, 0.0f, 1.0f },   /* X0X: ping-pong, 0 = off */
+    [FX_DL_WIDTH] = { { "Width", 127, 20, 0 }, CV_LIN, 0, 0.0f, 1.0f },  /* X0X: ping-pong, 0 = off */
 };
 
 int fxbus_nparams(void) { return FX_NPARAMS; }
@@ -178,7 +178,7 @@ void fxbus_init(fxbus_t *f, int16_t *dly_buf, int dly_len)
     f->dl_quiet = dly_len;
     f->dl_type = 0;
     f->wear = 64.0f / 127.0f;
-    fx_dl_width(f, 0.0f);
+    fx_dl_width(f, 20.0f / 127.0f);
 
     f->comp = 0.0f;
     f->drive = 2.0f;

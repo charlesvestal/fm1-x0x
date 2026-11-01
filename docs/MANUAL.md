@@ -558,7 +558,7 @@ sends, and has two pages:
 
 In SEL's list, under MORE: each effect's low cut and return level, and PING WIDTH, which bounces the
 echoes between left and right: 0 is off, 127 puts them hard left and right, and between, closer
-together.
+together. A new project starts at 20, a narrow bounce.
 
 ---
 
