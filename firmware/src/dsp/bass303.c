@@ -30,6 +30,12 @@ static float c_db2lin(float db) { return c_exp2f(db * 0.166096405f); }      /* f
 /* The render's passes (one call a sub-block): each register-allocated on its own, so a change elsewhere in the
  * render does not reshuffle (and spill) the hot loops */
 #define BASS303_PASS __attribute__((noinline))
+/* Unroll the loop that follows by two: clang's pragma; other compilers (the host tests' gcc) unroll as they choose */
+#if defined(__clang__)
+#define BASS303_UNROLL2 _Pragma("clang loop unroll_count(2)")
+#else
+#define BASS303_UNROLL2
+#endif
 
 static bass303_fixed_t bass303_k;     /* the coefficients every instance shares (bass303.h) */
 
@@ -837,7 +843,7 @@ static BASS303_PASS void run_amp(bass303_t *b, float *ab, int n)
     const float b0 = bass303_k.dc_b0, b1 = bass303_k.dc_b1, a1 = bass303_k.dc_a1, a2 = bass303_k.dc_a2, g = b->amp_scaler;
     float x1 = b->dc.x1, x2 = b->dc.x2, y1 = b->dc.y1, y2 = b->dc.y2;
     int i;
-    _Pragma("clang loop unroll_count(2)")   /* (no register moves for the state between samples) */
+    BASS303_UNROLL2                            /* (no register moves for the state between samples) */
     for (i = 0; i < n; i++) {
         float x = ab[i], y = b0 * (x + x2) + b1 * x1 + a1 * y1 + a2 * y2;
         x2 = x1;
@@ -861,7 +867,7 @@ static BASS303_PASS void run_decim(bass303_t *b, const float *osb, float *out, i
     float a0 = s[0].x1, a1 = s[0].y1, a2 = s[2].y1, a3 = s[4].y1;    /* newer samples: s[0], s[2], s[4] */
     float c0 = s[1].x1, c1 = s[1].y1, c2 = s[3].y1, c3 = s[5].y1;    /* older: s[1], s[3], s[5] */
     int i;
-    _Pragma("clang loop unroll_count(2)")   /* (no register moves for the state between samples) */
+    BASS303_UNROLL2                            /* (no register moves for the state between samples) */
     for (i = 0; i < n; i++) {
         float xo = osb[2 * i], xn = osb[2 * i + 1], p0, p1, p2, q0, q1, q2;
         p0 = 0.068204076f * (xn - a1) + a0;
@@ -899,7 +905,7 @@ static BASS303_PASS void run_post(bass303_t *b, const float *ab, float *out, int
     const float nt_b0 = bass303_k.nt_b0, nt_b1 = bass303_k.nt_b1, nt_a1 = bass303_k.nt_a1, nt_a2 = bass303_k.nt_a2;
     float ap_x1 = b->ap_x1, ap_y1 = b->ap_y1, hp2_y1 = b->hp2_y1, nt_x2 = b->nt.x2, nt_y1 = b->nt.y1, nt_y2 = b->nt.y2;
     int i;
-    _Pragma("clang loop unroll_count(2)")   /* (no register moves for the state between samples) */
+    BASS303_UNROLL2                            /* (no register moves for the state between samples) */
     for (i = 0; i < n; i++) {
         float s = out[i], t, u;
         t = ap_b0 * (s - ap_y1) + ap_x1;
