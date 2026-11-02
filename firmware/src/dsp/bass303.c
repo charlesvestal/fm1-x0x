@@ -67,22 +67,22 @@ static const x0x_param_t params[BASS303_NPARAMS] = {
 #define RAT_TONE_HZ 936.48098f           /* the stock tone: 1 / (2 pi (0.5 * 100k + 1.5k) 3.3n) */
 
 static const float makeup_soft[128] = {
-    1.0000f, 1.0262f, 1.0275f, 1.0289f, 1.0303f, 1.0319f, 1.0335f, 1.0354f,
-    1.0372f, 1.0393f, 1.0414f, 1.0438f, 1.0462f, 1.0491f, 1.0520f, 1.0548f,
-    1.0577f, 1.0613f, 1.0649f, 1.0685f, 1.0721f, 1.0766f, 1.0810f, 1.0854f,
-    1.0899f, 1.0957f, 1.1015f, 1.1074f, 1.1133f, 1.1192f, 1.1252f, 1.1312f,
-    1.1372f, 1.1452f, 1.1533f, 1.1614f, 1.1696f, 1.1778f, 1.1861f, 1.1945f,
-    1.2029f, 1.2135f, 1.2243f, 1.2351f, 1.2460f, 1.2570f, 1.2681f, 1.2793f,
-    1.2906f, 1.3044f, 1.3183f, 1.3323f, 1.3465f, 1.3608f, 1.3753f, 1.3899f,
-    1.4047f, 1.4222f, 1.4400f, 1.4579f, 1.4761f, 1.4945f, 1.5132f, 1.5320f,
-    1.5511f, 1.5733f, 1.5958f, 1.6186f, 1.6418f, 1.6652f, 1.6891f, 1.7132f,
-    1.7377f, 1.7657f, 1.7941f, 1.8230f, 1.8524f, 1.8822f, 1.9125f, 1.9433f,
-    1.9746f, 2.0098f, 2.0456f, 2.0821f, 2.1192f, 2.1570f, 2.1954f, 2.2345f,
-    2.2744f, 2.3186f, 2.3637f, 2.4096f, 2.4565f, 2.5042f, 2.5529f, 2.6026f,
-    2.6532f, 2.7087f, 2.7653f, 2.8232f, 2.8822f, 2.9425f, 3.0041f, 3.0669f,
-    3.1311f, 3.2007f, 3.2720f, 3.3447f, 3.4192f, 3.4952f, 3.5730f, 3.6525f,
-    3.7337f, 3.8212f, 3.9106f, 4.0022f, 4.0959f, 4.1917f, 4.2899f, 4.3903f,
-    4.4931f, 4.6024f, 4.7144f, 4.8291f, 4.9467f, 5.0670f, 5.1903f, 5.3166f,
+    1.0000f, 1.0294f, 1.0329f, 1.0366f, 1.0403f, 1.0444f, 1.0485f, 1.0531f,
+    1.0576f, 1.0627f, 1.0678f, 1.0734f, 1.0790f, 1.0854f, 1.0919f, 1.0983f,
+    1.1049f, 1.1124f, 1.1200f, 1.1277f, 1.1354f, 1.1442f, 1.1530f, 1.1619f,
+    1.1708f, 1.1813f, 1.1918f, 1.2024f, 1.2131f, 1.2238f, 1.2347f, 1.2457f,
+    1.2568f, 1.2698f, 1.2829f, 1.2961f, 1.3095f, 1.3230f, 1.3366f, 1.3504f,
+    1.3643f, 1.3802f, 1.3962f, 1.4123f, 1.4287f, 1.4453f, 1.4620f, 1.4790f,
+    1.4961f, 1.5152f, 1.5345f, 1.5541f, 1.5739f, 1.5940f, 1.6143f, 1.6349f,
+    1.6558f, 1.6787f, 1.7019f, 1.7254f, 1.7492f, 1.7734f, 1.7979f, 1.8228f,
+    1.8480f, 1.8752f, 1.9029f, 1.9311f, 1.9596f, 1.9885f, 2.0179f, 2.0477f,
+    2.0780f, 2.1104f, 2.1433f, 2.1768f, 2.2107f, 2.2452f, 2.2803f, 2.3159f,
+    2.3520f, 2.3904f, 2.4294f, 2.4691f, 2.5094f, 2.5504f, 2.5920f, 2.6343f,
+    2.6773f, 2.7227f, 2.7688f, 2.8157f, 2.8633f, 2.9118f, 2.9611f, 3.0113f,
+    3.0623f, 3.1157f, 3.1701f, 3.2253f, 3.2816f, 3.3389f, 3.3971f, 3.4564f,
+    3.5166f, 3.5794f, 3.6434f, 3.7084f, 3.7746f, 3.8420f, 3.9107f, 3.9805f,
+    4.0516f, 4.1252f, 4.2002f, 4.2766f, 4.3543f, 4.4334f, 4.5140f, 4.5961f,
+    4.6796f, 4.7657f, 4.8534f, 4.9427f, 5.0337f, 5.1263f, 5.2206f, 5.3166f,
 };
 static const float makeup_rat[128] = {
     1.0000f, 1.6276f, 1.6302f, 1.6332f, 1.5906f, 1.5451f, 1.5002f, 1.4562f,
@@ -183,8 +183,15 @@ static void bq_low_shelf(bass303_bq_t *q, float fc, float gain_db, float fs)
 /* Return Volume pot v's gain in dB (the voice's level; with the drive on, after it). */
 static float vol_db(int v) { return -60.0f + 60.0f * ((float)v * (1.0f / 127.0f)); }
 
-/* Return Soft's input gain in dB at Drive pot d, at the drive's fixed input level DRV_REF. */
-static float soft_db(int d) { return -2.0f + 32.0f * (float)d * (1.0f / 127.0f); }
+/* Return Soft's input gain in dB at Drive pot d, at the drive's fixed input level DRV_REF:
+ * -2 + 32 t^0.75 dB, t = d / 127. Even in dB, the knob's first quarter barely distorts; the curve
+ * moves more of the change to the bottom, with the same gain at both ends. */
+static float soft_db(int d)
+{
+    if (d <= 0)
+        return -2.0f;
+    return -2.0f + 32.0f * c_exp2f(0.75f * c_log2f((float)d * (1.0f / 127.0f)));
+}
 
 /* Return where Drive pot `pot` is on the RAT's taper, 0..1 over pots 1..127. */
 static float rat_t(int pot)
@@ -312,7 +319,7 @@ void bass303_pre_rescale(int type, int volume, int drive, int *new_drive, int *n
 {
     const float DB = 6.02059991f;                              /* 20 log10(2): dB from log2 */
     const float OLD_SOFT_DB = 24.0f;                           /* drive.h's Soft: 24 n dB, at the Volume's level */
-    float vdb = vol_db(volume), want, over, mk;
+    float vdb = vol_db(volume), want, over, mk, r;
     int p;
     *new_drive = drive;
     *new_volume = volume;
@@ -324,9 +331,12 @@ void bass303_pre_rescale(int type, int volume, int drive, int *new_drive, int *n
         return;
     }
     /* Soft: the gain the old shaper had, as one at the drive's level now (DRV_REF), and the pot
-     * that gives it */
+     * that gives it: soft_db's inverse, then whichever neighbouring pot is nearer in dB */
     want = OLD_SOFT_DB * (float)drive * (1.0f / 127.0f) + vdb - DB * c_log2f(DRV_REF);
-    p = (int)fm_clampf(127.0f * (want - soft_db(0)) / (soft_db(127) - soft_db(0)) + 0.5f, 1.0f, 127.0f);
+    r = fm_clampf((want - soft_db(0)) / (soft_db(127) - soft_db(0)), 1e-6f, 1.0f);
+    p = (int)fm_clampf(127.0f * c_exp2f(1.33333333f * c_log2f(r)), 1.0f, 127.0f);
+    if (p < 127 && soft_db(p + 1) - want < want - soft_db(p))
+        p++;
     /* past the new range's top the shaper is hit less hard than it was; deep in saturation its
      * output goes as 1 / its input gain, so the old one was quieter by the gain the new one lacks */
     over = fm_maxf(want - soft_db(127), 0.0f);
@@ -425,7 +435,7 @@ void bass303_set(bass303_t *b, int i, int v)
         powers(b->slew_pw, b->slew_c);
         break;
     case BASS303_DRIVE:
-        b->s_gain = c_db2lin(soft_db(v));                     /* drive.h: 24 n dB (at the Volume's level) */
+        b->s_gain = c_db2lin(soft_db(v));
         b->s_inv = 1.0f / b->s_gain;
         rat_coeffs(b);
         rat_tone(b);

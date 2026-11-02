@@ -33,8 +33,8 @@ expect sound2.0.8 86
 expect sound2.0.7 106
 expect laneval2.0.8.0 102
 expect laneval2.0.7.0 109
-expect sound2.1.8 56
-expect sound2.1.7 87
+expect sound2.1.8 42
+expect sound2.1.7 88
 # saved again: now revision 7, nothing moves a second time
 tap SAVE
 wait 300
@@ -66,5 +66,5 @@ wait 300
 reboot
 wait 300
 expect sound3.0.2 64
-expect sound2.1.8 56
-expect sound2.1.7 87
+expect sound2.1.8 42
+expect sound2.1.7 88
