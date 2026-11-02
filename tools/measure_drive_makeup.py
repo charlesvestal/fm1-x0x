@@ -7,17 +7,17 @@ drive does to the level: Soft's input gain, the RAT's taper or its tone filter, 
 
   tools/measure_drive_makeup.py                 print both tables, measured on the acid patch
   tools/measure_drive_makeup.py --type rat      only one
-  tools/measure_drive_makeup.py --patch 3       on another of tools/drive_render.c's PATCHES
+  tools/measure_drive_makeup.py --patch 3       on another of tools/drive_line.h's DRIVE_PATCHES
   tools/measure_drive_makeup.py --every-pot     at every pot instead of the default points
 
-The 303 plays tools/drive_render.c's acid line at Volume 96 through this firmware's bass303.c as it
-is, its makeup and rise included; both are gains after the drive, so taking them out of the measured
-level leaves what the drive itself does, and the table needs no special build. The level is measured
-at a set of pots (denser at the bottom of the knob, and for RAT around the tone filter's closing point,
-Drive 33, where the level bends) and interpolated in dB between them: these are the points the
-committed tables were measured at, so with the firmware unchanged it prints them as they are. With
---every-pot it measures all 127 (within 0.05 dB of the interpolated tables, but every entry moves,
-and so do the dsp_hash scenarios that run the drive).
+The 303 plays tools/drive_line.h's acid line (tools/drive_render.c) at Volume 96 through this
+firmware's bass303.c as it is, its makeup and rise included; both are gains after the drive, so
+taking them out of the measured level leaves what the drive itself does, and the table needs no
+special build. The level is measured at a set of pots (denser at the bottom of the knob, and for RAT
+around the tone filter's closing point, Drive 33, where the level bends) and interpolated in dB
+between them: these are the points the committed tables were measured at, so with the firmware
+unchanged it prints them as they are. With --every-pot it measures all 127 (within 0.05 dB of the
+interpolated tables, but every entry moves, and so do the dsp_hash scenarios that run the drive).
 
 After pasting new tables: tests/host/bass303_drive_test.c checks them (on the acid patch), the RAT
 migration needs refitting (tools/fit_drive_migration.py; Soft's migration follows the table by
@@ -34,7 +34,7 @@ from pathlib import Path
 
 try:
     import numpy as np
-    from fit_drive_migration import PATCHES, SEG, kweight
+    from fit_drive_migration import kweight, patch_names
 except ImportError:
     sys.exit("measure_drive_makeup.py needs numpy and scipy: pip3 install numpy scipy")
 
@@ -73,7 +73,7 @@ def level(typ, pot, patch):
     raw = subprocess.run([str(EXE), str(typ), "96", str(pot), str(patch)], capture_output=True,
                          check=True).stdout
     n = int(np.frombuffer(raw[:4], dtype=np.int32)[0])
-    x = np.frombuffer(raw[4:4 + 4 * n], dtype=np.float32).astype(float)[SEG]
+    x = np.frombuffer(raw[4:4 + 4 * n], dtype=np.float32).astype(float)
     return 10 * np.log10(np.mean(kweight(x) ** 2) + 1e-20)
 
 
@@ -95,12 +95,13 @@ def c_table(name, tab):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--type", choices=("soft", "rat", "both"), default="both")
-    ap.add_argument("--patch", type=int, default=0, help=f"0..{len(PATCHES) - 1}: {', '.join(PATCHES)}")
+    ap.add_argument("--patch", type=int, default=0, help="an index into tools/drive_line.h's DRIVE_PATCHES (0)")
     ap.add_argument("--every-pot", action="store_true", help="measure every pot, not the default points")
     args = ap.parse_args()
-    if not 0 <= args.patch < len(PATCHES):
-        ap.error(f"--patch 0..{len(PATCHES) - 1}")
     build()
+    patches = patch_names(EXE)
+    if not 0 <= args.patch < len(patches):
+        ap.error(f"--patch 0..{len(patches) - 1}: {', '.join(patches)}")
     cur, rise = firmware_tables()
     for typ, name in ((SOFT, "soft"), (RAT, "rat")):
         if args.type not in (name, "both"):
@@ -108,7 +109,7 @@ def main():
         pots = list(range(128)) if args.every_pot else POTS[typ]
         tab = measure(typ, cur[name], rise, pots, args.patch)
         diff = np.abs(20 * np.log10(tab / cur[name]))
-        print(f"/* {name}, on the {PATCHES[args.patch]} patch: {int(np.sum(tab != cur[name]))} entries differ "
+        print(f"/* {name}, on the {patches[args.patch]} patch: {int(np.sum(tab != cur[name]))} entries differ "
               f"from bass303.c's, by at most {diff.max():.3f} dB (Drive {int(diff.argmax())}) */")
         print(c_table(name, tab))
 

@@ -5,7 +5,7 @@ the new Drive and Volume that sound most like an old RAT setting, for projects s
 drive was rescaled. Both 303s are rendered on the host by tools/drive_render.c, built against this
 firmware's bass303.c and against the one from before the rescaling (bass303.c and the headers it
 includes, all from git show OLD_REV, so that a later change to fastmath.h can't change "before"),
-playing one acid line through each of drive_render.c's patches (PATCHES: dark and resonant, bright,
+playing one acid line through each of its patches (tools/drive_line.h: dark and resonant, bright,
 mellow, squelchy, a closed square), since how a drive setting sounds depends on what reaches it.
 
   tools/fit_drive_migration.py           fit, then print the C tables and the fit's errors
@@ -56,8 +56,6 @@ EXE_NEW, EXE_OLD = OUT / "drive_render", OUT / "drive_render_old"
 OLD_REV = "54194c5"                         # upstream main before the drive was rescaled
 FS = 44100
 SOFT, RAT = 1, 2
-PATCHES = ["acid", "bright", "mellow", "squelch", "sqrdark"]   # drive_render.c's PATCHES, in order
-SEG = slice(int(5512.5 * 16), int(5512.5 * 64))   # steps 16..63: past the first bar's settling
 STEP_DB = 60.0 / 127.0                       # a Volume pot step (amp_scaler: -60 + 60 n dB)
 VNODES = [0, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 127]
 DNODES = [1, 2, 4, 8, 12, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 127]
@@ -104,11 +102,12 @@ def build():
 
 
 def features(exe, typ, vol, drive, patch):
-    """Return the third-octave band levels (dB) and the K-weighted level (dB) of a render."""
+    """Return the third-octave band levels (dB) and the K-weighted level (dB) of a render (from the
+    line's step 16, as drive_render writes it)."""
     raw = subprocess.run([str(exe), str(typ), str(vol), str(drive), str(patch)], capture_output=True,
                          check=True).stdout
     n = int(np.frombuffer(raw[:4], dtype=np.int32)[0])
-    x = np.frombuffer(raw[4:4 + 4 * n], dtype=np.float32).astype(float)[SEG]
+    x = np.frombuffer(raw[4:4 + 4 * n], dtype=np.float32).astype(float)
     _, p = welch(x, FS, nperseg=NPS)
     bands = np.array([p[m].sum() for m in BAND]) + 1e-20
     return 10 * np.log10(bands), 10 * np.log10(np.mean(kweight(x) ** 2) + 1e-20)
@@ -220,6 +219,11 @@ def report(name, nd, nv, dist, old_ld, new_ld):
           f"level error (dB) median {np.median(level):.2f}, max {level.max():.2f}")
 
 
+def patch_names(exe=EXE_NEW):
+    """Return the names of drive_render's patches (tools/drive_line.h's DRIVE_PATCHES), in order."""
+    return subprocess.run([str(exe), "patches"], capture_output=True, check=True, text=True).stdout.split()
+
+
 def firmware_map(typ):
     out = subprocess.run([str(EXE_NEW), "map", str(typ)], capture_output=True, check=True, text=True).stdout.split()
     m = np.array(out, dtype=int).reshape(128, 128, 2)
@@ -236,9 +240,10 @@ def main():
     ap.add_argument("--check", action="store_true", help="measure the firmware's mapping as it is")
     args = ap.parse_args()
     build()
+    patches = patch_names()
     for typ, name in ((RAT, "RAT"), (SOFT, "Soft")) if args.check else ((RAT, "RAT"),):
-        ms = [measure(typ, p) for p in range(len(PATCHES))]
-        for (dist, old_ld, new_ld, *_), pname in zip(ms, PATCHES):
+        ms = [measure(typ, p) for p in range(len(patches))]
+        for (dist, old_ld, new_ld, *_), pname in zip(ms, patches):
             best = np.argmin(dist, axis=2)
             bestv = np.array([[volume_for(old_ld, new_ld, v, d, best[v, d]) if d else v for d in range(128)]
                               for v in range(128)])
@@ -254,7 +259,7 @@ def main():
     drv, vol = fit(ms)
     nd = np.array([[interp(drv, v, d) if d else 0 for d in range(128)] for v in range(128)])
     nv = np.array([[interp(vol, v, d) if d else v for d in range(128)] for v in range(128)])
-    for (dist, old_ld, new_ld, *_), pname in zip(ms, PATCHES):
+    for (dist, old_ld, new_ld, *_), pname in zip(ms, patches):
         report(f"RAT {pname}, the fitted tables", nd, nv, dist, old_ld, new_ld)
     print(f"\n/* old Volume nodes {VNODES}; old Drive nodes {DNODES} */")
     print(c_table("rat_mig_drive", drv))
