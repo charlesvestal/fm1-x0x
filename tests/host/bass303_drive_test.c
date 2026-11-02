@@ -10,7 +10,7 @@
  *  - the drive coming on starts fresh: switched on mid-note after it ran at Drive 64 and then went
  *    off, its output is the output of one that never ran, sample for sample;
  *  - the migration of every old setting (bass303_pre_rescale), Soft and RAT: Drive 0 left as it
- *    was, the new pots in range, and the new Drive no lower for more old Drive or old Volume, so
+ *    was, the new values in range, and the new Drive no lower for more old Drive or old Volume, so
  *    that a lane sweeping either pot moves it one way. */
 #include <math.h>
 #include <stdio.h>
@@ -48,18 +48,11 @@ static void check_migration(int type, const char *name)
     CHECK(bad_range == 0 && bad_d == 0 && bad_v == 0, "%s: the migration is in range and monotone", name);
 }
 
-/* Render the acid line at this drive type and Volume into out, with Drive drives[j] from sample
- * from[j] (from[0] = 0, then rising, on the 32-sample grid). */
-static void render_seq(float *out, int type, int vol, const int *drives, const int *from, int n)
-{
-    drive_line_render(&B, out, 0, type, vol, drives, from, n);
-}
-
 /* Render the acid line at this drive type, Volume and Drive into out. */
 static void render(float *out, int type, int vol, int drive)
 {
     static const int from0 = 0;
-    render_seq(out, type, vol, &drive, &from0, 1);
+    drive_line_render(&B, out, 0, type, vol, &drive, &from0, 1);
 }
 
 /* Run one biquad (b, a normalised so that a[0] = 1) over x in place. */
@@ -143,8 +136,8 @@ int main(void)
         static const int ran[3] = {64, 0, 5}, ran_from[3] = {0, 88192, 110240};   /* on at 2.5 s */
         static const int fresh[2] = {0, 5}, fresh_from[2] = {0, 110240};
         int diff = 0;
-        render_seq(buf, TYPES[k].type, 96, ran, ran_from, 3);
-        render_seq(ref, TYPES[k].type, 96, fresh, fresh_from, 2);
+        drive_line_render(&B, buf, 0, TYPES[k].type, 96, ran, ran_from, 3);
+        drive_line_render(&B, ref, 0, TYPES[k].type, 96, fresh, fresh_from, 2);
         for (int i = 110240; i < DRIVE_LINE_LEN; i++)
             diff += buf[i] != ref[i];
         printf("  %-4s on again after Drive 64: %d samples differ from a fresh start\n", TYPES[k].name, diff);

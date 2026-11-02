@@ -32,7 +32,7 @@
  *  - Drive (drive.h's models, rescaled): drive.h applies Volume before the drive, so Volume
  *    also set how hard it was hit, and Soft lost level as Drive rose while RAT was fully on
  *    from its first step. Here the voice reaches the drive at one level (Volume 96's) and
- *    Volume comes after it; a makeup gain per Drive pot keeps the level (with a small
+ *    Volume comes after it; a makeup gain per Drive value keeps the level (with a small
  *    deliberate rise); Soft's input gain is -2 + 32 n^0.75 dB; RAT's knob is linear in its
  *    op-amp's gain in dB, from its minimum at Drive 1, and its tone one-pole (drive.h:
  *    fixed at 936 Hz) opens at low Drive. Drive 0 is a bypass, as in drive.h.

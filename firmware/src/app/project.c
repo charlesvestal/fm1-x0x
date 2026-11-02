@@ -412,7 +412,7 @@ static void sound_rev2(void)
 }
 
 /* rev 7: the 303's drive rescaled (Volume after it; bass303.c). Each 303's DRIVE and VOLUME move to
- * the pots that sound as they did (bass303_pre_rescale), which depend on both and on the type. So
+ * the values that sound as they did (bass303_pre_rescale), which depend on both and on the type. So
  * on each step where a lane sets any of the three, the step's own type, Volume and Drive (its lanes'
  * values, else the pots') are mapped together. Each new value goes in its pot's lane where that lane
  * had a value, or where it differs from the pot's own migrated value; a lane the pot lacks is made

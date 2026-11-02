@@ -8,7 +8,8 @@ includes, all from git show OLD_REV, so that a later change to fastmath.h can't 
 playing one acid line through each of its patches (tools/drive_line.h: dark and resonant, bright,
 mellow, squelchy, a closed square), since how a drive setting sounds depends on what reaches it.
 
-  tools/fit_drive_migration.py           fit, then print the C tables and the fit's errors
+  tools/fit_drive_migration.py           fit, then print the fit's errors and bass303.c's migration
+                                         block (the node grid and the two tables)
   tools/fit_drive_migration.py --check   the firmware's mapping as it is, for RAT and for Soft (whose
                                          mapping is computed, not fitted: bass303_pre_rescale)
 
@@ -230,9 +231,20 @@ def firmware_map(typ):
     return m[:, :, 0], m[:, :, 1]
 
 
-def c_table(name, tab):
-    rows = ",\n".join("    {" + ", ".join(f"{x:3d}" for x in row) + "}" for row in tab)
-    return f"static const uint8_t {name}[{len(VNODES)}][{len(DNODES)}] = {{\n{rows},\n}};"
+def c_tables(drv, vol):
+    """Return bass303.c's migration block, the node grid and both tables, as it is pasted there."""
+    def table(name, tab):
+        rows = ",\n".join("    {" + ", ".join(f"{x:3d}" for x in row) + "}" for row in tab)
+        return f"static const uint8_t {name}[RAT_MIG_NV][RAT_MIG_ND] = {{\n{rows},\n}};"
+    nodes = lambda name, n, xs: f"static const uint8_t {name}[{n}] = {{{', '.join(map(str, xs))}}};"
+    return "\n".join([
+        "/* tools/fit_drive_migration.py, from here to the end of rat_mig_volume */",
+        f"#define RAT_MIG_NV {len(VNODES)}",
+        f"#define RAT_MIG_ND {len(DNODES)}",
+        nodes("rat_mig_vn", "RAT_MIG_NV", VNODES),
+        nodes("rat_mig_dn", "RAT_MIG_ND", DNODES),
+        table("rat_mig_drive", drv),
+        table("rat_mig_volume", vol)])
 
 
 def main():
@@ -261,9 +273,8 @@ def main():
     nv = np.array([[interp(vol, v, d) if d else v for d in range(128)] for v in range(128)])
     for (dist, old_ld, new_ld, *_), pname in zip(ms, patches):
         report(f"RAT {pname}, the fitted tables", nd, nv, dist, old_ld, new_ld)
-    print(f"\n/* old Volume nodes {VNODES}; old Drive nodes {DNODES} */")
-    print(c_table("rat_mig_drive", drv))
-    print(c_table("rat_mig_volume", vol))
+    print()
+    print(c_tables(drv, vol))
 
 
 if __name__ == "__main__":

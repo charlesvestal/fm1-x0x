@@ -1,5 +1,5 @@
 # A project saved before the 303's drive was rescaled (sound revision 5, as 1.1.0 saves, or earlier)
-# loads with each 303's DRIVE moved to the pot that drives as it did and its VOLUME to the one that
+# loads with each 303's DRIVE moved to the value that drives as it did and its VOLUME to the one that
 # keeps its level; a DRIVE lane's steps are mapped too, with a VOLUME lane made for them. Drive 0 is
 # left alone. (Values: bass303_pre_rescale; drive303lanes has a VOLUME lane.)
 wait 300

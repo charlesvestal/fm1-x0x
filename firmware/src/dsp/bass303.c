@@ -57,11 +57,11 @@ static const x0x_param_t params[BASS303_NPARAMS] = {
 
 /* ---- drive scaling (X0X; not in drive.h) ------------------------------------------------
  * The drive always sees the voice at one level, DRV_REF, and Volume is applied after it, so
- * Volume no longer sets how hard the drive is hit. A makeup gain per Drive pot keeps the
- * loudness level with Drive 0 (K-weighted, ITU-R BS.1770, measured on an acid line: cutoff 45,
- * reso 95, envmod 85, decay 45, accent 90, saw), and a deliberate rise on top of it, linear in
- * dB, reaches +3 dB at full Drive. Drive 0 is still a bypass. tools/measure_drive_makeup.py
- * measures the tables; re-measure them after changing what the drive does to the level. */
+ * Volume no longer sets how hard the drive is hit. A makeup gain per Drive value keeps the
+ * loudness level with Drive 0 (K-weighted, ITU-R BS.1770, measured on tools/drive_line.h's
+ * acid line, patch 0), and a deliberate rise on top of it, linear in dB, reaches +3 dB at full
+ * Drive. Drive 0 is still a bypass. tools/measure_drive_makeup.py measures the tables;
+ * re-measure them after changing what the drive does to the level. */
 #define DRV_REF 0.18620871f              /* -14.6 dB: about Volume 96's level (-14.65 dB) */
 #define DRV_RISE 3.0f
 #define RAT_TONE_HZ 936.48098f           /* the stock tone: 1 / (2 pi (0.5 * 100k + 1.5k) 3.3n) */
@@ -180,10 +180,10 @@ static void bq_low_shelf(bass303_bq_t *q, float fc, float gain_db, float fs)
     q->a2 = ((A + 1.0f) + (A - 1.0f) * cs - s2) / a0;
 }
 
-/* Return Volume pot v's gain in dB (the voice's level; with the drive on, after it). */
+/* Return the gain in dB at Volume v (the voice's level; with the drive on, after it). */
 static float vol_db(int v) { return -60.0f + 60.0f * ((float)v * (1.0f / 127.0f)); }
 
-/* Return Soft's input gain in dB at Drive pot d, at the drive's fixed input level DRV_REF:
+/* Return Soft's input gain in dB at Drive d, at the drive's fixed input level DRV_REF:
  * -2 + 32 t^0.75 dB, t = d / 127. Even in dB, the knob's first quarter barely distorts; the curve
  * moves more of the change to the bottom, with the same gain at both ends. */
 static float soft_db(int d)
@@ -193,28 +193,28 @@ static float soft_db(int d)
     return -2.0f + 32.0f * c_exp2f(0.75f * c_log2f((float)d * (1.0f / 127.0f)));
 }
 
-/* Return where Drive pot `pot` is on the RAT's taper, 0..1 over pots 1..127. */
-static float rat_t(int pot)
+/* Return where Drive d is on the RAT's taper, 0..1 over Drive 1..127. */
+static float rat_t(int d)
 {
-    return fm_clampf((float)(pot - 1) * (1.0f / 126.0f), 0.0f, 1.0f);
+    return fm_clampf((float)(d - 1) * (1.0f / 126.0f), 0.0f, 1.0f);
 }
 
-/* Return the RAT's distortion resistance, 0..1 (drive.h's dist), at Drive pot `pot`. drive.h maps
- * the pot to it linearly, so the op-amp's gain at 1 kHz, 1 + dist * 100k / |Z1| (|Z1| ~ 81 ohm), is
+/* Return the RAT's distortion resistance, 0..1 (drive.h's dist), at Drive d. drive.h maps the
+ * knob to it linearly, so the op-amp's gain at 1 kHz, 1 + dist * 100k / |Z1| (|Z1| ~ 81 ohm), is
  * already +21 dB at the first step and most of the knob is used up in its first tenth. Here the knob
  * is linear in that gain in dB, up to drive.h's maximum (dist = 1, ~61.8 dB). */
-static float rat_dist(int pot)
+static float rat_dist(int d)
 {
-    float t = rat_t(pot);
+    float t = rat_t(d);
     if (t <= 0.0f)
         return 0.0f;
     return fm_minf((c_db2lin(61.8f * t) - 1.0f) * 81e-5f, 1.0f);
 }
 
-/* Set the RAT's tone one-pole (drive.h: fixed at the stock 936 Hz) for the Drive pot: open to 12 kHz
- * at the bottom of the taper, closing, log-interpolated, to the stock tone a quarter of the way up
- * (Drive ~33), about where the distortion's harmonics make up for it. So low Drive brightens the
- * voice, as the distortion would, instead of dulling it before the distortion arrives; open for
+/* Set the RAT's tone one-pole (drive.h: fixed at the stock 936 Hz) for the current Drive: open to
+ * 12 kHz at the bottom of the taper, closing, log-interpolated, to the stock tone a quarter of the
+ * way up (Drive ~33), about where the distortion's harmonics make up for it. So low Drive brightens
+ * the voice, as the distortion would, instead of dulling it before the distortion arrives; open for
  * longer, it leaves the op-amp's mid boost unchecked and the voice hollow. */
 static void rat_tone(bass303_t *b)
 {
@@ -223,7 +223,7 @@ static void rat_tone(bass303_t *b)
     b->r_tone_b1 = c_expf(-FM_TWO_PI / BASS303_SR * fc);
 }
 
-/* Set the gain after the drive for the Drive pot: the makeup with its rise. */
+/* Set the gain after the drive for the current Drive: the makeup with its rise. */
 static void drv_gains(bass303_t *b)
 {
     int p = b->pot[BASS303_DRIVE], rat = b->drv_type == BASS303_DRV_RAT;
@@ -231,17 +231,20 @@ static void drv_gains(bass303_t *b)
     b->drv_makeup = (rat ? makeup_rat : makeup_soft)[p] * c_db2lin(rise);
 }
 
+/* Return the gain after the drive: Volume and the makeup (the drive runs at DRV_REF). */
+static float drv_out_gain(const bass303_t *b) { return b->amp_scaler * (1.0f / DRV_REF) * b->drv_makeup; }
+
 /* Return whether the drive is on (a type, and Drive above 0). */
 static int drive_on(const bass303_t *b) { return b->drv_type != BASS303_DRV_OFF && b->pot[BASS303_DRIVE] > 0; }
 
 /* The migration of a project saved before the drive was rescaled (project.c, sound revision 7):
  * the new Drive and Volume that sound as an old setting did.
  *
- * Soft: the same level into its shaper, so its output is the old one times the makeup, which the
- * Volume takes back out: exact, within the new range. Past its top (old Volume above about 106,
- * with Drive high) the new maximum saturates less than the old setting did; the Volume still
- * matches the level, to within about 1 dB. (tools/fit_drive_migration.py --check measures both
- * types.)
+ * Soft: the same level into its shaper, to the nearest Drive value, so its output is the old one
+ * times the makeup, which the Volume takes back out. Past the new range's top (old Volume above
+ * about 106, with Drive high) the new maximum saturates less than the old setting did; the Volume
+ * still matches the level, to within about 1 dB. (tools/fit_drive_migration.py --check measures
+ * both types.)
  *
  * RAT: drive.h's dist sets the op-amp's tone as well as its gain, so no rule in its gain matches
  * the sound. tools/fit_drive_migration.py measures it instead: for each old (Volume, Drive), the
@@ -249,10 +252,12 @@ static int drive_on(const bass303_t *b) { return b->drv_type != BASS303_DRV_OFF 
  * nodes (Volume every 8; Drive denser low down, where the old gain rose fastest), interpolated
  * between them. The Drive table is monotone, so a lane sweeping either pot moves it one way, and
  * smooth: where the old knob hardly changed the sound, nor does the mapping. */
-static const uint8_t rat_mig_vn[17] = {0, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 127};
-static const uint8_t rat_mig_dn[20] = {1, 2, 4, 8, 12, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 127};
-/* tools/fit_drive_migration.py */
-static const uint8_t rat_mig_drive[17][20] = {
+/* tools/fit_drive_migration.py, from here to the end of rat_mig_volume */
+#define RAT_MIG_NV 17
+#define RAT_MIG_ND 20
+static const uint8_t rat_mig_vn[RAT_MIG_NV] = {0, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 127};
+static const uint8_t rat_mig_dn[RAT_MIG_ND] = {1, 2, 4, 8, 12, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 127};
+static const uint8_t rat_mig_drive[RAT_MIG_NV][RAT_MIG_ND] = {
     { 45,  45,  45,  45,  45,  46,  50,  58,  77,  85,  94, 103, 109, 114, 118, 121, 123, 124, 125, 126},
     { 45,  45,  45,  45,  45,  46,  50,  58,  77,  85,  94, 103, 109, 114, 118, 121, 123, 124, 125, 126},
     { 45,  45,  45,  45,  45,  46,  51,  59,  77,  85,  95, 104, 110, 114, 118, 121, 123, 124, 125, 126},
@@ -271,7 +276,7 @@ static const uint8_t rat_mig_drive[17][20] = {
     { 83,  85,  89,  94,  97,  99, 103, 106, 109, 111, 113, 115, 117, 119, 121, 122, 123, 124, 125, 126},
     { 86,  87,  91,  95,  98, 100, 103, 106, 109, 111, 113, 115, 117, 119, 121, 122, 123, 124, 125, 126},
 };
-static const uint8_t rat_mig_volume[17][20] = {
+static const uint8_t rat_mig_volume[RAT_MIG_NV][RAT_MIG_ND] = {
     { 12,  23,  35,  47,  53,  58,  64,  67,  68,  69,  70,  71,  72,  73,  74,  75,  76,  77,  78,  79},
     { 20,  31,  43,  55,  61,  65,  71,  74,  75,  76,  77,  78,  79,  80,  81,  82,  83,  84,  85,  85},
     { 28,  39,  51,  62,  68,  72,  78,  81,  81,  82,  83,  84,  85,  86,  87,  88,  88,  89,  90,  91},
@@ -304,12 +309,13 @@ static int mig_node(const uint8_t *nodes, int n, int x, int *off, int *w)
 }
 
 /* Return table t at old (Volume, Drive), interpolated between its nodes and rounded to the nearest
- * pot. In integers, so that a table monotone in either pot interpolates monotone: in floats a value
- * on a half can round up at one setting and down at the next. */
-static int mig_lookup(const uint8_t t[17][20], int volume, int drive)
+ * whole value. In integers, so that a table monotone in either pot interpolates monotone: in floats
+ * a value on a half can round up at one setting and down at the next. */
+static int mig_lookup(const uint8_t t[RAT_MIG_NV][RAT_MIG_ND], int volume, int drive)
 {
     int fv, wv, fd, wd;
-    int a = mig_node(rat_mig_vn, 17, volume, &fv, &wv), b = mig_node(rat_mig_dn, 20, drive, &fd, &wd);
+    int a = mig_node(rat_mig_vn, RAT_MIG_NV, volume, &fv, &wv);
+    int b = mig_node(rat_mig_dn, RAT_MIG_ND, drive, &fd, &wd);
     int x = (t[a][b] * (wd - fd) + t[a][b + 1] * fd) * (wv - fv)
             + (t[a + 1][b] * (wd - fd) + t[a + 1][b + 1] * fd) * fv;      /* the value x (wv wd) */
     return (2 * x + wv * wd) / (2 * wv * wd);
@@ -330,8 +336,8 @@ void bass303_pre_rescale(int type, int volume, int drive, int *new_drive, int *n
         *new_volume = mig_lookup(rat_mig_volume, volume, drive);
         return;
     }
-    /* Soft: the gain the old shaper had, as one at the drive's level now (DRV_REF), and the pot
-     * that gives it: soft_db's inverse, then whichever neighbouring pot is nearer in dB */
+    /* Soft: the gain the old shaper had, as one at the drive's level now (DRV_REF), and the Drive
+     * that gives it: soft_db's inverse, then whichever neighbouring value is nearer in dB */
     want = OLD_SOFT_DB * (float)drive * (1.0f / 127.0f) + vdb - DB * c_log2f(DRV_REF);
     r = fm_clampf((want - soft_db(0)) / (soft_db(127) - soft_db(0)), 1e-6f, 1.0f);
     p = (int)fm_clampf(127.0f * c_exp2f(1.33333333f * c_log2f(r)), 1.0f, 127.0f);
@@ -841,8 +847,7 @@ static BASS303_PASS void drive_rat(bass303_t *b, float *out, int n, float wg)
 
 static void drive_block(bass303_t *b, float *out, int n)
 {
-    /* Volume and the makeup, after the drive */
-    const float wg = b->amp_scaler * (1.0f / DRV_REF) * b->drv_makeup;
+    const float wg = drv_out_gain(b);
     int i, ns;
     for (i = 0; i < n; i += ns) {
         ns = n - i < BASS303_DSUB ? n - i : BASS303_DSUB;
@@ -1214,7 +1219,7 @@ void bass303_render(bass303_t *b, float *out, int n)
      * settled (below -120 dB at the output: its state is at DRV_REF, scaled after it), for
      * BASS303_IDLE_HOLD samples in a row (see bass303.h) */
     if (!b->gate && b->amp_y < 1e-6f && fm_fabsf(b->dc.y1) < 1e-6f && fm_fabsf(b->dc.y2) < 1e-6f
-        && fm_fabsf(b->dcb_y1) * (b->amp_scaler * (1.0f / DRV_REF) * b->drv_makeup) < 1e-6f) {
+        && fm_fabsf(b->dcb_y1) * drv_out_gain(b) < 1e-6f) {
         b->quiet += n;
         if (b->quiet >= BASS303_IDLE_HOLD) {
             clear_audio_state(b);
