@@ -568,7 +568,6 @@ void seq_advance(seq_t *s, uint32_t k, const seq_sink_t *o)
     }
     if (s->req_stop) {
         s->req_stop = 0;
-        s->req_start = s->req_cont = 0;
         if (s->playing)
             do_stop(s, o);
     }
@@ -632,7 +631,13 @@ void seq_advance(seq_t *s, uint32_t k, const seq_sink_t *o)
 }
 
 void seq_start(seq_t *s) { s->req_start = 1; }
-void seq_stop(seq_t *s) { s->req_stop = 1; }
+void seq_stop(seq_t *s)
+{
+    /* Cancel older requests when Stop arrives, not newer Start/Continue
+     * requests when this Stop is processed at the next audio update. */
+    s->req_start = s->req_cont = 0;
+    s->req_stop = 1;
+}
 void seq_continue(seq_t *s) { s->req_cont = 1; }
 void seq_sync(seq_t *s) { s->req_sync = 1; }
 void seq_ext_clock(seq_t *s) { s->ext_pending++; }
