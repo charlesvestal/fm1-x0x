@@ -94,7 +94,8 @@ at your own risk.</div>
   <a href="__REPO__"><strong>Source</strong><span>GitHub, GPL-3.0. Built on Felucca by Hügelton Instruments.</span></a>
 </nav>
 <p class="small">To go back to the official firmware, use M-VAVE's updater, M-UPGRADE, from
-<a href="https://www.m-vave.com/download">m-vave.com/download</a>. M-VAVE and FM-1 are trademarks of their owners.</p>
+<a href="https://www.m-vave.com/download">m-vave.com/download</a> (M-UPGRADE 3.11 finds v__VERSION__, not older
+versions; for those, use the installer's "Back to the stock firmware"). M-VAVE and FM-1 are trademarks of their owners.</p>
 </main>
 </body>
 </html>

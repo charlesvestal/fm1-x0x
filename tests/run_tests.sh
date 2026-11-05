@@ -69,7 +69,16 @@ run x0x-backup python3 tests/x0x_backup_test.py $OUT/backup.x0b
 if command -v node >/dev/null 2>&1; then
     run backup-page sh -c "python3 tests/x0x_backup_record.py $OUT/backup.x0b $OUT/backup_transcript.json && \
         node tests/host/backup_page_test.mjs $OUT/backup_transcript.json"
+    # the web installer's handshake (web/fm1ota.js): an X0X that answers M-UPGRADE 3.11's query short and its whole
+    # identity to the one with 01, older builds, M-VAVE's firmware, the loader
+    run installer-hs node tests/host/installer_hs_test.mjs
 fi
+# the M-UPGRADE handshake (firmware/src/ota.c): a release's identity cut to NAME_ and three digits for the plain
+# query (M-UPGRADE 3.11), the whole one for the query with body 01; a dev build's; the update loader's, whole
+for m in long short loader; do
+    case $m in long) f="" ;; short) f="-DTEST_ID='\"FM-1_900\"'" ;; loader) f="-DFELUCCA_LOADER=1" ;; esac
+    run "ota-hs-$m" sh -c "$CC -std=c11 -O1 -Wall -Wextra -Werror -Wno-unused-function $f -o $OUT/ota_hs_$m tests/ota_hs_test.c && $OUT/ota_hs_$m"
+done
 # the update path, against the firmware package (Felucca's tests; needs ./build.sh)
 if [ -f build/x0x.fwsc ]; then
     run ota-entry sh -c "$CC -o $OUT/ota_test tests/ota_test.c && $OUT/ota_test build/x0x.fwsc"

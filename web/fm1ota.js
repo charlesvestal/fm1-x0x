@@ -7,6 +7,11 @@
 // the device sends cmd 0x30 read requests on the logical image and we answer.
 
 const HS_QUERY = [0xF0, 0x00, 0x32, 0x45, 0x00, 0x00, 0x00, 0x40, 0x7F, 0xF7];
+// the handshake with the one-byte body 01 (00 59 11, length 1, 01, checksum FE): firmware/src/ota.c answers HS_QUERY
+// with its name, '_' and three digits only ("FM-1_901": M-UPGRADE 3.11 refuses more) and this one with its whole
+// identity ("FM-1_9010200"). M-VAVE's firmware, the update loaders and older builds don't answer it.
+// (PERF-1's scheme, as felucca-bsp's and fm1-base's: their installers and ours ask the same way)
+export const HS_FULL = [0xF0, 0x00, 0x32, 0x45, 0x08, 0x00, 0x00, 0x40, 0x00, 0x7E, 0x01, 0xF7];
 const UPGRADE = [0xF0, 0x22, 0x24, 0x35, 0x7F, 0xF7];
 const MAXDATA = 512;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -59,7 +64,8 @@ function parseRequest(pkt) {
 function parseIdentity(pkt) {
   const d = unpack7(pkt.slice(1, -1));
   if (d.length !== 34 || d[0] !== 0 || d[1] !== 0x59 || d[2] !== 0x11) return null;
-  const txt = String.fromCharCode(...d.slice(6, 33)).replace(/\0+$/, "");
+  const z = d.indexOf(0, 6);                     // the text up to its first zero (bytes after it may carry data)
+  const txt = String.fromCharCode(...d.slice(6, z < 0 || z > 33 ? 33 : z));
   const m = /^([^_]+)_(\d+)$/.exec(txt);
   return m ? { text: txt, model: m[1], version: parseInt(m[2], 10) } : null;
 }
@@ -92,17 +98,30 @@ class Link {
   close() { this.input.onmidimessage = null; }
 }
 
+// send a handshake -> the identity answered, null (no answer in ms), false (the send failed)
+async function ask(link, query, ms) {
+  if (!link.send(query)) return false;
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    const p = await link.read(end - Date.now());
+    if (!p) break;
+    const id = parseIdentity(p);
+    if (id) return id;
+  }
+  return null;
+}
+
+// the identity: HS_QUERY, then HS_FULL when the answer is NAME_ and three digits (a firmware on ota.c from M-UPGRADE
+// 3.11's fix on tells its whole identity so); the plain answer when nothing answers HS_FULL (M-VAVE's, an older build)
 async function handshake(link, tries = 3) {
   link.drain();
   for (let t = 0; t < tries; t++) {
-    if (!link.send(HS_QUERY)) return null;
-    const end = Date.now() + 1000;
-    while (Date.now() < end) {
-      const p = await link.read(end - Date.now());
-      if (!p) break;
-      const id = parseIdentity(p);
-      if (id) return id;
-    }
+    const id = await ask(link, HS_QUERY, 1000);
+    if (id === false) return null;
+    if (id === null) continue;
+    if (IS_OTA(id) || !/^[^_]+_\d{3}$/.test(id.text)) return id;
+    const full = await ask(link, HS_FULL, 600);
+    return full && full.model === id.model && full.text.startsWith(id.text) ? full : id;
   }
   return null;
 }

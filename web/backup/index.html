@@ -96,13 +96,15 @@
 // --- backup protocol: begin (tools/x0x_backup.py, firmware/src/backup.c; tested by tests/host/backup_page_test.mjs)
 const PB = (() => {
   const HS_QUERY = [0xF0, 0x00, 0x32, 0x45, 0x00, 0x00, 0x00, 0x40, 0x7F, 0xF7];   // fm1_install.py / fm1ota.js
+  // the one with the body 01: the whole identity (HS_QUERY gets NAME_ and three digits, M-UPGRADE 3.11's limit)
+  const HS_FULL = [0xF0, 0x00, 0x32, 0x45, 0x08, 0x00, 0x00, 0x40, 0x00, 0x7E, 0x01, 0xF7];
   const RS_REQ = 0x41, BU_REQ = 0x42, BU_END = 0x43;
   const OK_ADDR = 0xC0000000, ASK_ADDR = 0xC1000000, FAIL_ADDR = 0xCF000000;
   const MAGIC = [0x58, 0x30, 0x58, 0x42], VERSION = 1, NOBJ = 6, HEAD = 16, REC = 8, PAYLOAD_MAX = 3840, MAXDATA = 512;   // "X0XB"
   const OBJ_IDS = [0, 1, 2, 3, 5, 6];       // OBJ_SET, OBJ_SOUND, OBJ_PAT0, OBJ_PAT1, OBJ_SONG, OBJ_MOTION (not OBJ_PANEL)
   const PLAYING = 10, DECLINED = 11;
   const X0X = "FM-1_9";                                            // X0X's package identity
-  const DELAY = { poll: 500, idle: 10000, ask: 75000, first: 3000, hs: 1000 };   // ms, as x0x_backup.py
+  const DELAY = { poll: 500, idle: 10000, ask: 75000, first: 3000, hs: 1000, hsFull: 600 };   // ms, as x0x_backup.py
   const ERRORS = {
     1: "the file's size", 2: "the transfer (a piece of the file did not arrive)", 3: "the file's head",
     4: "a part's header", 5: "a part's check (a byte changed on the way)", 6: "the whole file's check",
@@ -178,7 +180,8 @@ const PB = (() => {
     if (pkt.length < 2 || pkt[0] !== 0xF0 || pkt[pkt.length - 1] !== 0xF7) return null;
     const d = unpack7(pkt.slice(1, -1));
     if (d.length !== 34 || d[0] !== 0 || d[1] !== 0x59 || d[2] !== 0x11) return null;
-    const txt = String.fromCharCode(...d.slice(6, 33)).replace(/\0+$/, "");
+    const z = d.indexOf(0, 6);                   // the text up to its first zero (bytes after it may carry data)
+    const txt = String.fromCharCode(...d.slice(6, z < 0 || z > 33 ? 33 : z));
     return /^[^_]+_\d+$/.test(txt) ? txt : null;
   }
 
@@ -215,17 +218,29 @@ const PB = (() => {
     return `${parts.length ? parts.join(", ") : "an empty project"} (${total.toLocaleString("en")} bytes)`;
   }
 
+  // send a handshake -> the identity answered, null (no answer in ms), false (the send failed)
+  async function ask(link, query, ms) {
+    if (!link.send(query)) return false;
+    const end = Date.now() + ms;
+    while (Date.now() < end) {
+      const p = await link.read(end - Date.now());
+      if (!p) break;
+      const id = parseIdentity(p);
+      if (id) return id;
+    }
+    return null;
+  }
+  // the identity (fm1ota.js handshake): HS_QUERY, then HS_FULL when the answer is NAME_ and three digits; the plain
+  // answer when nothing answers HS_FULL (M-VAVE's, an older build)
   async function handshake(link, tries = 2) {
     link.drain();
     for (let t = 0; t < tries; t++) {
-      if (!link.send(HS_QUERY)) return null;
-      const end = Date.now() + DELAY.hs;
-      while (Date.now() < end) {
-        const p = await link.read(end - Date.now());
-        if (!p) break;
-        const id = parseIdentity(p);
-        if (id) return id;
-      }
+      const id = await ask(link, HS_QUERY, DELAY.hs);
+      if (id === false) return null;
+      if (id === null) continue;
+      if (/^ota-/i.test(id) || !/^[^_]+_\d{3}$/.test(id)) return id;
+      const full = await ask(link, HS_FULL, DELAY.hsFull);
+      return full && full.split("_")[0] === id.split("_")[0] && full.startsWith(id) ? full : id;
     }
     return null;
   }
@@ -320,7 +335,7 @@ const PB = (() => {
     }
   }
 
-  return { HS_QUERY, RS_REQ, BU_REQ, BU_END, OK_ADDR, ASK_ADDR, FAIL_ADDR, MAGIC, VERSION, NOBJ, PLAYING, DECLINED, X0X, DELAY, ERRORS,
+  return { HS_QUERY, HS_FULL, RS_REQ, BU_REQ, BU_END, OK_ADDR, ASK_ADDR, FAIL_ADDR, MAGIC, VERSION, NOBJ, PLAYING, DECLINED, X0X, DELAY, ERRORS,
            pack7, unpack7, crc32, frame, parseFrame, response, parseRequest, parseIdentity, parse, summary, find, backup, restore };
 })();
 // --- backup protocol: end

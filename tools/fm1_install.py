@@ -26,6 +26,11 @@ import sys
 import time
 
 HS_QUERY = bytes([0xF0, 0x00, 0x32, 0x45, 0x00, 0x00, 0x00, 0x40, 0x7F, 0xF7])
+# the handshake with the one-byte body 01 (00 59 11, length 1, 01, checksum FE): firmware/src/ota.c answers HS_QUERY
+# with its name, '_' and three digits only ("FM-1_901": M-UPGRADE 3.11 refuses more) and this one with its whole
+# identity ("FM-1_9010200"). M-VAVE's firmware, the update loaders and older builds don't answer it.
+# (PERF-1's scheme, as felucca-bsp's and fm1-base's: their installers and ours ask the same way)
+HS_FULL = bytes([0xF0, 0x00, 0x32, 0x45, 0x08, 0x00, 0x00, 0x40, 0x00, 0x7E, 0x01, 0xF7])
 UPGRADE = bytes([0xF0, 0x22, 0x24, 0x35, 0x7F, 0xF7])
 FINISH_CHECK, FINISH_WRITE = 0xE0000000, 0xF0000000
 MAXDATA = 512
@@ -35,7 +40,7 @@ PORT_RE = re.compile(r"fm-1|felucca|ota|composite|sinco|usb-midi", re.I)   # nev
 
 # seconds; the tests shorten them
 DELAY = {"open": 0.3, "start": 2.0, "reply": 0.01, "loader": 3.0, "reboot": 3.0, "retry": 1.0,
-         "poll": 1.0, "hs": 1.0, "idle_check": 8.0, "idle_write": 180.0,
+         "poll": 1.0, "hs": 1.0, "hs_full": 0.6, "idle_check": 8.0, "idle_write": 180.0,
          "wait_loader": 30.0, "wait_reboot": 40.0}
 
 EXIT = {"usage": 2, "badpkg": 2, "notfound": 3, "model": 6, "lost": 4, "stopped": 4, "badreq": 4,
@@ -109,7 +114,7 @@ def parse_identity(pkt):
     d = unpack7(pkt[1:-1])
     if len(d) != 34 or d[:3] != b"\x00\x59\x11":
         return None
-    txt = d[6:33].rstrip(b"\0").decode("latin-1")
+    txt = d[6:33].split(b"\0", 1)[0].decode("latin-1")   # the text up to its first zero (bytes after it may carry data)
     m = re.fullmatch(r"([^_]+)_(\d+)", txt)
     return Identity(txt, m[1], int(m[2])) if m else None
 
@@ -217,19 +222,36 @@ class Device:
         self.link, self.id, self.name = link, ident, name
 
 
+def ask(link, query, secs):
+    """send a handshake -> the identity answered, None (no answer in secs), False (the send failed)"""
+    if not link.send(query):
+        return False
+    end = time.monotonic() + secs
+    while (left := end - time.monotonic()) > 0:
+        p = link.read(left)
+        if p is None:
+            break
+        ident = parse_identity(p)
+        if ident:
+            return ident
+    return None
+
+
 def handshake(link, tries=3):
+    """the identity: HS_QUERY, then HS_FULL when the answer is NAME_ and three digits (a firmware on ota.c from
+    M-UPGRADE 3.11's fix on tells its whole identity so); the plain answer when nothing answers HS_FULL (M-VAVE's,
+    an older build)"""
     link.drain()
     for _ in range(tries):
-        if not link.send(HS_QUERY):
+        ident = ask(link, HS_QUERY, DELAY["hs"])
+        if ident is False:
             return None
-        end = time.monotonic() + DELAY["hs"]
-        while (left := end - time.monotonic()) > 0:
-            p = link.read(left)
-            if p is None:
-                break
-            ident = parse_identity(p)
-            if ident:
-                return ident
+        if ident is None:
+            continue
+        if ident.loader or not re.fullmatch(r"[^_]+_\d{3}", ident.text):
+            return ident
+        full = ask(link, HS_FULL, DELAY["hs_full"])
+        return full if full and full.model == ident.model and full.text.startswith(ident.text) else ident
     return None
 
 

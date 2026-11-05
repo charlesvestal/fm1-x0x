@@ -22,7 +22,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import fm1_install as I  # noqa: E402
 import x0x_backup as B  # noqa: E402
 
-I.DELAY.update(open=0, hs=0.1, retry=0.02)
+I.DELAY.update(open=0, hs=0.1, hs_full=0.1, retry=0.02)
 B.DELAY.update(poll=0.02, idle=0.3, ask=0.5, first=0.3)
 failed = 0
 

@@ -3,7 +3,15 @@
 /* M-UPGRADE update entry.
  *
  * The updater talks SysEx (F0 pack7(00 59 cmd len24 body chk) F7):
- *   cmd 0x11  handshake -> we answer our package identity (FELUCCA_ID)
+ *   cmd 0x11  handshake -> we answer our package identity (FELUCCA_ID), 27 bytes, the text then zeros: to the
+ *             plain query (no body: M-UPGRADE's) its name, '_' and the first three digits only ("FM-1_9010200"
+ *             -> "FM-1_901"), because M-UPGRADE 3.11 takes NAME_ and 1-3 digits and refuses the rest ("Invalid
+ *             device identity"); to the query with the one-byte body 01 the whole identity, version included
+ *             (the installers ask so when the plain answer is NAME_ and three digits; the stock firmware, the
+ *             update loader and builds before this don't answer it, so they keep the plain answer). The scheme
+ *             is PERF-1's (deamonSLINKY/PERF-1 775106b), as felucca-bsp's chip/ota.c (41a6e86). The update
+ *             loader (FELUCCA_LOADER) answers the plain query only, with its whole identity ("ota-FM-1_900"
+ *             passes M-UPGRADE 3.11). A host reads the text up to its first zero
  *   F0 22 24 35 7F F7  upgrade -> ota_session(): pull parts of the package
  *     with cmd 0x30 read requests, check them, stage the package's update
  *     loader at 0xE0000 (outside Felucca's store), ask 0xE0000000 ("success"),
@@ -125,13 +133,24 @@ static int ota_send_msg(uint32_t cmd, const uint8_t *body, uint32_t n)   /* n <=
     return ota_wire_send(ota_wire, w);
 }
 
-static void ota_reply_identity(void)
+/* full 0: the name, '_' and three digits (M-UPGRADE 3.11's limit); 1: the whole identity. The loader's is whole */
+static void ota_reply_identity(int full)
 {
     static const char ID[] = FELUCCA_ID;         /* == the package marker string */
     uint8_t id[27];
-    uint32_t i;
+    uint32_t i, n = sizeof ID - 1u;
+#ifndef FELUCCA_LOADER
+    if (!full) {
+        for (i = 0; i < n && ID[i] != '_'; i++)
+            ;
+        if (i + 4u < n)
+            n = i + 4u;                          /* "FM-1_9010200" -> "FM-1_901"; "FM-1_900" stays */
+    }
+#else
+    (void)full;
+#endif
     for (i = 0; i < sizeof id; i++)
-        id[i] = i < sizeof ID - 1u ? (uint8_t)ID[i] : 0;
+        id[i] = i < n ? (uint8_t)ID[i] : 0;
     ota_send_msg(0x11, id, sizeof id);
 }
 
@@ -153,13 +172,29 @@ static uint32_t ota_take(void)
     return d;
 }
 
+/* the decoded frame (d: its length) a handshake? 1 the plain query, 2 the one with the body 01 (not the loader's),
+ * 0 neither */
+static int ota_hs(uint32_t d)
+{
+    if (d < 7u || ota_dec[2] != 0x11)
+        return 0;
+    if (d == 7u)
+        return 1;
+#ifndef FELUCCA_LOADER
+    if (d == 8u && ota_dec[6] == 1u)
+        return 2;
+#endif
+    return 0;
+}
+
 /* main loop, outside a session: answer handshakes. Returns the frame's decoded length (0: none), the frame in
  * ota_dec, for the app's own commands (X0X: backup.c's 0x41 / 0x42) */
 static uint32_t ota_service(void)
 {
     uint32_t d = ota_take();
-    if (d == 7u && ota_dec[2] == 0x11)
-        ota_reply_identity();
+    int hs = ota_hs(d);
+    if (hs)
+        ota_reply_identity(hs == 2);
     return d;
 }
 
@@ -186,8 +221,8 @@ static int ota_read(uint32_t addr, uint8_t *dst, uint32_t len)
             d = ota_take();
             if (!d)
                 continue;
-            if (d == 7u && ota_dec[2] == 0x11) {
-                ota_reply_identity();
+            if (ota_hs(d)) {
+                ota_reply_identity(ota_hs(d) == 2);
                 continue;
             }
             if (d == len + 15u && ota_dec[2] == 0x30 && ota_rd24(ota_dec + 3) == len + 8u &&

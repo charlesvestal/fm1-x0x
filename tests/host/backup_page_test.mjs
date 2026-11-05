@@ -18,7 +18,7 @@ const html = fs.readFileSync(path.join(root, "web/backup/index.html"), "utf8");
 const m = /\/\/ --- backup protocol: begin[^\n]*\n([\s\S]*?)\/\/ --- backup protocol: end/.exec(html);
 if (!m) { console.log("FAIL no backup protocol markers in web/backup/index.html"); process.exit(1); }
 const PB = new Function(`"use strict";\n${m[1]}\nreturn PB;`)();
-Object.assign(PB.DELAY, { poll: 5, idle: 300, ask: 500, first: 300, hs: 100 });
+Object.assign(PB.DELAY, { poll: 5, idle: 300, ask: 500, first: 300, hs: 100, hsFull: 100 });
 
 let fails = 0;
 const check = (ok, msg) => { console.log(`${ok ? "ok  " : "FAIL"} ${msg}`); if (!ok) fails++; };
@@ -130,9 +130,19 @@ class FakeX0X {
     this.ask(...r.value);
   }
   rx(d) {
+    // newOta: ota.c from M-UPGRADE 3.11's fix on, NAME_ and three digits to HS_QUERY, the whole to HS_FULL
+    const reply = (text) => {
+      const t = [...Buffer.from(text), ...new Array(27 - text.length).fill(0)];
+      t[24] = 0xB3, t[25] = 0x60, t[26] = 0x14;                  // felucca-bsp#29: the flash's JEDEC id after the text
+      this.q.push([0xF0, ...PB.pack7([0, 0x59, 0x11, 27, 0, 0, ...t, ~t.reduce((a, v) => a + v, 0) & 255]), 0xF7]);
+    };
     if (same(d, PB.HS_QUERY)) {
-      const t = [...Buffer.from(this.identity)];
-      this.q.push([0xF0, ...PB.pack7([0, 0x59, 0x11, 0, 0, 0, ...t, ...new Array(28 - t.length).fill(0)]), 0xF7]);
+      reply(this.newOta ? this.identity.slice(0, this.identity.indexOf("_") + 4) : this.identity);
+      return;
+    }
+    if (same(d, PB.HS_FULL)) {
+      this.hsFull = (this.hsFull || 0) + 1;
+      if (this.newOta) reply(this.identity);
       return;
     }
     const f = PB.parseFrame(d);
@@ -206,6 +216,13 @@ check(PB.VERSION === 1 && (img[4] | img[5] << 8) === 1, "the device's backups: v
   const dev = new FakeX0X(other, { identity: "FM-1_3000401" });
   const e = await err(connect(dev));
   check(e && e.code === "model" && /not X0X/.test(e.message), "not X0X (Polly's identity): refused");
+}
+{
+  const dev = new FakeX0X(img, { identity: "FM-1_9010200", newOta: true });
+  const c = await connect(dev);
+  check(c && c.id === "FM-1_9010200" && dev.hsFull === 1,
+        "an X0X that answers FM-1_901 to the plain query (M-UPGRADE 3.11): its whole identity asked with 01");
+  c.link.close();
 }
 {
   const dev = new FakeX0X(other, { stallAfter: 5 });

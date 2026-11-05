@@ -51,6 +51,8 @@ to X0X starts with an empty project. To keep it, save it to a file first (see
 **Go back:** "Back to the stock firmware", at the bottom of the same page, puts M-VAVE's firmware
 back (download the FM-1 file from the link there, choose it, press the button; if the FM-1 doesn't
 take it, use the V15 file from the second link). M-VAVE's own updater, M-UPGRADE, works too.
+M-UPGRADE 3.11 finds this version of X0X, not older ones (it says "A USB MIDI device is present but did
+not answer"): use the button for those.
 
 > Installing other firmware is at your own risk. If the FM-1 ever won't start, see
 > [Recovering an FM-1 that won't start](#recovering-an-fm-1-that-won-t-start).

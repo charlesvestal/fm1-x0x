@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define FELUCCA_ID "FM-1_900"
+#define FELUCCA_ID "FM-1_9010200"   /* a release's: the plain handshake answers FM-1_901 */
 #define FELUCCA_OTA_DRYRUN 0
 
 static uint8_t nor[0x100000];
@@ -174,8 +174,18 @@ int main(int argc, char **argv)
         host_reply(m, 7);
         ota_service();
         bad += check("handshake answered", ident_replies == 1);
-        bad += check("identity frame is " FELUCCA_ID,
-                     ota_msg[2] == 0x11 && !memcmp(ota_msg + 6, FELUCCA_ID, sizeof FELUCCA_ID - 1));
+        bad += check("plain query: FM-1_901 (M-UPGRADE 3.11: NAME_ + 1-3 digits)",
+                     ota_msg[2] == 0x11 && !memcmp(ota_msg + 6, "FM-1_901", 8) && ota_msg[6 + 8] == 0);
+    }
+    reset_dev();
+    {
+        uint8_t m[8] = {0, 0x59, 0x11, 1, 0, 0, 1, 0xFE};   /* body 01: the whole identity */
+        host_reply(m, 8);
+        ota_service();
+        bad += check("asked with 01: answered", ident_replies == 1);
+        bad += check("asked with 01: the whole identity " FELUCCA_ID,
+                     ota_msg[2] == 0x11 && !memcmp(ota_msg + 6, FELUCCA_ID, sizeof FELUCCA_ID - 1) &&
+                     ota_msg[6 + sizeof FELUCCA_ID - 1] == 0);
     }
 
     /* full session */
