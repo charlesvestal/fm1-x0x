@@ -15,6 +15,7 @@
 #include "fm1_lcd_hw.h"
 #include "fm1_cpu1.h"
 #include "fm1_flash.h"
+#include "fm1_flash_ok.h"   /* the flash parts the storage may use (FM1B_FLASH_JEDEC_OK) */
 #include "fm1_xip.h"
 #include "fm1_perf.h"
 
@@ -48,7 +49,7 @@ static inline int32_t clamp(int32_t v, int32_t lo, int32_t hi) { return v < lo ?
 #include "midi_uart.c"
 #endif
 
-static uint8_t flash_ok;          /* JEDEC id matched at boot */
+static uint8_t flash_ok;          /* a known flash part at boot (fm1_flash_ok.h) */
 static void audio_silence(void);
 static int st_read(uint32_t off, void *dst, uint32_t n)   /* 256-byte IRQ-off windows: audio keeps up */
 {

@@ -21,6 +21,7 @@ recipients its complete corresponding source under the same licence.
 | Speed-ups of the 303's render (passes over sub-blocks, the shared coefficients), the 909's sample voices and the 808's metal bank (`dsp/bass303*`, `dsp/drum909.c`, `dsp/drum808*`), the same samples bit for bit | after [Optimist](https://github.com/w0ts/optimist) (henri / hdavid), a fork of X0X | GPL-3.0-only |
 | The idea of a browser emulator for FM-1 firmware (`web/emu/`) | [Groove OS](https://www.groove-os.com/) by Peter Gombos, whose site runs its firmware in the browser; no code from it | credit only |
 | The screen reader's firmware side: `firmware/src/announce.c`, `tools/gen_words.py` | [fm1-base](https://github.com/charlesvestal/fm1-base) (`device/announce.c`, `tools/gen_words.py`), Copyright (C) 2026 Charles Vestal, copied by [fm1-reader](https://github.com/charlesvestal/fm1-reader)'s `tools/sync_announce.sh` | MPL-2.0 (compatible with the GPL: MPL-2.0 section 3.3) |
+| The flash parts the storage may use: `firmware/hal/fm1_flash_ok.h`, `tests/host/flash_ok_test.c` | [fm1-base](https://github.com/charlesvestal/fm1-base) (`device/fm1_flash_ok.h`, `tests/flash_ok_test.c`, fm1-base#35), Copyright (C) 2026 Laurens (@profikid) | MPL-2.0 (compatible with the GPL: MPL-2.0 section 3.3) |
 | Everything else in `firmware/src/{app,dsp,seq}`, `host/`, `tests/` | X0X | GPL-3.0-only |
 
 No recorded breaks are in this tree or in the default firmware: the built-in break loops are

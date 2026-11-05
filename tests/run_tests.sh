@@ -57,6 +57,7 @@ for t in drum909 drum808 bass303 breaks; do
     [ -f "tests/host/run_$t.sh" ] && run "$t" sh "tests/host/run_$t.sh"
 done
 run storage sh -c "$CC -O2 -o $OUT/storage_test tests/storage_test.c && $OUT/storage_test"
+run flash-ok sh -c "$CC -std=c99 -Wall -Wextra -Werror -o $OUT/flash_ok_test tests/host/flash_ok_test.c && $OUT/flash_ok_test"   # firmware/hal/fm1_flash_ok.h: the flash parts the storage may use
 # backup and restore over USB (firmware/src/backup.c) on storage.c over a simulated flash: the stream's frames, a
 # restore refused, cut or damaged changing nothing, SEL restoring it all, a power cut at each write: the old project
 # or the new, whole. Then tools/x0x_backup.py against a simulated X0X, on that image

@@ -390,7 +390,7 @@ static void fm1_main(void)
         fm1_sysvdd_raise(15);                       /* 1.60 V, then 1.38 V (fm1_sys.h) */
         plat_vdc14_level = (uint8_t)fm1_vdc14();
         plat_sysvdd_level = (uint8_t)fm1_sysvdd();
-        flash_ok = FL_FAR(fl_jedec_ram)() == 0x856014u;   /* the expected 1 MiB part, else RAM only */
+        flash_ok = FM1B_FLASH_JEDEC_OK(FL_FAR(fl_jedec_ram)());   /* a known 1 MiB part, else RAM only */
         irq_restore(f);
         if (flash_ok) {
             rs_boot();                              /* a restore's commit cut short by a power loss: finished */
