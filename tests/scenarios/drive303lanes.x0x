@@ -1,0 +1,62 @@
+# A 303's VOLUME lane, saved before the drive was rescaled (sound revision 6, the one before it;
+# drive303 covers 5 and 4): the old RAT's sound depended on Volume and Drive together, so after
+# loading, each step's Volume and Drive are mapped together (bass303_pre_rescale), and a DRIVE lane
+# is made to carry the step's new Drive, but only where it differs from the pot's: with Drive 0 (a
+# bypass, then and now) nothing changes.
+wait 300
+# 303 A: RAT, Volume 96, Drive 0; a Volume move recorded over a pass (96 down to 60)
+param 2 0 9 2
+param 2 0 7 96
+param 2 0 8 0
+turn ALGO 2
+expect part 2
+tap SEQ
+tapkey w0
+tap EDIT
+tap SEL
+turn SELECT 9
+wait 300
+tap REC
+tap PLAY
+wait 400
+turn ALGO -36
+wait 300
+tap PLAY
+wait 300
+tap REC
+expect lanes 1
+expect sound2.0.7 60
+expect laneval2.0.7.0 78
+expect laneval2.0.7.11 61
+expect laneval2.0.7.13 82
+expect laneval2.0.8.0 -1
+sndrev 6
+tap SAVE
+wait 300
+reboot
+wait 300
+# Drive 0: the lane and the pots as they were, and no DRIVE lane made
+expect lanes 1
+expect sound2.0.8 0
+expect sound2.0.7 60
+expect laneval2.0.7.0 78
+expect laneval2.0.7.13 82
+expect laneval2.0.8.0 -1
+# the same, saved at Drive 60
+param 2 0 8 60
+sndrev 6
+tap SAVE
+wait 300
+reboot
+wait 300
+# the pots: (Volume 60, Drive 60); each step: (its Volume, Drive 60), both lanes
+expect lanes 2
+expect sound2.0.8 109
+expect sound2.0.7 104
+expect laneval2.0.8.0 112
+expect laneval2.0.7.0 108
+# step 11's Drive maps to the pot's own, so the new DRIVE lane leaves it empty (255) and the pot plays
+expect laneval2.0.8.11 255
+expect laneval2.0.7.11 105
+expect laneval2.0.8.13 113
+expect laneval2.0.7.13 109

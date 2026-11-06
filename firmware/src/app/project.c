@@ -16,6 +16,7 @@
 #include "x0x.h"
 #include "../dsp/drum909.h"            /* DR_SD (the sound's revisions) */
 #include "../dsp/master.h"             /* MST_* (the sound's revisions) */
+#include "../dsp/bass303.h"            /* BASS303_*, the drive's revision */
 #include "lz.c"
 
 project_t proj;
@@ -410,6 +411,57 @@ static void sound_rev2(void)
     proj.sound.v[T_FX][1][0] = (uint8_t)(proj.sound.v[T_FX][0][FX_DL_TYPE] ? 16 + proj.sound.v[T_FX][0][FX_DL_WEAR] * 111 / 127 : 0);
 }
 
+/* rev 7: the 303's drive rescaled (Volume after it; bass303.c). Each 303's DRIVE and VOLUME move to
+ * the values that sound as they did (bass303_pre_rescale), which depend on both and on the type. So
+ * on each step where a lane sets any of the three, the step's own type, Volume and Drive (its lanes'
+ * values, else the pots') are mapped together. Each new value goes in its pot's lane where that lane
+ * had a value, or where it differs from the pot's own migrated value; a lane the pot lacks is made
+ * then, if the pool has room (otherwise that step plays the pot's migrated value) */
+static void sound_rev7(void)
+{
+    lane_t *L = proj.arr.lane;
+    int b, k, s, nd, nv, bd, bv;
+    for (b = 0; b < NBASS; b++) {
+        uint8_t *p = proj.sound.v[T_303][b];
+        const int typ = p[BASS303_DRVTYPE], vol = p[BASS303_VOLUME], drv = p[BASS303_DRIVE];
+        bass303_pre_rescale(typ, vol, drv, &bd, &bv);  /* what a step without its own value plays */
+        for (k = 0; k < NLANE; k++) {                 /* each part pattern with lanes on these pots, */
+            const lane_t *l = &L[k];                  /* once: at the first of its lanes */
+            int kt, kv, kd;
+            if (!l->used || l->t != T_303 || l->v != b ||
+                (l->i != BASS303_DRVTYPE && l->i != BASS303_VOLUME && l->i != BASS303_DRIVE))
+                continue;
+            kt = motion_find(L, l->pat, l->part, T_303, b, BASS303_DRVTYPE);
+            kv = motion_find(L, l->pat, l->part, T_303, b, BASS303_VOLUME);
+            kd = motion_find(L, l->pat, l->part, T_303, b, BASS303_DRIVE);
+            if ((kt >= 0 && kt < k) || (kv >= 0 && kv < k) || (kd >= 0 && kd < k))
+                continue;                             /* migrated already, at its first lane */
+            for (s = 0; s < NSTEPS; s++) {
+                int ts = kt >= 0 ? L[kt].val[s] : MOT_NONE, vs = kv >= 0 ? L[kv].val[s] : MOT_NONE;
+                int ds = kd >= 0 ? L[kd].val[s] : MOT_NONE;
+                if (ts == MOT_NONE && vs == MOT_NONE && ds == MOT_NONE)
+                    continue;                         /* the step plays the pots: they move below */
+                bass303_pre_rescale(ts == MOT_NONE ? typ : ts, vs == MOT_NONE ? vol : vs, ds == MOT_NONE ? drv : ds,
+                                    &nd, &nv);
+                if (vs != MOT_NONE || nv != bv) {
+                    if (kv < 0)
+                        kv = motion_alloc(L, l->pat, l->part, T_303, b, BASS303_VOLUME);
+                    if (kv >= 0)
+                        L[kv].val[s] = (uint8_t)nv;
+                }
+                if (ds != MOT_NONE || nd != bd) {
+                    if (kd < 0)
+                        kd = motion_alloc(L, l->pat, l->part, T_303, b, BASS303_DRIVE);
+                    if (kd >= 0)
+                        L[kd].val[s] = (uint8_t)nd;
+                }
+            }
+        }
+        p[BASS303_DRIVE] = (uint8_t)bd;
+        p[BASS303_VOLUME] = (uint8_t)bv;
+    }
+}
+
 /* a BD gained REV and DLY before its PAN (909: 8 -> 10, 808: 7 -> 9): the pan and its motion move, the sends start
  * at none (as the kick had) */
 static void sound_bd_sends(int t, int pan)            /* (rev 3: the 909's at 8; rev 4: the 808's at 7) */
@@ -508,6 +560,8 @@ int project_load(void)
     if (sound_ok && proj.set.snd_rev < 6)             /* before PING WIDTH: PING-PONG on is full width, off 0 */
         proj.sound.v[T_FX][FX_VOICE(FX_DL_WIDTH)][FX_INDEX(FX_DL_WIDTH)] =
             proj.sound.v[T_FX][0][FX_DL_PING] ? 127 : 0;
+    if (sound_ok && proj.set.snd_rev < 7)             /* before the 303's drive was rescaled */
+        sound_rev7();
     proj.set.snd_rev = PROJ_SND_REV;
     return bad ? -1 : 0;
 }
