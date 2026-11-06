@@ -38,7 +38,7 @@ LANDING = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>X0X for the FM-1</title>
-<meta name="description" content="Groovebox firmware for the M-VAVE FM-1: a 909, an 808, two 303s and a breakbeat player.">
+<meta name="description" content="X0X is groovebox firmware for the M-VAVE FM-1, with a 909, an 808, two 303s and a breakbeat player.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600&family=Barlow+Semi+Condensed:wght@600;700&display=swap">
@@ -76,26 +76,26 @@ a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 <body>
 <main>
 <h1>X0X</h1>
-<p class="lede">Groovebox firmware for the M-VAVE FM-1. A 909, an 808, two 303s with the TB-3PO
-line generator, and a breakbeat player, all running at once, with patterns, a song mode and
-recorded knob moves.</p>
+<p class="lede">X0X is groovebox firmware for the M-VAVE FM-1. It plays a 909, an 808, two 303s and a
+breakbeat player, all at once, and TB-3PO writes 303 lines for you. Write patterns, arrange them into a song
+and record your knob moves.</p>
 <div class="video"><iframe src="https://www.youtube-nocookie.com/embed/cZLYrZaLDUk" title="X0X running on the FM-1"
   allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen loading="lazy"></iframe></div>
-<div class="status">X0X installs and uninstalls the way Felucca does, and the installer can put M-VAVE's own firmware back. Installing is
-at your own risk.</div>
+<div class="status">X0X installs and uninstalls the way Felucca does, and the installer can put M-VAVE's own firmware back. You
+install it at your own risk.</div>
 <nav class="ways" aria-label="Get X0X">
-  <a href="emu/"><strong>Try it in the browser</strong><span>The same code the FM-1 runs, with sound. Mouse, touch or keyboard; no FM-1 needed.</span></a>
-  <div class="card"><strong><a href="install/">Install v__VERSION__</a> <a class="new" href="new/">What's new?</a></strong><span>From Chrome or Edge, with the FM-1 connected by USB. Nothing to install on the computer.</span></div>
-  <a href="manual/"><strong>Manual</strong><span>Getting started in ten steps, then everything else.</span></a>
-  <a href="breaks/"><strong>Your own breaks</strong><span>Drop in loops and send them to the BREAK part, from Chrome or Edge.</span></a>
-  <a href="backup/"><strong>Back up your project</strong><span>Save your project to a file, and load it back later. Keep as many as you like.</span></a>
-  <a href="https://charlesvestal.github.io/fm1-reader/"><strong>Screen reader</strong><span>Hear what the screen shows, with the page's voice or your own screen reader.</span></a>
+  <a href="emu/"><strong>Try it in the browser</strong><span>Listen right here, and play it with a mouse, a touch screen or the keyboard. It runs the same code as the FM-1, so you don't need one.</span></a>
+  <div class="card"><strong><a href="install/">Install v__VERSION__</a> <a class="new" href="new/">What's new?</a></strong><span>Connect your FM-1 by USB and install from Chrome or Edge. There's nothing to install on your computer.</span></div>
+  <a href="manual/"><strong>Manual</strong><span>Get started in ten steps, then read about everything else.</span></a>
+  <a href="breaks/"><strong>Your own breaks</strong><span>Drop in your own loops and send them to the BREAK part from Chrome or Edge.</span></a>
+  <a href="backup/"><strong>Back up your project</strong><span>Save your project to a file and load it back later. You can keep as many as you like.</span></a>
+  <a href="https://charlesvestal.github.io/fm1-reader/"><strong>Screen reader</strong><span>Hear what the screen shows, in the page's own voice or through your own screen reader.</span></a>
   <a href="firmware/__PKG__"><strong>Download __PKG__</strong><span>For the command-line installer: <code>python3 tools/fm1_install.py __PKG__</code></span></a>
-  <a href="__REPO__"><strong>Source</strong><span>GitHub, GPL-3.0. Built on Felucca by Hügelton Instruments.</span></a>
+  <a href="__REPO__"><strong>Source</strong><span>On GitHub under GPL-3.0. Built on Felucca by Hügelton Instruments.</span></a>
 </nav>
-<p class="small">To go back to the official firmware, use M-VAVE's updater, M-UPGRADE, from
-<a href="https://www.m-vave.com/download">m-vave.com/download</a> (M-UPGRADE 3.11 finds v__VERSION__, not older
-versions; for those, use the installer's "Back to the stock firmware"). M-VAVE and FM-1 are trademarks of their owners.</p>
+<p class="small">To go back to the official firmware, use M-VAVE's own updater, M-UPGRADE, from
+<a href="https://www.m-vave.com/download">m-vave.com/download</a>. M-UPGRADE 3.11 finds v__VERSION__ but not older
+versions. For those, use "Back to the stock firmware" in the installer. M-VAVE and FM-1 are trademarks of their owners.</p>
 </main>
 </body>
 </html>
