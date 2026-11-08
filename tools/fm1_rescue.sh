@@ -62,6 +62,8 @@ echo "Stock firmware: ${PKGS[*]}"
 echo
 echo "If it asks for a password, type your computer's password (nothing shows while you type) and press Return."
 echo "When it says it is waiting: plug the FM-1 in and switch it on."
-echo "It will crash and go blank; that is when it is caught. (Ctrl-C stops it.)"
+echo "If it crashes, it goes blank; that is when it is caught. (Ctrl-C stops it.)"
+echo "If it starts normally, put it in update mode: hold REC while you switch it on, or, on a"
+echo "firmware with a countdown (X0X, MONK-1), hold OCT- and OCT+ until the screen goes black."
 echo
 exec sudo "$DIR/env/bin/python" "$DIR/fm1_rescue.py" "${PKGS[@]}" --ask --wait 300

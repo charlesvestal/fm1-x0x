@@ -4,7 +4,8 @@
 mask-ROM "UBOOT"), from a Mac (or Linux), with no extra hardware.
 
 For an FM-1 whose firmware crashes at start-up, or one left in the chip's update mode (an install cut
-short). X0X 0.2-beta crashed at once, and after two failed
+short), or one whose firmware starts but cannot install (X0X 1.2.0 on a UC25HQ80: its loader never started;
+fm1-x0x#46): put that one in the chip's update mode by its keys. X0X 0.2-beta crashed at once, and after two failed
 boots enters UBOOT, which shows up on USB as "WL80UBOOT1.00" (4C4A:8057). macOS then takes it for a
 disk, upsets it, and it reboots into the crash a few seconds later; this script waits for it,
 takes it away from macOS (hence sudo) and keeps it.
@@ -355,6 +356,8 @@ def backend(usb):
 def open_device(usb, timeout):
     """Wait for 4C4A:8057 and take it from macOS's mass storage driver."""
     print("waiting for the FM-1 in update mode (switch it on, or wait for it to cycle) ...")
+    print("  if it starts normally: hold REC while you switch it on, or, on a firmware with a countdown")
+    print("  (X0X, MONK-1), hold OCT- and OCT+ until the countdown ends and the screen goes black")
     be = backend(usb)
     t0 = time.time()
     while time.time() - t0 < timeout:

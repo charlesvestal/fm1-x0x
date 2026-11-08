@@ -892,6 +892,10 @@ screen and only the red charging light. Neither the web installer nor M-VAVE's u
 FM-1 in that state. On a Mac, though, a script can put M-VAVE's firmware back, with the USB cable
 you already have.
 
+The same script helps if X0X 1.2.0 is on one of the newer FM-1s (sold since autumn 2026, with the
+UC25HQ80 flash chip). X0X starts, but it can't save, and no installer can reach it. M-VAVE's updater
+can't either. Use the script, then install X0X 1.2.1 or later, which works on these FM-1s.
+
 Open Terminal, paste this line and press Return:
 
 ```
@@ -902,8 +906,9 @@ bash -c "$(curl -fsSL https://raw.githubusercontent.com/charlesvestal/fm1-x0x/ma
    finished, paste the line again.
 2. If it asks for a password, type your Mac password (nothing shows as you type) and press Return.
 3. When it says it's waiting, plug the FM-1 in and switch it on. It crashes and goes blank, and
-   the script catches it. The script checks the chip, saves a backup of the FM-1's memory in the
-   `fm1-rescue` folder in your home folder, and asks before it writes anything.
+   the script catches it. If X0X starts normally instead, hold OCT- and OCT+ until the countdown
+   ends and the screen goes black. The script checks the chip, saves a backup of the FM-1's memory
+   in the `fm1-rescue` folder in your home folder, and asks before it writes anything.
 4. Type **yes** and press Return. Don't unplug anything until it says it's restarting the FM-1.
    The FM-1 then starts into its original firmware, and you can install X0X again from there.
 
