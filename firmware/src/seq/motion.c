@@ -40,6 +40,13 @@ void motion_step(motion_t *m, int part, int pat, int step, int next, int pass)
     m->last[part] = (uint8_t)step;
     if (next < 0 || next >= NSTEPS)
         next = 0;
+    /* first the lanes not on this pattern: their knobs back to base before this pattern's lanes play */
+    for (k = 0; k < NLANE; k++) {
+        lane_t *l = &m->lane[k];
+        lane_rt_t *r = &m->rt[k];
+        if (l->used && l->part == part && r->gen == l->gen && l->pat != pat)
+            to_base(m, l, r);
+    }
     for (k = 0; k < NLANE; k++) {
         lane_t *l = &m->lane[k];
         lane_rt_t *r = &m->rt[k];
