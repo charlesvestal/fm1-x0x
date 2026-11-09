@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>マニュアル · X0X</title>
+<meta name="description" content="X0X のマニュアル。M-VAVE FM-1 用グルーヴボックスファームウェアです。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600&family=Barlow+Semi+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400&display=swap">
+<style>
+:root {
+  --ground: #f4f5f6; --sheet: #ffffff; --ink: #1c1f23; --muted: #5b626a; --rule: #d9dde1;
+  --accent: #a35a08; --code-bg: #eef0f2; --swatch-ring: rgba(0,0,0,.18);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #131518; --sheet: #1a1d21; --ink: #e6e8eb; --muted: #9aa1a9; --rule: #2d3137;
+    --accent: #f0a043; --code-bg: #24282d; --swatch-ring: rgba(255,255,255,.22);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #131518; --sheet: #1a1d21; --ink: #e6e8eb; --muted: #9aa1a9; --rule: #2d3137;
+  --accent: #f0a043; --code-bg: #24282d; --swatch-ring: rgba(255,255,255,.22);
+  color-scheme: dark;
+}
+body {
+  background: var(--ground); color: var(--ink); margin: 0;
+  font: 400 17px/1.6 "Barlow", "Helvetica Neue", Arial, sans-serif;
+  padding-inline: 16px; padding-block: 32px 64px;
+}
+main { max-width: 46rem; margin: 0 auto; }
+h1, h2, h3 { font-family: "Barlow Semi Condensed", "Barlow", "Arial Narrow", sans-serif; text-wrap: balance; line-height: 1.15; }
+h1 { font-size: 2.3rem; font-weight: 700; margin: 0 0 .3rem; letter-spacing: -.01em; }
+h2 { font-size: 1.55rem; font-weight: 600; margin: 3rem 0 .8rem; padding-top: 1rem; border-top: 1px solid var(--rule); }
+h2 .num { color: var(--accent); margin-right: .35em; font-variant-numeric: tabular-nums; }
+h3 { font-size: 1.2rem; font-weight: 600; margin: 2rem 0 .5rem; }
+p, li { max-width: 65ch; }
+p { margin: 0 0 1rem; }
+ul, ol { padding-left: 1.3rem; margin: 0 0 1rem; }
+li { margin: .2rem 0; }
+strong { font-weight: 600; }
+a { color: var(--accent); text-underline-offset: 2px; }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+code, pre { font-family: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace; font-size: .86em; }
+code { background: var(--code-bg); padding: .08em .35em; border-radius: 4px; }
+pre { background: var(--code-bg); padding: 14px 16px; border-radius: 8px; overflow-x: auto; line-height: 1.45; margin: 0 0 1.2rem; }
+pre code { background: none; padding: 0; font-size: inherit; }
+hr { display: none; }
+.table { overflow-x: auto; margin: 0 0 1.3rem; }
+table { border-collapse: collapse; width: 100%; font-size: .95rem; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; vertical-align: top; padding: .45rem .7rem .45rem 0; border-bottom: 1px solid var(--rule); }
+th { font-family: "Barlow Semi Condensed", "Barlow", sans-serif; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; font-size: .82rem; color: var(--muted); }
+td:first-child { white-space: nowrap; }
+.lede { color: var(--muted); margin-bottom: 1.6rem; }
+.status { background: var(--sheet); border: 1px solid var(--rule); border-radius: 8px; padding: 12px 16px; }
+.status p { margin: 0; }
+a.home { color: inherit; text-decoration: none; }
+main > a.home { display: inline-block; font: 700 1rem "Barlow Semi Condensed", "Barlow", sans-serif; letter-spacing: .03em; color: var(--muted); margin: 0 0 .4rem; }
+a.home:hover { color: var(--accent); }
+pre:focus-visible, .table:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+.skip { position: absolute; left: 16px; top: -100px; background: var(--sheet); color: var(--accent); padding: 8px 14px;
+        border: 2px solid var(--accent); border-radius: 8px; font-weight: 600; z-index: 10; }
+.skip:focus { top: 12px; }
+.callout { border-left: 3px solid var(--accent); background: var(--sheet); border-radius: 0 8px 8px 0; padding: 10px 16px; margin: 0 0 1.2rem; max-width: 65ch; }
+.callout p { margin: 0; }
+details { border: 1px solid var(--rule); border-radius: 8px; padding: 0 16px; margin: 0 0 1.2rem; }
+details > summary { cursor: pointer; padding: 10px 0; font-weight: 600; color: var(--muted); }
+details[open] > summary { margin-bottom: .4rem; }
+details > :last-child { margin-bottom: 1rem; }
+.swatch { display: inline-block; width: .7em; height: .7em; border-radius: 3px; margin-right: .4em; vertical-align: .02em; box-shadow: 0 0 0 1px var(--swatch-ring); }
+nav.contents ol { columns: 2 14rem; column-gap: 2rem; padding-left: 1.3rem; }
+.figs { display: flex; flex-wrap: wrap; gap: 20px; margin: .4rem 0 1.6rem; }
+figure { margin: 0; flex: 0 1 auto; }
+figure img { display: block; max-width: 100%; height: auto; border-radius: 10px; }
+figure.shot img { width: 300px; image-rendering: pixelated; box-shadow: 0 0 0 1px var(--rule); }
+figure.wide { flex-basis: 100%; }
+figure.wide img { width: 100%; }
+figcaption { color: var(--muted); font-size: .88rem; margin-top: .4rem; max-width: 300px; }
+figure.wide figcaption { max-width: none; }
+nav.contents li { break-inside: avoid; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+<style>body { font-family: "Barlow", "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", "Meiryo", sans-serif; }</style>
+</head>
+<body>
+<a class="skip" href="#s1">本文へスキップ</a>
+<main id="content">
+<h1><a class="home" href="../">X0X</a></h1>
+<p class="lede">X0X は M-VAVE FM-1 をグルーヴボックスに変えるファームウェアです。909 と 808、303 が 2 台、そしてブレイクビーツプレイヤーが、すべて同時にステレオで鳴ります。各パートはそれぞれ独自のパターンを演奏でき、パターンを並べてソング(曲)を作ったり、ノブの動きを録音したり、個々のステップに専用のサウンドや再生確率を持たせたりできます。</p>
+<p>このバージョンの新機能:<a href="https://charlesvestal.github.io/fm1-x0x/new/">What's new</a>(英語)を参照。</p>
+<div class="callout"><p>このページは<strong>非公式の日本語訳</strong>です(2026-11-09 時点の原文に基づく翻訳。AI 翻訳支援を使用)。原文は <a href="../manual/">X0X Manual(英語)</a>、誤訳の報告は <a href="https://github.com/charlesvestal/fm1-x0x/issues">issue</a> へ。</p></div>
+<div class="figs"><figure class="wide"><img src="img/fm1-panel.svg" alt="X0X を実行している FM-1 のイラスト。左に MASTER(音量)、SELECT(ページ)、PRESETS(パターン)、ALGORITHM(パート)のノブ、その下に OCT- と OCT+(16 ステップ戻る/進む)。中央に画面。右に KNOB1〜KNOB4(そのページの 4 つの値)、その下に 2 段のボタン列:FX(エフェクト)、SEL(リスト)、ENV(押さえるとアクセント)、LFO(ミキサー)、EDIT(サウンド)、GLO(設定)、HOME(パターン/ソング)、SAVE(保存、押さえるとコピー)、ARP(TB-3PO)、SEQ(ステップ)、PLAY/STOP、REC(録音)。さらに下に黒鍵(ドラムトラック、ブレイクのスライス、パートミュート、ミキサーチャンネル)と白鍵(ステップ、HOME ではパターン)。各コントロールの詳細はセクション 3。"><figcaption>FM-1 のイラスト。X0X 実行時の各コントロールの名称</figcaption></figure></div>
+<hr>
+<nav class="contents" aria-label="目次"><h2 id="contents">目次</h2>
+<ol><li><a href="#s1">インストール</a></li><li><a href="#s2">はじめに</a></li><li><a href="#s3">コントロール</a></li><li><a href="#s4">画面</a></li><li><a href="#s5">909 と 808</a></li><li><a href="#s6">303A と 303B</a></li><li><a href="#s7">TB-3PO</a></li><li><a href="#s8">ブレイク</a></li><li><a href="#s9">パターン</a></li><li><a href="#s10">録音</a></li><li><a href="#s11">ノブモーション、Pロック、確率</a></li><li><a href="#s12">ソング</a></li><li><a href="#s13">エフェクト</a></li><li><a href="#s14">ミックスとマスター</a></li><li><a href="#s15">設定と保存</a></li><li><a href="#s16">MIDI と USB オーディオ</a></li><li><a href="#s17">トラブルシューティング</a></li><li><a href="#s18">パラメータ</a></li><li><a href="#s19">クレジット</a></li></ol>
+</nav>
+<hr>
+<h2 id="s1"><span class="num">1</span>インストール</h2>
+<p><strong>まず試すには:</strong><a href="https://charlesvestal.github.io/fm1-x0x/emu/">X0X エミュレーター</a>なら、まったく同じコードをブラウザー上でサウンド付きで動かせます。マウス、タッチスクリーン、キーボードで演奏できます。</p>
+<p><strong>インストール:</strong>Chrome か Edge で<a href="https://charlesvestal.github.io/fm1-x0x/install/">ウェブインストーラー</a>を開き、FM-1 を USB データケーブルで接続して Install を押します。書き込み中はケーブルを抜かないでください。完了すると FM-1 が X0X で再起動します。</p>
+<p><strong>アップデート:</strong>同じ手順です。アップデートではプロジェクト(パターン、サウンド、ソング、設定)は保持されます。別のファームウェアを入れた場合は保持されません。同じメモリーにはそのファームウェア独自の内容が書き込まれるため、X0X に戻すとプロジェクトは空の状態から始まります。残しておきたい場合は、先にファイルへ保存してください(<a href="#back-up-your-project">プロジェクトのバックアップ</a>を参照)。</p>
+<p><strong>元に戻す:</strong>同じページの一番下にある「Back to the stock firmware」で M-VAVE 純正ファームウェアに戻せます(そこのリンクから FM-1 用ファイルをダウンロードし、選んでボタンを押します。受け付けない場合は 2 つ目のリンクの V15 ファイルを使ってください)。M-VAVE 純正のアップデーター M-UPGRADE も使えます。ただし M-UPGRADE 3.11 が認識するのはこのバージョンの X0X だけで、古いバージョンは認識しません(「A USB MIDI device is present but did not answer」と表示されます)。古いバージョンへはボタンで戻してください。</p>
+<div class="callout"><p>他のファームウェアのインストールは自己責任で行ってください。FM-1 が起動しなくなった場合は「<a href="#recovering-an-fm-1-that-won-t-start">起動しなくなった FM-1 の復旧</a>」を参照してください。</p></div>
+<details><summary>コマンドラインからインストール</summary>
+<p><a href="https://github.com/charlesvestal/fm1-x0x/releases">リリースページ</a>からファームウェアファイル(例:<code>x0x-1.0.fwsc</code>)をダウンロードし、GitHub から X0X のソースを入手、Python 3 に <code>pip3 install mido python-rtmidi</code> でライブラリーを入れて、次を実行します:</p>
+<pre tabindex="0" aria-label="コマンド"><code>python3 tools/fm1_install.py x0x-1.0.fwsc</code></pre>
+<p>(hugelton.github.io のウェブインストーラーがインストールするのは X0X ではなく Felucca です。)</p>
+</details>
+<hr>
+<h2 id="s2"><span class="num">2</span>はじめに</h2>
+<p>電源を入れてから最初のビートを保存するまでの、5 分間のツアーです。X0X を起動すると画面には 909 が表示され、すべてのパートは空の状態です。</p>
+<ol><li><strong>キックを足す。</strong>黒鍵 1 を押してバスドラムを選びます(音が鳴ります)。次に白鍵の 1、5、9、13 を押します。</li><li><strong>PLAY を押す。</strong>キックが毎拍鳴ります。</li><li><strong>クラップを足す。</strong>黒鍵 7 を押し、白鍵 5 と 13 を押します。パターン再生中にドラムを選んでも音は鳴らないため、うっかり余計なヒットが入ることはありません。</li><li><strong>オープンハットを足す。</strong>黒鍵 9 を押し、白鍵 3、7、11、15 を押します。</li><li><strong>303 のラインを作る。</strong>ALGORITHM を時計回りに 2 クリック回して 303A にし、ARP を押します。OCT+ を押すたびに新しいラインが書き込まれます。気に入るラインが出るまで続けましょう。</li><li><strong>303 のサウンドを形作る。</strong>EDIT を押すと、ノブが 303 のフィルターになります。KNOB 1 でフィルターの開閉、KNOB 2 でレゾナンスを設定します。</li><li><strong>ブレイクを足す。</strong>ALGORITHM をさらに 2 クリック回して BREAK にし、16 個すべての白鍵を押します。ブレイクが 1 小節通して鳴るようになります。</li><li><strong>パートをミュートする。</strong>HOME を押してから黒鍵 5 でブレイクをミュートします。もう一度押すと元に戻ります。</li><li><strong>フィルタースイープを録音する。</strong>ALGORITHM を 303A に戻して EDIT を押します。REC を押し、KNOB 1 を 1〜2 小節かけてゆっくり回し、もう一度 REC を押します。スイープはパターンが一周するたびに再生されるようになります。</li><li><strong>保存する。</strong>PLAY を押して停止し、SAVE を押します。電源を切ってもすべて保持されます。(停止後数秒で X0X が自動保存もします。セクション 15 を参照。)</li></ol>
+<p>次は:セクション 9 でパターンの追加と切り替え方、セクション 12 でパターンを並べてソングにする方法を説明します。</p>
+<hr>
+<h2 id="s3"><span class="num">3</span>コントロール</h2>
+<p>マニュアル冒頭のイラストにすべてのコントロール名が書かれています。詳しくは:</p>
+<p>画面を開くボタンは常に同じ画面を開きます。もう一度押すとその画面の次のページに移ります。SEQ、EDIT、ARP は ALGORITHM で選んだパートを表示します。</p>
+<div class="table"><table><thead><tr><th>コントロール</th><th>働き</th></tr></thead><tbody>
+<tr><td><strong>MASTER</strong></td><td>音量。</td></tr>
+<tr><td><strong>SELECT</strong></td><td>前または次のページ。リスト内では上下移動。ステップを押さえたまま回すと、そのステップの確率を設定します(セクション 11)。</td></tr>
+<tr><td><strong>PRESETS</strong></td><td>次のパターンへ。パートの画面ではそのパートだけ、HOME では 5 パートすべてが変わります。</td></tr>
+<tr><td><strong>ALGORITHM</strong></td><td>パートの選択:909、808、303A、303B、BREAK。リスト内ではハイライト中の値を変更します。</td></tr>
+<tr><td><strong>OCT-, OCT+</strong></td><td>ステップを 16 個ずつ切り替えます(1〜16 … 49〜64)。HOME と SONG ではパターン 1〜16 と 17〜32 を切り替えます。303 のキーボードではオクターブを変えます。TB-3PO ではラインを変異させるか、新しいラインを書き込みます。</td></tr>
+<tr><td><strong>KNOB 1–4</strong></td><td>画面下部の 4 つの値。1 クリックで 1 ステップ。少しだけ素早く回しても 1 クリックずつですが、勢いよく回すと加速します。ENV を押さえたまま回すと、そのノブはデフォルト値に戻ります。</td></tr>
+<tr><td><strong>FX</strong></td><td>リバーブとディレイ。</td></tr>
+<tr><td><strong>SEL</strong></td><td>この画面のすべてをリストで表示します。どのページにも載っていない設定も含まれます(「リスト」を参照)。確認ダイアログでは「はい」。</td></tr>
+<tr><td><strong>ENV</strong></td><td>鍵盤を押しながら押さえると:アクセント。押さえたままノブを回すと:そのノブがデフォルト値に戻ります。</td></tr>
+<tr><td><strong>LFO</strong></td><td>ミキサーとマスター。鍵盤を押しながら押さえると:スライド。</td></tr>
+<tr><td><strong>EDIT</strong></td><td>選択中パートのサウンド。鍵盤では引き続きそのパートのステップを書き込めます。</td></tr>
+<tr><td><strong>GLO</strong></td><td>設定。もう一度押すと閉じます。</td></tr>
+<tr><td><strong>HOME</strong></td><td>パターン画面:5 パートすべてと、それぞれの演奏パターン、ミュート状態。もう一度押すとソング画面、さらに押すと戻ります。リスト内では「戻る」、確認ダイアログでは「いいえ」。</td></tr>
+<tr><td><strong>SAVE</strong></td><td>すべて保存(再生中に押した場合は停止したときに保存)。押さえたままにするとパターンをコピー。その後白鍵を押すと貼り付きます。</td></tr>
+<tr><td><strong>ARP</strong></td><td>TB-3PO。303 のラインジェネレーター(303 を選択中)。</td></tr>
+<tr><td><strong>SEQ</strong></td><td>選択中パートのステップ画面。LENGTH と RATE(303 ではさらに DIRECTION と TRANSPOSE)があります。</td></tr>
+<tr><td><strong>PLAY</strong></td><td>再生と停止。</td></tr>
+<tr><td><strong>REC</strong></td><td>録音のオン/オフ:ドラムのヒット、303 のノート、ノブの動き、SONG 画面ではソング自体。303 ではオンの間、鍵盤がキーボードになります。</td></tr>
+<tr><td><strong>白鍵</strong></td><td>ステップ。HOME ではパターン。MASTER と FX 画面では何もしません。</td></tr>
+<tr><td><strong>黒鍵</strong></td><td>ドラムのトラック、またはブレイクのスライス。HOME ではパートのミュート、ミキサーではチャンネルの選択。</td></tr>
+</tbody></table></div>
+<p><strong>HOME の押しっぱなし</strong>で次の操作ができます:+ REC で元に戻す(アンドゥ)、+ PLAY でやり直し(リドゥ)、+ SELECT でテンポ設定、+ SEQ をビートに合わせて叩くとテンポのタップ入力、+ 白鍵でどの画面からでもパターン選択、+ 黒鍵でドラムトラックのミュート(909 か 808 の画面)またはチャンネルのミュート(ミキサー)。</p>
+<div class="figs"><figure class="wide"><img src="img/fm1-keys.svg" alt="鍵盤の役割:白鍵 1〜16 はステップ 1〜16(HOME ではパターン)。黒鍵 1〜11 は 909 のトラック BD、SD、LT、MT、HT、RS、CP、CH、OH、CR、RD(808 画面では 808 のトラック、BREAK ではブレイクのスライス、HOME ではパートミュート)。"><figcaption>鍵盤の役割</figcaption></figure></div>
+<p>(SEL ボタンは Felucca ファームウェアでは SCL という表記です。)</p>
+<h3 id="lists">リスト</h3>
+<p>SEL を押すと、今いる画面のすべての項目がリストになります。各ページのノブがすべてグループ化されて並び(たとえば 909 なら <code>BD: THIS TRACK</code> と <code>909: ALL TRACKS</code>)、続いて <strong>MORE</strong>、つまりどのページにも載っていない設定が出てきます。あまり使わない設定は MORE の場所にあります。たとえばドラムトラックの DRIVE や DIST、コンプレッサーの詳細などです。</p>
+<p>リスト内では SELECT で移動、ALGORITHM でハイライト中の値を変更、SEL で戻る矢印(↩)の付いた行=アクションを実行します。HOME で戻ります。ノートが失われる可能性のある操作の前には必ず確認があり、SEL が「はい」、HOME が「いいえ」です。</p>
+<div class="figs"><figure class="shot"><img src="img/screen-list.png" alt="リスト表示になった MIX 画面:LEVEL -5 dB(ハイライト)、PAN C、REV 0%、DLY 0%、909 SD LEVEL 58、909 SD PAN C。最下部に SELECT: MOVE、ALGO: CHANGE、HOME: BACK。"><figcaption>リスト表示</figcaption></figure><figure class="shot"><img src="img/screen-ask.png" alt="画面上の確認ダイアログ:FACTORY RESET? SOUND, PATTERNS, SONG — SEL YES / HOME NO。"><figcaption>確認ダイアログ</figcaption></figure></div>
+<div class="callout"><p><strong>ボタンの働きがわからないときは</strong>、そのボタンを単独で 1 秒ほど押さえてください。今いる画面での働きと、その組み合わせがカードで表示されます。離しても何も起こりません。</p></div>
+<h3 id="undo">アンドゥ</h3>
+<p>HOME を押さえたまま REC を押すと、直前の変更を取り消せます。画面には何を取り消したかが表示されます(例:<code>UNDO 909 P1</code>)。HOME + PLAY でやり直しです。最大 32 ステップまでさかのぼれます(非常に大きな変更の後はより少なくなります)。1 ステップとは、少し手を止めるまでに行った一連の操作のことです。続けて叩いた数ステップ、ノブの 1 回転、録音 1 回分などが 1 ステップになります。アンドゥの対象はサウンド、パターン、ソング、ノブモーションで、CLEAR PATTERN や FACTORY RESET さえも取り消せますが、テンポと設定は対象外です。履歴は電源を切ると消えます。</p>
+<details><summary>キーライトの表示</summary>
+<p>キーライトには明るさが 2 段階あります。オンまたは選択中のものは明るく、選択できる状態のものは薄暗く点灯します。</p>
+<div class="table"><table><thead><tr><th>画面</th><th>明</th><th>暗</th></tr></thead><tbody>
+<tr><td>HOME</td><td>再生中のパターン(切り替えを予約したパターンは点滅);再生中のパート</td><td>ノートがあるパターン;ミュート中のパート</td></tr>
+<tr><td>SONG</td><td>現在小節のパターン;現在小節で鳴っているパート</td><td>ノートがあるパターン;現在小節でミュート中のパート</td></tr>
+<tr><td>909 / 808</td><td>選択中トラックのヒット;選択中トラック</td><td>ヒットのある他のトラック</td></tr>
+<tr><td>303</td><td>ノート</td><td>タイ</td></tr>
+<tr><td>303(REC オン)</td><td>押さえている鍵</td><td>位置の目印になる C の鍵</td></tr>
+<tr><td>BREAK</td><td>ブレイクが鳴るステップ</td><td>スライスパッド 1〜8</td></tr>
+<tr><td>ミキサー(PARTS、909 MIX、808 MIX)</td><td>ノブが操作対象にしているチャンネル(ミュート中は点滅)</td><td>他のチャンネル</td></tr>
+</tbody></table></div>
+</details>
+<hr>
+<h2 id="s4"><span class="num">4</span>画面</h2>
+<figure class="shot"><img src="img/screen-909.png" alt="909 画面。パターン P1、125 BPM、再生中:トラック BD〜RD とアクセント(AC)の 16 ステップのグリッドで、SD が選択されている。SD のノブ:TUNE 64、TONE 68、SNAPPY 64、DECAY 41。"><figcaption>909 画面</figcaption></figure>
+<p><strong>最上行</strong>には、左から順に:</p>
+<ul>
+<li>パートがそれぞれの色で表示されます(909 はオレンジ、808 は赤、303A は緑、303B は青、BREAK は紫)。サウンド画面以外では画面名も表示されます。SEQ、TB-3PO、303 のキーボードがオンのときは KEYS。</li>
+<li>再生中のパターン(例:<code>P3</code>)。<code>P3 &gt;5</code> は次にパターン 5 が来ることを示します。16 ステップより長いパートでは、白鍵が表示しているステップ範囲が続いて表示されます(33-48 など)。</li>
+<li>テンポ。外部 MIDI クロックに同期している間はアンバー(琥珀色)で表示されます。</li>
+<li>再生中は再生マーク、録音中は赤い点。小さな灰色の点は未保存の変更があることを示します。</li>
+</ul>
+<p>ボタンが何らかの操作を行うと、最上行にその内容が 1 秒ほど表示されます。たとえば <code>SAVED</code> や <code>P1 PASTED TO P5</code> のように。</p>
+<p><strong>ノブ</strong>は「誰の設定か」を示すタグの下に並びます。選択中トラック(BD)、マシン全体(909 KIT)、303 のサウンド(303A TONE)、パターン(P3 SEQUENCE)、ミキサー(PARTS: 303A、909 MIX: CP)、SEQ で押さえている 303 のステップ(303A STEP 5)、Pロック(BD P-LOCK STEP 5)などです。セクションに複数ページがある場合、タグにページ数が表示され(BD (1/2) など)、行末の点はその画面の全ページで、現在のページが点灯します。選択肢の少ない設定は、リング(円形ダイヤル表示)の代わりに小さな四角の列で表示されます。</p>
+<p>ノブを回すと、その値が 1 秒ほど大きな文字で表示されます。「誰の設定か」も一緒です。トラックのもの(BD TUNE)か、パターンのもの(P3 LENGTH)か。パターンに属する設定はパターンの切り替えとともに変わり、パターンのコピーでも一緒にコピーされます。サウンドはどのパターンを再生していても変わりません。</p>
+<p>画面の一番下にある<strong>フッター</strong>は、この画面での鍵盤の役割を示します(BLACK: TRACK、WHITE: STEP など)。最初にボタンを押すまでの間は HOLD ANY BUTTON: WHAT IT DOES と表示されます。</p>
+<figure class="shot"><img src="img/screen-readout.png" alt="KNOB1 を回している 909 画面:グリッドの上に SD TUNE 70 という箱が重なり、下の TUNE ノブが 70 の位置でハイライトされている。"><figcaption>ノブを回したところ</figcaption></figure>
+<hr>
+<h2 id="s5"><span class="num">5</span>909 と 808</h2>
+<p>各ドラムマシンには 11 のトラックがあり、黒鍵 1 つに 1 つずつ割り当てられています。</p>
+<div class="table"><table><thead><tr><th>鍵</th><th>909</th><th>808</th></tr></thead><tbody>
+<tr><td>1</td><td>バスドラム(BD)</td><td>バスドラム(BD)</td></tr>
+<tr><td>2</td><td>スネア(SD)</td><td>スネア(SD)</td></tr>
+<tr><td>3–5</td><td>ロー・ミッド・ハイタム</td><td>ロー・ミッド・ハイタム、またはコンガ</td></tr>
+<tr><td>6</td><td>リムショット(RS)</td><td>リムショット、またはクラベス</td></tr>
+<tr><td>7</td><td>クラップ(CP)</td><td>クラップ、またはマラカス</td></tr>
+<tr><td>8</td><td>クローズドハット(CH)</td><td>カウベル(CB)</td></tr>
+<tr><td>9</td><td>オープンハット(OH)</td><td>シンバル(CY)</td></tr>
+<tr><td>10</td><td>クラッシュ(CR)</td><td>オープンハット(OH)</td></tr>
+<tr><td>11</td><td>ライド(RD)</td><td>クローズドハット(CH)</td></tr>
+</tbody></table></div>
+<p>909 のハットとシンバルは、元の機材と同じくサンプル音源です。両マシンのその他の音はすべてシンセシスで作られています。808 ではトラックの SOUND 設定で、タムとコンガ、リムショットとクラベス、クラップとマラカスを切り替えます。どちらのマシンでも、クローズドハットはオープンハットを打ち切ります。</p>
+<p><strong>ビートの打ち込み。</strong>黒鍵を押してトラックを選びます。パターン停止中は音も鳴ります。(再生中は選んでも鳴らないため、うっかりヒットを足すことがありません。GLO &gt; KEY SOUND = ALWAYS でこの動作を変えられます。)次に白鍵を押します。空のステップはオンになり、オンのステップをタップするとオフになります。白鍵を押しながら ENV を押さえると、代わりにアクセントが付きます。アクセントのあるステップではすべてのドラムが大きく鳴ります。</p>
+<p>パターンは最大 64 ステップの長さにできます。白鍵には一度に 16 ステップが表示され、OCT+ で次の 16 へ、OCT- で前に戻ります。現在の範囲は最上行に表示されます。</p>
+<p><strong>トラックのミュート:</strong>HOME を押さえたままそのトラックの黒鍵を押します。もう一度押すと解除です。ミュートされたトラックの行は灰色になります。トラック単位のミュートは保存されず、HOME でパート全体をミュートしてもトラック単位のミュート状態はそのままです。</p>
+<p><strong>ページ構成。</strong>EDIT には選択中トラックのサウンドが表示されます(1 ページ。909 のキックのみ 2 ページ)。続いて KIT に ACCENT、つまりアクセント付きステップがどれだけ大きく鳴るかの設定があります。トラックの DRIVE と DIST は SEL のリストの MORE にあります。SEQ にはマシン全体の LENGTH と RATE があります。SWING は HOME にあります。すべてのパートにスイングがかかるためです。</p>
+<p>各トラックのレベル、パン、リバーブ/ディレイセンドはミキサーにあります。LFO を押して 909 MIX か 808 MIX を開くと、11 トラックすべてのレベルが一度に見えます。黒鍵でトラックを選び、ノブでその LEVEL、PAN、REV、DLY を設定します。808 の切り替え音(コンガなど)は元のトラックのパンを共有するため、コンガはタムと同じ位置に鳴ります。</p>
+<hr>
+<h2 id="s6"><span class="num">6</span>303A と 303B</h2>
+<p>同じ仕様の 303 が 2 台あります。それぞれが独自のサウンドと独自のラインを持ちます。</p>
+<figure class="shot"><img src="img/screen-303.png" alt="303A 画面:パターンのノートが A1〜A3 のピアノロールに表示され、アクセント(AC)とスライド(SL)の行、スケール A MIN、SEED B5CD。303A TONE ノブ:CUTOFF 48、RESO 100、ENVMOD 85、DECAY 64。"><figcaption>303A 画面</figcaption></figure>
+<p><strong>ステップ。</strong>白鍵を押すとそのステップがオンになり、もう一度タップするとオフになります。ステップを編集するには SEQ を押し、そのステップの鍵を押さえたままノブを回します。KNOB 1 でノート、KNOB 2 でゲート(REST=休符、NOTE=ノート、TIE=タイ)、KNOB 3 でアクセント、KNOB 4 でスライドを設定します。OCT- と OCT+ で、押さえているノートが 1 オクターブ移動します。空のステップは押した瞬間にオンになるので、「押す → 押さえる → ノートを設定」を一気に行えます。スライドは、このステップのノートから次のステップのノートへ滑らかに移ります。(EDIT でステップを押さえると、代わりにそのステップ専用のサウンドが設定できます。セクション 11 の「Pロック」を参照。)</p>
+<p><strong>タイ</strong>は直前のノートをこのステップを通して保持し、ノートを鳴り直しません。画面ではタイが付いたノートは、保持しているノートと 1 本の長いバーでつながって表示されます。タイの上で KNOB 1 を回すと、独立したノートになります。</p>
+<p><strong>キーボード。</strong>REC を押すと 27 鍵すべてがキーボードになります(最上行に KEYS と表示)。演奏したノートは書き込まれます。パターン停止中は 1 ステップずつ、再生中はリアルタイムに入ります。OCT- と OCT+ でオクターブを変えられます。ある鍵を押さえたまま別の鍵を弾くと、303 がその間をスライドします。もう一度 REC を押すとステップ編集に戻ります。</p>
+<p><strong>フリープレイ。</strong>何も書き込まずに 303 を演奏するには、SEQ を押して SELECT で KEYS ページへ切り替え、FREE PLAY を ON にします。すると 303 のどの画面でも、停止中・再生中を問わず鍵盤で 303 を弾けるので、ラインを試しながら EDIT のノブを回せます。最上行には FREE PLAY と表示されます。REC を押すまで何も書き込まれず、押せば上記のとおりに録音されます。ステップ入力に戻すには FREE PLAY を OFF にします。この設定は各 303 に独立して保持され、電源投入時はどちらもオフです。</p>
+<p><strong>ページ構成。</strong>EDIT には TONE(CUTOFF、RESO、ENVMOD、DECAY)と VOICE(ACCENT、WAVE ののこぎり波/矩形波、DRIVE、SLIDE タイム)があります。TUNE、VOLUME、DRIVE TYPE(off、soft、RAT)、ACCENT DECAY は SEL のリストにあります。SEQ にはラインの LENGTH(1〜64 ステップ)、RATE、DIRECTION(順方向、逆方向、ピンポン、ランダム)、TRANSPOSE があります。各 303 のレベル、パン、センドはミキサー(LFO)にあります。</p>
+<hr>
+<h2 id="s7"><span class="num">7</span>TB-3PO</h2>
+<p>TB-3PO は 303 のラインを自動生成します。ALGORITHM で 303 を選んで ARP を押してください。</p>
+<figure class="shot"><img src="img/screen-tb3po.png" alt="303A に TB-3PO を表示:生成されたラインがピアノロールに、A MIN、SEED B5CD。P1 GENERATE ノブ:DENS 70%、ACCENT 40%、SLIDE 25%、OCTS 2。最下部に OCT+: NEW LINE、OCT-: MUTATE。"><figcaption>TB-3PO</figcaption></figure>
+<p><strong>OCT+</strong> を押すと完全に新しいラインを書き込み、<strong>OCT-</strong> を押すと現在のラインを変異させます(約 4 分の 1 のステップが変わります)。</p>
+<p>TB-3PO には 2 つのページがあります(ARP をもう一度押すか、SELECT を回します)。</p>
+<ul>
+<li><strong>GENERATE:</strong>DENS、ACCENT、SLIDE で、鳴るステップの数、アクセントの数、スライドの数を設定します。OCTS は音域を 1〜3 オクターブで設定します。</li>
+<li><strong>SCALE:</strong>ROOT、SCALE(マイナー、フリジアン、ハーモニックマイナー、マイナーペンタトニック、ドリアン、メジャー)、OCTAVE、そして MUTATE。MUTATE は 1〜16 小節ごとに(または「変異なし」で)ラインを自動で変異させ続けます。</li>
+</ul>
+<p>これらのノブは今鳴っているラインを変えません。次に OCT+ または OCT- を押したときの条件を設定するものです。押すまでの間、ラインは手編集を含めてそのまま保たれます。ノブの設定とラインの内容が一致しなくなると、画面に <code>NEW LINE</code> と星印が表示されます。同じ設定とシードは常に同じラインを生成します。Schwung の TB-3PO モジュールが書くラインと同じものです。</p>
+<p>ラインを手で編集するには SEQ を、サウンドを形作るには EDIT を押します。</p>
+<hr>
+<h2 id="s8"><span class="num">8</span>ブレイク</h2>
+<p>ブレイクは 8 つのスライスに切ったドラムループで、X0X が再生しながら組み替えていきます。</p>
+<figure class="shot"><img src="img/screen-break.png" alt="BREAK 画面:ループの波形が 8 つのスライスに切られ、再生中のスライスがハイライト、8 つすべて ON。A 909 GR、B 909 FL、PLAYING A。P1 LOOPS ノブ:LOOP A 909 GR、LOOP B 909 FL、B CHANCE 0%、PITCH 0。"><figcaption>ブレイク(スライス 5 を再生中)</figcaption></figure>
+<p><strong>ステップ。</strong>白鍵は 1 小節の 16 ステップです。押すとその位置でブレイクが鳴り、もう一度タップすると止まります。</p>
+<p><strong>スライスを演奏する。</strong>黒鍵 1〜8 を押さえると、そのスライスを自分で鳴らせます。離すと再びジェネレーターに制御が戻ります。鍵 9 を押さえると逆再生、鍵 10 で半速、鍵 11 でスタッター(同じ場所のリピート)します。</p>
+<p><strong>ステップ専用スライス。</strong>白鍵を押さえたまま黒鍵 1〜8 を押すと、そのステップは常にループ A のそのスライスを先頭から再生するようになり、ステップの枠にスライス番号が表示されます。(ステップを押さえたまま)同じ黒鍵をもう一度押すと、ジェネレーターに制御を返します。これでキックとスネアを好きな位置に固定し、残りはジェネレーターに任せることができます。</p>
+<p><strong>ジェネレーター。</strong>SEQ に GROOVE と RETRIG の 2 ページがあります。</p>
+<ul>
+<li><strong>COMPLEXITY:</strong>次のスライスをそのまま鳴らす代わりに、別のスライスへ飛ぶ頻度。これが「量」の設定です。0 ではループがそのまま鳴り、ROLL と FILL もそれに応じて効きます。25% からフルに効き始めるため、低めの設定ならループに近いまま保てます。</li>
+<li><strong>ANCHOR:</strong>キックとスネアのスライスを 1 拍目と 3 拍目に保持する強さ。</li>
+<li><strong>ROLL:</strong>スライスを繰り返したり、隣のスライスへ移ったりする頻度。</li>
+<li><strong>FILL:</strong>フレーズの最後の小節で、これらのルールをどれだけ崩すか。</li>
+<li><strong>RETRIG 2X、3X、4X、8X:</strong>各小節で、どこかの 1 拍がそのレートでスタッターする確率。</li>
+</ul>
+<p>SEL のリスト:PHRASE(フレーズの長さ。2、4、8、16 小節、またはオフ)、A LENGTH と B LENGTH(新しいスライスを選び直す頻度。1/4 小節から 8 小節ごと)。</p>
+<p><strong>ループ。</strong>EDIT には LOOP A、LOOP B、B CHANCE(フレーズの最後の小節でループ B に切り替わる確率。PHRASE オフ時はどの小節でも)と PITCH があります。もう一度 EDIT を押すと FILTER と LEVEL になります。FILTER は 1 ノブ式で、中央が OFF、左へ回すとローパス、右へ回すとハイパスです。ハイパスにするとループのハットが残り、キックとスネアは 909 や 808 に任せられます。ループはテンポに合わせて速くまたは遅く再生されるため、サンプラーと同じくピッチもテンポに追従します。PITCH はそれにさらに加算します。X0X には独自のループが 2 つ付属します。909 GR と 909 FL で、付属の 909 で鳴らしたものです。アップロードしたループはその後に並びます。</p>
+<p>これらすべて、ステップとスライスとループはパターンと一緒に保存されます。ブレイクのレベル、パン、センドはミキサーの PARTS ページ(LFO、黒鍵 5)にあります。</p>
+<h3 id="your-own-breaks">自分のブレイクを読み込む</h3>
+<p>自分のループは<a href="https://charlesvestal.github.io/fm1-x0x/breaks/">ブレイクループページ</a>から読み込めます。Chrome か Edge で、FM-1 を接続して開いてください。ループは X0X のループの後に BR1、BR2 という名前で並びます。合計で約 21 秒、1 小節のループなら 9 本ほど入ります。</p>
+<details><summary>コマンドラインから</summary>
+<p>FM-1 を接続した状態で実行します:</p>
+<pre tabindex="0" aria-label="コマンド"><code>python3 tools/upload_breaks.py --bars amen.wav think.wav funky.wav ...</code></pre>
+<p><code>--bars</code> を付けると各ファイルの 1 小節分だけが送られます。付けない場合はファイル全体が送られます。この操作は既存のループをすべて置き換えます。<code>--dry-run FOLDER</code> は FM-1 なしで、何が入るかを確認できます。schwung-breakbeat が X0X の隣にあれば、<code>--bbgen</code> で BB Gen の定番ブレイクを送れます。ループをファームウェア自体に組み込む方法は BUILDING.md を参照してください。</p>
+</details>
+<hr>
+<h2 id="s9"><span class="num">9</span>パターン</h2>
+<figure class="shot"><img src="img/screen-home.png" alt="HOME、パターン P1、125 BPM:パターンのスロットが 1 行に並び、その下に各パート(909、808、303A、303B、BRK)のステップ列。PERFORM ノブ:TEMPO 125 bpm、SWING 50%、FILTER OFF、PUMP 4.0 dB。"><figcaption>HOME</figcaption></figure>
+<p>パターンは 32 個あります。1 つのパターンには、各パートのステップ、長さ、レート、ブレイクの設定、スイング、そしてノブモーション、Pロック、確率がすべて含まれます。サウンド、エフェクト、マスターの設定はパターンの一部ではないため、パターンが変わっても変化しません。</p>
+<p>各パートはそれぞれのパターンを演奏します。ドラムがパターン 7 を鳴らしている間に、303 たちがパターン 3 を鳴らすということもできます。</p>
+<p><strong>HOME</strong> にはパターン 1〜16 が枠(ボックス)で表示され、1 つの白鍵に 1 つずつ対応します。OCT+ で 17〜32 が表示され(枠の下に P17-32 と出ます)、OCT- で戻ります。4 つごとに番号が付いています。各枠の中には、そのパターンにノートを持つパートの行が表示されます。そのパートが今そのパターンを演奏していれば明るく、そうでなければ薄暗く表示されます。</p>
+<p><strong>パターンの選択</strong></p>
+<ul>
+<li><strong>5 パートすべて:</strong>HOME で白鍵を押すか PRESETS を回します。他の画面からは、HOME を押さえたまま白鍵を押します。</li>
+<li><strong>1 パートだけ:</strong>そのパートの画面(SEQ、EDIT、TB-3PO)で PRESETS を回します。</li>
+<li><strong>チェーン:</strong>HOME で白鍵を 2 つ同時に押さえます。5 パートすべてが、最初のパターンから 2 番目のパターンまでを 1 小節ずつ順に演奏し、また最初に戻ります。単一のパターンを選ぶとチェーンは解除されます。</li>
+</ul>
+<p>再生中は現在の小節が終わった時点で新しいパターンが始まり、停止中はすぐに切り替わります。パターンが変わったパートはステップ 1 から再生し直し、他のパートはそのまま演奏を続けます。</p>
+<p><strong>コピーと貼り付け。</strong>SAVE を押さえると最上行に <code>P1 COPIED</code> と表示されます。白鍵を押すとそのパターンへ貼り付きます(<code>P1 PASTED TO P2</code>)。5 パートすべてが、今演奏している状態のままコピーされます。貼り付け先のパターンにノートがある場合は、先に確認があります。SAVE を押さえている間、OCT- と OCT+ でパターン 1〜16 と 17〜32 を切り替えられます。</p>
+<p><strong>クリア。</strong>SAVE を押さえたまま REC を押すと、選択中パートの分をそのパターンから消せます。GLO &gt; CLEAR PATTERN で 5 パートすべてを消せます。</p>
+<p><strong>ミュート。</strong>HOME では黒鍵 1〜5 でパートをミュート/解除します。ミュートは保存されません。ただしソングの中は例外です。</p>
+<p><strong>長さとスイング。</strong>パートごとに長さを変えられるので、パート同士が少しずつずれて重なっていきます。小節の長さは 909 の長さで決まり、スイングは 909 のパターンに保持され、すべてのパートにかかります。スイングは 16 分音符を 1 つおきに遅らせます。50% がストレート、75% が最大です。</p>
+<p>HOME のノブはライブ演奏用です。TEMPO、SWING、そしてマスターの FILTER と PUMP です。</p>
+<p><strong>タップテンポ。</strong>どの画面からでも、HOME を押さえたまま SEQ をビートに合わせて叩くとテンポを入力できます。再生中・停止中どちらでも。3 回続けて叩いた時点でテンポが設定され、叩き続けると直近 4 回のタップに追従します。1〜2 回では何も変わらないので、誤って押しても影響ありません。2 秒間間を空けると最初からやり直しです。再生中は 3 回目以降、叩くたびにビートがタップのタイミングに移動します。全パートが直近の 4 分音符へジャンプし、そこから演奏を続けます。わずかに遅れたタップは直前に通過した拍へ戻り、わずかに早いタップは次に来る拍へ進みます。小節の区切りの直前ならタップで小節が終わり、次のパターンやソングの次の小節が入ってきます。結果は TEMPO 表示に出ます。X0X が外部 MIDI クロックに同期している間はクロックがテンポを決めるため、タップは何もしません。</p>
+<hr>
+<h2 id="s10"><span class="num">10</span>録音</h2>
+<p>REC を押すと録音がオンになり、もう一度押すとオフになります。</p>
+<ul>
+<li><strong>ドラム:</strong>パターンの再生中に黒鍵を押すとヒットが記録されます(REC オン中は常に音が鳴ります)。ENV を押さえるとアクセント付きで記録されます。</li>
+<li><strong>303(リアルタイム):</strong>REC オンで 303 の鍵盤がキーボードになります。パターンの再生中に演奏します。</li>
+<li><strong>303(ステップ入力):</strong>REC オンでパターン停止中は、押した鍵がステップ 1 から順に次のステップへ入っていきます。鍵を押しながら ENV でアクセント、LFO でスライドを付けます。休符は ENV を押さえながら OCT- か OCT+、タイは LFO を押さえながら OCT- か OCT+ で入力します。</li>
+<li><strong>ノブの動き:</strong>REC オンでパターン再生中に、サウンドのノブを回します(セクション 11)。</li>
+<li><strong>ソング:</strong>SONG 画面で REC + PLAY(セクション 12)。</li>
+</ul>
+<hr>
+<h2 id="s11"><span class="num">11</span>ノブモーション、Pロック、確率</h2>
+<p>この 3 つはどれもステップに固有の値を持たせる機能で、すべてパターンと一緒に保存されます。</p>
+<h3 id="knob-motion">ノブモーション</h3>
+<figure class="shot"><img src="img/screen-motion.png" alt="記録したカットオフスイープを再生している 303A 画面:CUTOFF の横に点が付き、値は 18。RESO 100、ENVMOD 85、DECAY 64。"><figcaption>記録したカットオフスイープの再生中</figcaption></figure>
+<p>REC をオンにして PLAY を押し、サウンドのノブを回します。X0X は動かしたステップ位置にノブの値を記録し、短い空白は補間するので、ゆっくりのスイープでも途切れません。再生時はステップからステップへ滑らかに移ります。</p>
+<ul>
+<li>モーションが記録されたノブは表示の隅に点が付き、再生に合わせてリングが記録どおりに動きます。</li>
+<li>触れなかったステップでは、ノブ本来の設定値で鳴ります。</li>
+<li>REC を付けずにノブを回すと、パターン 1 周の間だけ手動の値が優先され、その後は記録されたモーションが再び再生されます。</li>
+<li><strong>ノブのモーションを消す</strong>には、SAVE を押さえたままそのノブを回します。</li>
+<li>モーションはパートのパターンに属します。303 のノブは 303 のパターンに、エフェクトとマスターのノブは 909 のパターンに記録されます。パターンのコピー・クリアでは、モーションも一緒にコピー・クリアされます。</li>
+<li>停止すると、すべてのノブは本来の設定に戻ります。</li>
+</ul>
+<h3 id="p-locks">Pロック</h3>
+<p>1 つのステップだけに専用のサウンドを持たせられます。キックの 1 発だけチューンを高く、303 の 1 音だけフィルターを開く、ブレイクの 1 ステップだけピッチを上げる、といった具合です。</p>
+<ul>
+<li>EDIT でオンのステップを押さえたままサウンドのノブを回します。そのステップだけ新しい値で鳴り、他のステップはノブの設定値のままです。ステップを押さえている間、ノブの行には <code>P-LOCK STEP 5</code> と表示され、ノブはそのステップの値を示し、ロックされたノブにはアンバーの点が付きます。停止中でも、ステップを押さえている間はロックの音が聞けます。</li>
+<li>タップは従来どおりステップのオン/オフです。ロックを作るのは「押さえる + ノブを回す」の組み合わせだけです。空のステップは押した瞬間にオンになるので、押して押さえてロックまで一気に行えます。</li>
+<li><strong>1 つのロックを消す</strong>には、ステップを押さえたまま SAVE も押さえて、そのノブを回します。</li>
+<li>SEQ でステップを押さえてもロックは作られません(303 では代わりに、そのステップのノートをノブで設定します)。</li>
+</ul>
+<h3 id="probability">確率</h3>
+<p>ステップ(SEQ か EDIT で)を押さえたまま SELECT を回すと、そのステップが鳴る確率を 100% から 5% まで 5% 刻みで設定できます。最上行に表示されます(<code>STEP 5: 50%</code> など)。サイコロはステップが回ってくるたびに振られるので、50% ならだいたい 1 回おきに鳴ります。</p>
+<p>5% の先まで回し続けると<strong>サイクル</strong>になります。1:2、2:2、1:3 … と 8:8 まで続きます。1:4 のステップはそのパートのパターン 4 周のうち 1 周目にだけ鳴り、2:4 なら 2 周目に鳴ります。ランダム性はありません。各パートは自分の周回数を数えていて、PLAY を押すかパターンが変わるたびに 1 に戻ります。</p>
+<ul>
+<li>909 と 808 では確率は選択中トラックのステップに属するので、同じステップのキックとハットにそれぞれ別の確率を設定できます。</li>
+<li>303 でスキップされたステップは休符になります。ブレイクでは、スキップされたステップは発火しません。</li>
+<li>スキップされたドラムヒットは MIDI ノートを送りません。</li>
+</ul>
+<h3 id="good-to-know">知っておくと良いこと</h3>
+<ul>
+<li>Pロックや 100% 未満の確率を持つステップは、ステップグリッドに小さな刻み目が付きます。</li>
+<li>Pロックと確率は記録されたモーションと同じ方式で保存され、パートパターンごとにロックした設定 1 つにつき 1 つの「ノブ」スロットを使います。全パターン合計で 160 個まで入り、いっぱいになると最上行に <code>MOTION FULL</code> と表示されます。</li>
+<li>隣り合う 2 つのロックされたステップは、録音したモーションと同じように、一方の値から他方の値へ滑らかに移ります。</li>
+</ul>
+<hr>
+<h2 id="s12"><span class="num">12</span>ソング</h2>
+<figure class="shot"><img src="img/screen-song.png" alt="SONG 画面、ソング S3、120 BPM:小節 1 は全 5 パートが P1、小節 2 は P2(303B は P5)、小節 3 は 808 がサイレントの P1、小節 4 は END。小節 3 を再生中。BAR ノブ:BAR 1、303B P1、BREAK P1、REPEAT x1。"><figcaption>SONG</figcaption></figure>
+<p>ソングは最大 192 小節のリストです。各小節には、各パートがどのパターンを演奏し、どのパートがミュートされているかが書かれています。ソングを開くには HOME を 2 回押します(もう一度 HOME でパターン画面に戻ります)。</p>
+<ul>
+<li><strong>小節を書く:</strong>白鍵を押します。選択中の小節に 5 パートすべてがそのパターンになり、次の小節が選択されます。ソングの終わりで鍵を押すと新しい小節が追加されていきます。</li>
+<li><strong>小節を編集する:</strong>KNOB 1 で小節を選び、他のノブでその小節の各パートのパターンを設定します。</li>
+<li><strong>小節内のパートをミュートする:</strong>黒鍵 1〜5 を押します。</li>
+<li><strong>小節を繰り返す:</strong>SONG 画面の 2 ページ目(SELECT を回す)で、REPEAT により選択中の小節を最大 8 回繰り返せます(行末に x2 … x8 と表示されます)。同じパターンの 4 小節分が 1 行になります。</li>
+<li><strong>ソングを再生する:</strong>SONG 画面で PLAY を押します。ソングは選択中の小節から始まり、ループします。止めるまで、どの画面へ移動しても(HOME でミュート、EDIT でサウンド)演奏を続けます。再生中、最上行には S と現在の小節番号が表示されます。他の画面で PLAY を押した場合はパターンを演奏します。どちらになるかは PLAY を押した画面で決まり、最上行にどちらか(S または P)が表示されます。</li>
+<li><strong>ソングを録音する:</strong>SONG 画面で REC をオンにして PLAY を押します。再生しながら、パターンを変えたりパートをミュートしたりと自由に操作します。開始した小節から、小節が経過するたびにソングへ書き込まれ、終わりを超えて演奏するとソングが伸びていきます。録音は、それまでその小節にあった内容を上書きします。</li>
+</ul>
+<p>SONG 画面で SEL を押すと、LENGTH、INSERT BAR、DELETE BAR、CLEAR SONG があります。</p>
+<hr>
+<h2 id="s13"><span class="num">13</span>エフェクト</h2>
+<figure class="shot"><img src="img/screen-fx.png" alt="FX 画面:909、808、303A、303B、BRK の REVERB と DELAY のセンド量がバーで表示。DELAY 1/8. TAPE、FEEDBACK 40%、REVERB 57。REVERB ノブ:DECAY 73、TONE 57。"><figcaption>FX</figcaption></figure>
+<p>リバーブとディレイがそれぞれ 1 系統あり、すべてのパートが両方にセンドできます。パートごとのセンドはミキサーの PARTS ページ(LFO)に、各ドラムトラックのセンドは 909 MIX と 808 MIX にあります。FX には各パートのセンド量が表示され、2 つのページがあります。</p>
+<ul>
+<li><strong>REVERB:</strong>DECAY と TONE。リバーブは滑らかなステレオリバーブで、送った音はワイドに戻ってきます。</li>
+<li><strong>DELAY:</strong>TIME(1/32 から付点 2 分音符までの音符の長さ)、FEEDBACK、TONE、TAPE。TAPE を一番左(DIGI)にすると、クリーンな 12 ビットデジタルディレイになります。上げていくとテープディレイになり、回すほど揺れ・サチュレーション・劣化が深まり、フィードバックを高くすると自己発振することもあります。</li>
+</ul>
+<p>SEL のリストの MORE:各エフェクトのローカットとリターンレベル、そして PING WIDTH。PING WIDTH はエコーを左右に往復させます。0 でオフ、127 でエコーがハードに左右へ振り分けられ、中間の値では左右が寄って鳴ります。新しいプロジェクトの初期値は 20(狭い往復)です。</p>
+<hr>
+<h2 id="s14"><span class="num">14</span>ミックスとマスター</h2>
+<figure class="shot"><img src="img/screen-mix.png" alt="コンプレッサーがポンプしている MIX 画面:出力の波形、ゲインリダクションメーター(GR)、COMP -14dB、PUMP 11.5dB、AUDIO LOAD 0%。MASTER ノブ:DRIVE 41、COMP 78%、PUMP 11.5 dB、FILTER OFF。"><figcaption>MIX(コンプレッサーがポンプしているところ)</figcaption></figure>
+<p>LFO を押すとミキサーが開きます。もう一度押すか SELECT を回すと、4 つのページを切り替えられます。右側の赤いバーはコンプレッサーのゲインリダクションです。</p>
+<ul>
+<li><strong>PARTS:</strong>各パートのレベルとメーター。黒鍵 1〜5 で 909、808、303A、303B、ブレイクを選びます。ノブはその LEVEL、PAN、REV、DLY です。</li>
+<li><strong>909 MIX と 808 MIX:</strong>各ドラムマシン専用のミキサーで、全トラックのレベルがひと目でわかります。黒鍵でトラックを選び、ノブでその LEVEL、PAN、REV、DLY を設定します。</li>
+<li><strong>MASTER:</strong>ミックス全体に効く 4 つのノブ。画面には直近数秒の出力レベルが表示され、ポンプやコンプレッサーの動きが見えます。</li>
+</ul>
+<p>PARTS、909 MIX、808 MIX では、HOME を押さえたまま黒鍵を押すと、そのチャンネルのミュート/解除ができます(PARTS ではパート、ドラムページではトラック)。キーライトに表示されます。ノブが操作対象にしているチャンネルは明るく点灯し(ミュート中は点滅)、他は薄暗く、ミュートされたものは消灯します。</p>
+<p>ミキサー画面で ALGORITHM を回すと、そのパートのページへ移ります。ドラムマシンなら 909 MIX か 808 MIX、303 とブレイクなら PARTS(そのパートを選択した状態)です。</p>
+<div class="table"><table><thead><tr><th>MASTER</th><th>働き</th></tr></thead><tbody>
+<tr><td><strong>DRIVE</strong></td><td>ミックス全体をサチュレートさせます(909 のドライブ段)。</td></tr>
+<tr><td><strong>COMP</strong></td><td>コンプレッサーを 1 ノブにまとめたもの:0 でオフ。上げるほどスレッショルドが下がり、レシオが上がり、メイクアップゲインが同時に加わります。4 分の 3 が工場出荷時のハードな絞り(-24 dB から 4:1、+16 dB)です。</td></tr>
+<tr><td><strong>PUMP</strong></td><td>キックが鳴るたびにミックス全体を最大 24 dB 下げて、また膨らませます。ビッグビートの「呼吸」です。アクセント付きのキックは強くポンプします。COMP が 0 でも、キックがミュートされていても働くので、鳴っていないキックでドライブさせることもできます。どのキックを使うかは SEL のリストの PUMP BY で設定します(909 のキック、808 のキック、または両方)。</td></tr>
+<tr><td><strong>FILTER</strong></td><td>1 ノブ式:中央でオフ。左に回すとローパスが閉じていき、右に回すとハイパスが開いていきます。</td></tr>
+</tbody></table></div>
+<p>FILTER と PUMP は HOME の PERFORM ページにもあり、ライブ演奏で使えます。</p>
+<div class="callout"><p><strong>工場出荷時のミックスはビッグビート向けに設定されています。</strong>手前にブレイク、その下に 909 のキック、303 は RAT ディストーションを通してテープディレイへ、クラップにはリバーブ。クリーンなミックスにしたいときは、COMP と PUMP を 0 にします。</p></div>
+<details><summary>マスターの詳細</summary>
+<p>SEL のリストの MORE:コンプレッサーの THRESH(-48〜0 dB)、RATIO(1:1〜20:1 と INF)、ATTACK(0.1〜100 ms)、RELEASE(10〜1500 ms)、MAKEUP(0〜24 dB)、MIX(ドライ〜フル圧縮。パラレル圧縮用)。PUMP BY(909 のキック、808 のキック、または両方)。フィルターの RESO。クリッピングを防ぐ LIMIT(オンのままにしておいてください)。ドライブ段の DIST タイプ、GLUE コンプレッサー、VOLUME。COMP や FILTER を回すと、その詳細設定も一緒に変わります。</p>
+</details>
+<hr>
+<h2 id="s15"><span class="num">15</span>設定と保存</h2>
+<figure class="shot"><img src="img/screen-global.png" alt="GLOBAL リスト:CLOCK OUT ON(ハイライト)、NOTES OUT OFF、909 MIDI CH 10、808 MIDI CH 11、303A MIDI CH 2、303B MIDI CH 3。"><figcaption>GLOBAL</figcaption></figure>
+<p>GLO を押すとこれらの設定があります。5 つのセクション(MIDI、AUDIO、KEYS AND SCREEN、PROJECT、SYSTEM)に分かれています。</p>
+<div class="table"><table><thead><tr><th>設定</th><th>働き</th></tr></thead><tbody>
+<tr><td><strong>CLOCK OUT</strong></td><td>MIDI クロックとスタート/ストップメッセージを送ります。</td></tr>
+<tr><td><strong>NOTES OUT</strong></td><td>パターンを MIDI ノートとして送出します。</td></tr>
+<tr><td><strong>909 … BREAK MIDI CH</strong></td><td>各パートの MIDI チャンネル。ノートと CC の入出力に使います。1〜16。OFF にするとそのパートへの受信ノートと CC を無視し、送信もしなくなります。</td></tr>
+<tr><td><strong>CC OUT</strong></td><td>OFF(デフォルト):CC は送信しません。KNOBS:手で回したノブが CC として送出されます。ALL:ノブモーションや Pロックが再生する値も送出されます。詳細はセクション 16 を参照。</td></tr>
+<tr><td><strong>MIX MIDI CH</strong></td><td>ミキサーのレベル、エフェクト、マスター用のチャンネル:1(デフォルト)〜16、または OFF。</td></tr>
+<tr><td><strong>OUTPUT</strong></td><td>NORMAL、または LOUD。LOUD はヘッドホンとライン出力(と USB オーディオ)が 6 dB 大きくなります。音量の足りないヘッドホン用です。マスターの LIMIT(デフォルトでオン)がクリッピングを防ぎます。</td></tr>
+<tr><td><strong>USB AUDIO</strong></td><td>FOLLOWS KNOB(デフォルト):USB オーディオの音量が FM-1 本体と一致します。MASTER ノブも含みます。FULL:ノブの位置にかかわらず USB オーディオはフルレベルのままなので、本体の音量を絞ったままケーブル経由で録音できます。</td></tr>
+<tr><td><strong>LIGHTS</strong></td><td>ON:キーライトがステップを表示し、消灯しているボタンも薄く光って読めるようになります。KEYS:キーライトのみ。OFF:どちらもなし。</td></tr>
+<tr><td><strong>KEY SOUND</strong></td><td>STOPPED(デフォルト):パターン再生中は、ドラムを選んでも 303 のステップを編集しても音が鳴りません。ただし REC オン中は鳴ります。ALWAYS:常に音が鳴ります。いずれの場合も 303 のキーボードは常に鳴ります。</td></tr>
+<tr><td><strong>THEME</strong></td><td>画面の色:グリーン、アンバー、シアン、レッド、モノクロ。</td></tr>
+<tr><td><strong>SAVE PROJECT</strong></td><td>すべて保存します。</td></tr>
+<tr><td><strong>AUTOSAVE</strong></td><td>ON(デフォルト):パターン停止中、4 秒間何も操作しなければ変更が自動保存されます。OFF:SAVE を押したときだけ保存します。</td></tr>
+<tr><td><strong>CLEAR PATTERN</strong></td><td>現在のパターンの 5 パートすべてをクリアします。</td></tr>
+<tr><td><strong>FACTORY RESET</strong></td><td>工場出荷時のサウンドと空のパターンに戻ります。ソングもノブモーションもありません。保存済みのプロジェクトは、上書き保存するまで残ります。</td></tr>
+<tr><td><strong>PERFORMANCE</strong></td><td>パフォーマンスページ(後述)を開きます。</td></tr>
+<tr><td><strong>2ND CORE</strong></td><td>ON(デフォルト):FM-1 のプロセッサーコアを両方使います。OFF:1 コアで動きます。次回の電源投入時に反映されます。2 コアでクラッシュした場合、X0X が自動で OFF にします(下記のパフォーマンスページを参照)。</td></tr>
+<tr><td><strong>ABOUT X0X</strong></td><td>バージョン、パターン用メモリーの使用率(MEM)、オーディオ負荷を表示します。</td></tr>
+<tr><td><strong>BATTERY</strong></td><td>バッテリー残量:FULL、2/3、1/3、EMPTY。パソコンが FM-1 に給電している間は USB POWER。表示のみで変更できません。</td></tr>
+</tbody></table></div>
+<h3 id="saving">保存</h3>
+<p><strong>SAVE</strong> はサウンド、32 パターンすべて、ソング、ノブモーション、テンポ、設定を保存します。画面右上の小さな灰色の点は未保存の変更があることを意味し、未保存のものは電源を切ると失われます。</p>
+<p>AUTOSAVE がオン(デフォルト)なら SAVE を使うことはほぼありません。パターン停止中に 4 秒間何も触れていなければ、X0X が自動で保存して <code>AUTOSAVED</code> と表示します。</p>
+<div class="callout"><p><strong>X0X は再生中に保存することはありません。</strong>保存の間、サウンドが一瞬止まります(FM-1 は保存先と同じメモリーから再生しているため)。そのため再生中に SAVE を押すと <code>SAVES WHEN STOPPED</code> と表示され、停止したときに保存します。</p></div>
+<details><summary>収容容量</summary>
+<p>X0X はパターン、ソング、ノブモーションを、FM-1 のメモリーに収まるよう圧縮しています。空のステップはほとんど場所を取らないので、典型的なプロジェクトではメモリーのほんの一部しか使いません(使用率は GLO &gt; ABOUT X0X に MEM として表示されます)。プロジェクトが大きすぎて入らなくなった場合は <code>MEMORY FULL: NOT SAVED</code> と表示され、以前の保存内容が保持されます。要らないパターンをクリアすれば場所が空きます。旧バージョンで保存されたプロジェクトはそのままの形で読み込まれます(ステップは 1〜32、パターンは 1〜16)。</p>
+</details>
+<details><summary>パフォーマンス:FM-1 の働き具合</summary>
+<p>GLO &gt; PERFORMANCE には FM-1 の働き具合が 1 秒ごとに更新されて表示されます。オーディオ負荷とそのピーク、音切れ(ドロップアウト)の有無、各パートのプロセッサー使用率です。</p>
+<p>きちんと計測するには、SEL を押して RUN PERF TEST を選びます。X0X が自前の 3 つのパターンを 15 秒ほど再生します。シンプルなループから、最も混み合った状態までです。終わるとプロジェクトは元どおりに戻り、結果が表示されます。HOME か PLAY でテストを途中で止められます。</p>
+<p>X0X は FM-1 のプロセッサーコアを両方使います。808 とブレイクは 2 基目で動くため、パフォーマンスページの 808 の割合は「1 基目が 2 基目を待つ時間」を示し、全体の負荷は下がります。ある FM-1 では、テストの 3 パターンが 1 コア動作時の 43%、83%、115% から 39%、54%、68% になり、最悪ケースのピークも限界超過から 84% になりました。</p>
+<p>パフォーマンスページの右上には <code>2 CORES</code> と表示されます。一部の FM-1 では 2 基目のコアの負荷が正しく読めないことがあり、X0X は初回にそれを検知して 1 コアで動き続け、ページには赤字で <code>1 CORE: BAD READS</code> と表示されます。動作自体はすべて正常ですが、最も混み合ったパターンでは音切れするかもしれません。</p>
+<p>2 コア動作中に X0X がクラッシュすると、1 コアで再起動し、GLO &gt; 2ND CORE を OFF にして同じクラッシュを繰り返さないようにします。このときページには <code>1 CORE (GLO)</code> と表示されます。再び 2 コアを試すには、2ND CORE を ON にして FM-1 の電源を入れ直します。起動中にクラッシュした場合も、X0X は(その 1 回だけ)1 コアで起動します。</p>
+<p>コア表示の下には、X0X がプロセッサーの 2 つの電源に与えている電圧が表示されます。1.38 / 1.60V で、M-VAVE 純正ファームウェアと同じです。FM-1 のブートローダーはこれより低い 1.26 / 1.40V で起動しますが、その電圧では、2 コアが忙しく動いているときにメモリーを誤読する FM-1 があります。</p>
+<p>FM-1 が限界に近づくと、X0X は音切れを起こす代わりに自分で負荷を軽くします。303 がオーバーサンプリングをやめ(明るくレゾナンスの強いノートがわずかにザラつきます)、808 の音はフェードの終わりが少し早くなります。この状態では、オーディオ負荷の横に GUARD がアンバーで点灯し、3 秒静かになると消えます。パフォーマンスページには発動した回数が記録されます(<code>GUARD 3x</code> など)。</p>
+<p>自分のパターンで X0X が音切れする場合は、テスト結果とパターンの写真を送ってもらえると最も役立ちます。</p>
+<p>X0X がクラッシュすると、数秒間赤い画面を表示して再起動します。FM-1 の電源を切るまで、パフォーマンスページの下部にはそのクラッシュの数値が赤字で残ります(<code>CRASH PC … RA …</code>、<code>EMU … DBG …</code>)。クラッシュを報告するときは、この数値の写真を添えるのが最も役立ちます。</p>
+<p>KNOB 1 で追加のカウンター(STALLS)がオンになります。実験的なものです。オンにして FM-1 の調子がおかしくなったら、電源を入れ直してください。</p>
+</details>
+<h3 id="back-up-your-project">プロジェクトのバックアップ</h3>
+<p>X0X が保持できるプロジェクトは 1 つです。複数を残したいときや、他のファームウェアを試す間自分のプロジェクトを退避しておきたいときは、パソコン上のファイルに保存し、後で読み込み直せます。Chrome か Edge で<a href="https://charlesvestal.github.io/fm1-x0x/backup/">バックアップページ</a>を開き、FM-1 を USB で接続してください。</p>
+<ul>
+<li><strong>バックアップ:</strong>Back up を押します。プロジェクトがダウンロードフォルダーに <code>.x0b</code> ファイルとして保存されます。中身はサウンド、32 パターンすべて、ソング、ノブモーション、テンポ、設定です。X0X はそのまま演奏を続けられますが、まだ保存していない変更は、停止したときに初めてファイルへ入ります。</li>
+<li><strong>リストア:</strong>X0X を停止し、バックアップを選んで Restore を押します。X0X は何かを変える前にファイル全体を検証します。その後画面に <code>RESTORE FROM USB?</code> と表示されるので、SEL で復元、HOME で現状維持です。バックアップが FM-1 上のプロジェクトを置き換え、X0X がすぐに読み込みます。</li>
+</ul>
+<p>バックアップにはブレイクループは含まれません。WAV ファイルを保管しておき、<a href="https://charlesvestal.github.io/fm1-x0x/breaks/">ブレイクループページ</a>から再度読み込んでください。旧バージョンの X0X で作ったバックアップは、新しいバージョンで復元できます。</p>
+<details><summary>コマンドラインから</summary>
+<p>FM-1 を接続した状態で実行します:</p>
+<pre tabindex="0" aria-label="コマンド"><code>python3 tools/x0x_backup.py backup my-song.x0b
+python3 tools/x0x_backup.py restore my-song.x0b</code></pre>
+<p><code>python3 tools/x0x_backup.py info my-song.x0b</code> でバックアップの内容を確認できます。ファイル形式はバックアップページのものと同じです。</p>
+</details>
+<hr>
+<h2 id="s16"><span class="num">16</span>MIDI と USB オーディオ</h2>
+<p>USB で接続すると、FM-1 は「X0X FM-1」という名前の MIDI デバイスとして認識されます。</p>
+<p>X0X は USB と FM-1 の TRS MIDI IN ジャックの両方から、同じように MIDI を受け取ります。各パートは自分のチャンネルで待ち受けています。デフォルトは次のとおりです。</p>
+<div class="table"><table><thead><tr><th>入力</th><th>対応</th></tr></thead><tbody>
+<tr><td>チャンネル 10</td><td>909。General MIDI のドラムノートに対応:36 キック、38 スネア、41・45・50 タム、37 リム、39 クラップ、42 クローズドハット、46 オープンハット、49 クラッシュ、51 ライド。</td></tr>
+<tr><td>チャンネル 11</td><td>808。同じノートに加えて、カウベルが 56、シンバルが 49。</td></tr>
+<tr><td>チャンネル 2</td><td>303A。重なるノートはスライドし、ベロシティ 100 以上でアクセントが鳴ります。</td></tr>
+<tr><td>チャンネル 3</td><td>303B。同様。</td></tr>
+<tr><td>チャンネル 4</td><td>ノート 36〜43 でブレイクのスライス 1〜8 を鳴らします。</td></tr>
+<tr><td>クロック</td><td>X0X は入力された MIDI クロックに自動で同期し、クロックが止まってから 0.5 秒後に自分のテンポへ戻ります。Start、Stop、Continue でパターンの開始・停止ができます。</td></tr>
+</tbody></table></div>
+<p>GLO で各パートのチャンネルを設定できます(909 MIDI CH など)。OFF にすればそのパートのノートを無視できます。たとえば、他の機材が同じチャンネルでノートを送りながらクロックを送ってくるような場合です。X0X は MIDI を送ることもできます。CLOCK OUT がオンならクロックとスタート/ストップ、NOTES OUT がオンなら各パートのチャンネルでパターンをノートとして送ります。</p>
+<p>X0X が外部クロックに同期している間、最上行のテンポ表示は約 1 秒の平均になるため、クロックごとにちらつきません。</p>
+<h3 id="midi-cc">MIDI CC</h3>
+<p>MIDI コントローラーから、X0X のノブを MIDI CC で動かせます。各パートはノートと同じ自分のチャンネルで CC を受け取り、MIX MIDI CH(デフォルトはチャンネル 1)がミキサー、エフェクト、マスターを受け持ちます。CC は、表示中のページにかかわらず、ノブを回したのと同じようにそのノブを設定します。再生中に REC がオンだとノブモーションとして記録されます。そうでなければノブを設定し、そのノブにパターンのモーションがある場合は、CC が 1 周の間モーションに勝ります。CC のスイープ(連続変化)はアンドゥ 1 ステップになります。CC マップは固定で、MIDI ラーン(学習)はありません。最初のバンクは CTL-1 と一致しているため、CTL-1 なら設定なしでこれらのノブを動かせます。</p>
+<p>パートのチャンネルで受ける CC(909 はチャンネル 10、808 は 11、303A は 2、303B は 3、ブレイクは 4):</p>
+<div class="table"><table><thead><tr><th>CC</th><th>303A と 303B</th><th>909 と 808</th><th>ブレイク</th></tr></thead><tbody>
+<tr><td>7, 10, 91, 93</td><td>そのパートのレベル、パン、リバーブセンド、ディレイセンド</td><td>同じ</td><td>同じ</td></tr>
+<tr><td>16–19</td><td>CUTOFF、RESO、ENVMOD、DECAY</td><td>16 FILTER、17 LEVEL、18 PITCH</td><td></td></tr>
+<tr><td>20–23</td><td>ACCENT、WAVE、DRIVE、SLIDE</td><td>20〜30:トラック 1〜11 の TUNE</td><td></td></tr>
+<tr><td>24–27</td><td>TUNE、VOLUME、DRVTYP、ACCDEC</td><td></td><td></td></tr>
+<tr><td>74, 71, 75</td><td>CUTOFF、RESO、DECAY の再割り当て(受信のみ、送信なし)</td><td>74:FILTER の再割り当て</td><td></td></tr>
+<tr><td>70–80</td><td></td><td>トラック 1〜11 の DECAY</td><td></td></tr>
+<tr><td>102–112</td><td></td><td>トラック 1〜11 の LEVEL</td><td></td></tr>
+<tr><td>12</td><td>キットの ACCENT</td><td></td><td></td></tr>
+</tbody></table></div>
+<p>ドラムトラックは画面の並び順で数えます。909 では BD、SD、LT、MT、HT、RS、CP、CH、OH、CR、RD、808 では BD、SD、LT、MT、HT、RS、CP、CB、CY、OH、CH です。909 のクラップの DECAY は TAIL のことであり、909 のリムショットには DECAY がないため、チャンネル 10 では CC 75 は何もしません。</p>
+<p>MIX MIDI CH で受ける CC:</p>
+<div class="table"><table><thead><tr><th>CC</th><th>設定対象</th></tr></thead><tbody>
+<tr><td>16–19</td><td>MASTER ページ:DRIVE、COMP、PUMP、FILTER(64 がオフ)</td></tr>
+<tr><td>74, 71</td><td>マスターの FILTER の再割り当てと、その RESO</td></tr>
+<tr><td>20, 21</td><td>リバーブの DECAY と TONE</td></tr>
+<tr><td>22–25</td><td>ディレイの TIME、FEEDBACK、TONE、TAPE</td></tr>
+<tr><td>102–106</td><td>909、808、303A、303B、ブレイクのレベル</td></tr>
+</tbody></table></div>
+<p>WAVE のようなスイッチ系の設定は値 64 で切り替わります。パートのチャンネルの CC 120(オールサウンドオフ)と CC 123(オールノートオフ)は、MIDI がホールドしているノートを解放します。</p>
+<p>CC OUT(GLO)がオンのとき、X0X は CC を送信します。KNOBS では、ノブ、SEL のリストの行、ENV + ノブのいずれかで手動で値を変えるたびに、そのノブの CC が送られます。受信した CC は送り返されないため、MIDI をエコーする DAW でもループしません。パートのレベルは 2 回送られます。パートのチャンネルの CC 7 と、MIX MIDI CH の 102〜106 です。ALL ではさらに、ノブモーションと Pロックが再生する値も送られ、X0X のレーンで他のシンセをドライブできます。レーンは 6 ms あたり最大 4 CC しか送らず、ノートの余地が残っている間だけ送るため、混み合ったパターンでも CC のせいでノートが欠けることはありません。ALL では、レーンが直前に送ったのと同じ値で返ってきた CC は無視されます。</p>
+<p>プロジェクトの読み込み時と、アンドゥ/リドゥの後には、マップ上の全ノブの値が 1 回ずつ送られるため、LED リング付きのコントローラーでも現在値がそのまま表示されます。</p>
+<h3 id="usb-audio">USB オーディオ</h3>
+<p>同じ USB ケーブルを通して、FM-1 はパソコンに「X0X FM-1」というオーディオ入力としても認識されます。44.1 kHz の 2 チャンネルで、ドライバーのインストールは不要です。ヘッドホンで聞こえている音を、VOLUME を通した後の状態でステレオで届けます。</p>
+<p>どのオーディオアプリでも録音でき、ライブモニタリングもできます。FM-1 は USB オーディオをパソコンのクロックに合わせるため、ライブモニタリングでもズレたり音切れしたりしません。アプリが入力を開いた直後の一瞬、FM-1 が安定するまでクリック音が出ることがあります。</p>
+<h3 id="screen-reader">スクリーンリーダー</h3>
+<p>X0X は、自分の画面の内容をスクリーンリーダーに伝えられます。FM-1 を USB で接続し、Chrome か Edge で <a href="https://charlesvestal.github.io/fm1-reader/">FM-1 Screen Reader</a> を開いて Connect をクリックしてください。今いるページとそのノブ、回しているノブの値、リストの行とその位置(「clock out on、22 項目中の 1 番」など)、ヘルプカード、確認ダイアログ、オン/オフしたステップ、再生と停止、そしてすべてのメッセージが読み上げられます。機械語風の表記ではなく、言葉に直して伝わる形で読むのが特徴です。「bass drum tune 37」のように読み、「BD TUNE 37」のまま読み上げたりはしません。</p>
+<p>ページ自体の音声で、速度とピッチを選んで読み上げさせることも、すべてを自分のスクリーンリーダー(VoiceOver、NVDA、JAWS、TalkBack)に任せることもできます。W を押すと画面全体をもう一度読み上げます。ページが接続するまで FM-1 は何も送らないため、同じケーブルにつながっている DAW がそのデータを見ることはありません。</p>
+<hr>
+<h2 id="s17"><span class="num">17</span>トラブルシューティング</h2>
+<p><strong>アップデートモード:</strong>OCT- と OCT+ を同時に 5 秒押さえます。カウントダウンが表示され、終わる前に離すとキャンセルできます。</p>
+<p><strong>キャリブレーション:</strong>ボタンやノブが正しく動かないときは、FM-1 の電源を入れる際に OCT- と OCT+ を押さえたままにします。画面の案内に従って、各ボタンを押し、各ノブを順に回します。</p>
+<p><strong>クラッシュ後:</strong>X0X は赤い CRASH 画面を表示し、数秒後に自動で再起動します。次回起動時に <code>RESTARTED AFTER A CRASH</code> とアドレス(PC …)が一瞬表示されます。問題を報告するときは、そのアドレスと操作内容を添えてください。</p>
+<p><strong>セーフモード:</strong>起動中に 2 回続けてクラッシュすると、代わりに SAFE MODE で起動します。音は出ませんが USB は機能するので、ウェブインストーラーからアクセスできます。X0X を入れ直すか、同じページから純正ファームウェアへ戻してください。PLAY を押すと、通常どおりの X0X 起動を試みます。セーフモードでもさらに 2 回失敗すると、FM-1 はチップ自体のアップデートモードに落ち、下記のレスキューだけが届くようになります。</p>
+<details><summary>BRIGHTNESS 変更後に起動画面から動かない場合(0.9-beta 以前)</summary>
+<p>0.9-beta までのバージョンには、FM-1 をフリーズさせ得る輝度設定があり、設定が保存されるため、再インストール後も毎回の起動でフリーズし続けていました。ウェブインストーラーから 0.10-beta 以降をインストールしてください。この設定は廃止され、保存された値も無視され、FM-1 は正常に起動します。</p>
+</details>
+<h3 id="recovering-an-fm-1-that-won-t-start">起動しなくなった FM-1 の復旧</h3>
+<p>0.5-beta 以降は、クラッシュを繰り返す FM-1 はセーフモード(前述)で起動し、ウェブインストーラーで修復できます。それより前のバージョンは、2 回クラッシュするとチップ自体のアップデートモードに落ちていました(0.2-beta がこれに当たります:X0X 画面 → 赤い X0X CRASH 画面 → 真っ暗な画面)。中断されたインストール(ケーブルが抜けた、パソコンがスリープした)でもこの状態になることがあります。真っ暗な画面で、赤い充電ランプだけが点いている状態です。この状態の FM-1 はウェブインストーラーも M-VAVE のアップデーターも見つけられませんが、スクリプトなら M-VAVE のファームウェアを書き戻せます。Mac で、お手持ちの USB ケーブルだけで行えます。</p>
+<p>ターミナルを開き、次の行を貼り付けて Return を押します:</p>
+<pre tabindex="0" aria-label="コマンド"><code>bash -c "$(curl -fsSL https://raw.githubusercontent.com/charlesvestal/fm1-x0x/main/tools/fm1_rescue.sh)"</code></pre>
+<ol>
+<li>コマンドライン開発者ツールのインストールを求めるウィンドウが出たら Install をクリックします。終わったら、もう一度同じ行を貼り付けます。</li>
+<li>パスワードを求められたら、Mac のパスワードを入力して(入力中は何も表示されません)Return を押します。</li>
+<li>待機中と表示されたら、FM-1 を接続して電源を入れます。クラッシュして画面が暗くなり、スクリプトがそれを検知します。スクリプトはチップを確認し、FM-1 のメモリーのバックアップをホームフォルダーの <code>fm1-rescue</code> フォルダーに保存し、書き込みの前に確認します。</li>
+<li><strong>yes</strong> と入力して Return を押します。FM-1 を再起動すると表示されるまで、何も抜かないでください。FM-1 は純正ファームウェアで起動するので、そこから再度 X0X をインストールできます。</li>
+</ol>
+<p>このスクリプトは M-VAVE の FM-1 ファームウェア(V16 と、Internet Archive から V15)と JieLi のフラッシュローダーをダウンロードし、両方を既知のフィンガープリントと照合します。FM-1 がすでに持っているブートローダーに合うバージョンを書き戻します。その後 V15 から V16 へ上げるには、M-VAVE の M-UPGRADE を使ってください。書き込むのはメモリーのファームウェア領域だけで、ブートローダーや FM-1 自身の設定には決して触れず、書き込んだものはすべて検証します。再実行も常に安全です。失敗したら、ターミナルウィンドウの内容をすべてコピーして <a href="https://github.com/charlesvestal/fm1-x0x/issues">issue を立てて</a>ください。FM-1 がまったく認識されない場合でも、Felucca の <a href="https://github.com/kurogedelic/FM-1-transporter">FM-1-transporter</a>(USB ラインに配線した小さな RP2040 ボード)なら届きます。</p>
+<hr>
+<h2 id="s18"><span class="num">18</span>パラメータ</h2>
+<p>ドラムの設定は 0〜127 の範囲です。ディストーションのタイプである DIST は、DIODE、CLIP、SAT、BFZ、PDIST、FOLD、CRUSH から選べます。PAN は L64 から C(中央)を経て R63 までです。</p>
+<p>各トラックの Level、Pan、Rev、Dly はミキサー(909 MIX、808 MIX)にあります。Drive と Dist は SEL のリストに、残りはそのトラックのサウンドページにあります。</p>
+<details><summary>909 のトラック</summary>
+<div class="table"><table><thead><tr><th>909 トラック</th><th>設定</th></tr></thead><tbody>
+<tr><td>BD</td><td>Tune, Attack, Decay, Level, Pitch depth, Pitch, Drive, Dist, Rev, Dly, Pan</td></tr>
+<tr><td>SD</td><td>Tune, Tone, Snappy, Decay, Level, Drive, Dist, Rev, Dly, Pan</td></tr>
+<tr><td>LT, MT, HT</td><td>Tune, Decay, Level, Attack, Drive, Dist, Rev, Dly, Pan</td></tr>
+<tr><td>RS</td><td>Level, Tune, Drive, Dist, Rev, Dly, Pan</td></tr>
+<tr><td>CP</td><td>Level, Tune, Tail, Drive, Dist, Rev, Dly, Pan</td></tr>
+<tr><td>CH, OH</td><td>Decay, Level, Tune, Drive, Dist, Rev, Dly, Pan</td></tr>
+<tr><td>CR, RD</td><td>Tune, Level, Decay, Drive, Dist, Rev, Dly, Pan</td></tr>
+<tr><td>KIT</td><td>Accent(アクセント付きステップの音量増分)</td></tr>
+</tbody></table></div>
+</details>
+<details><summary>808 のトラック</summary>
+<div class="table"><table><thead><tr><th>808 トラック</th><th>設定</th></tr></thead><tbody>
+<tr><td>BD</td><td>Level, Tone, Decay, Tune, Attack, Drive, Dist, Rev, Dly, Pan</td></tr>
+<tr><td>SD</td><td>Level, Tone, Snappy, Tune, Decay, Drive, Dist, Rev, Dly, Pan</td></tr>
+<tr><td>LT, MT, HT</td><td>Level, Tune, Decay, Sound, Drive, Dist, Rev, Dly, Pan</td></tr>
+<tr><td>RS</td><td>Level, Tune, Decay, Sound, Drive, Dist, Rev, Dly, Pan</td></tr>
+<tr><td>CP</td><td>Level, Tune, Decay, Attack, Sound, Drive, Dist, Rev, Dly, Pan</td></tr>
+<tr><td>CB, CH</td><td>Level, Tune, Decay, Drive, Dist, Rev, Dly, Pan</td></tr>
+<tr><td>CY, OH</td><td>Level, Decay, Tune, Drive, Dist, Rev, Dly, Pan</td></tr>
+<tr><td>KIT</td><td>Accent</td></tr>
+</tbody></table></div>
+</details>
+<details><summary>303</summary>
+<div class="table"><table><thead><tr><th>303 設定</th><th>範囲</th></tr></thead><tbody>
+<tr><td>Cutoff, Reso, EnvMod</td><td>0–127</td></tr>
+<tr><td>Decay</td><td>200–2000 ms</td></tr>
+<tr><td>Accent</td><td>0–127</td></tr>
+<tr><td>Wave</td><td>Saw(のこぎり波)または Square(矩形波)</td></tr>
+<tr><td>Tune</td><td>A = 400〜480 Hz。中央は 440 Hz</td></tr>
+<tr><td>Volume</td><td>0–127</td></tr>
+<tr><td>Drive, Drive type</td><td>Off、soft、RAT</td></tr>
+<tr><td>Slide</td><td>2–360 ms</td></tr>
+<tr><td>Accent decay</td><td>30–3000 ms</td></tr>
+</tbody></table></div>
+</details>
+<details><summary>ブレイク</summary>
+<div class="table"><table><thead><tr><th>ブレイク設定</th><th>範囲</th></tr></thead><tbody>
+<tr><td>Complexity, Anchor, Roll, Fill</td><td>0–100</td></tr>
+<tr><td>Retrig 2x, 3x, 4x, 8x</td><td>0–100</td></tr>
+<tr><td>Phrase</td><td>Off、2、4、8、16 小節</td></tr>
+<tr><td>B chance</td><td>0–100</td></tr>
+<tr><td>A length, B length</td><td>1/4、1/2、1、2、4、8 小節</td></tr>
+<tr><td>Level</td><td>0–127</td></tr>
+<tr><td>Pitch</td><td>-12〜+12 半音</td></tr>
+<tr><td>Filter</td><td>LP 100%〜1%、OFF、HP 1%〜100%</td></tr>
+</tbody></table></div>
+</details>
+<details><summary>エフェクトとマスター</summary>
+<div class="table"><table><thead><tr><th>エフェクトページ</th><th>設定</th></tr></thead><tbody>
+<tr><td>REVERB</td><td>Decay, Tone。リストでは:ローカット、リターンレベル</td></tr>
+<tr><td>DELAY</td><td>Time(1/32, 1/16T, 1/16, 1/8T, 1/16., 1/8, 1/4T, 1/8., 1/4, 1/2T, 1/4., 1/2, 1/2.)、Feedback, Tone, Tape(DIGI、その先はテープとその劣化度)。リストでは:ローカット、リターンレベル、ping width(0 でオフ)</td></tr>
+<tr><td>MASTER</td><td>Drive, Comp, Pump, Filter。リストでは:コンプレッサーの詳細、pump by、resonance、リミッター、ドライブのタイプ、glue、音量</td></tr>
+</tbody></table></div>
+</details>
+<p>ディレイはテンポに追従します。外部 MIDI クロックを含みます。2 秒を超えるディレイ(1/2. は 90 BPM 未満、1/2 は 60 BPM 未満のとき)は長さの半分で再生されますが、それでも拍には乗ります。PING がオンだと、エコーは 1 ディレイタイムの間隔で左右を往復します。1 秒を超えるディレイは、代わりに中央で鳴ります。</p>
+<hr>
+<h2 id="s19"><span class="num">19</span>クレジット</h2>
+<p>X0X は GNU General Public License バージョン 3 のフリーソフトウェアです。ファームウェアを共有する場合は、ソースコードも共有しなければなりません。</p>
+<ul>
+<li>プラットフォーム(ハードウェア層、USB、アップデートローダー、インストーラー、ストレージ)は、Leo Kuroshita 氏(<strong>Hügelton Instruments</strong>)の <strong>Felucca</strong> によるものです。</li>
+<li>909 は athousanddetails 氏の <strong>9W9</strong> によるもので、Matthew Cieplak 氏の <strong>ER-99</strong> が基になっています。ハットとシンバルのサンプルは ER-99 のものです。</li>
+<li>808 は athousanddetails 氏の <strong>8W8</strong> によるものです。</li>
+<li>リバーブは <strong>luchak</strong> 氏によるものです。</li>
+<li>303 は <strong>schwung-303</strong> によるもので、Robin Schmidt 氏の Open303(MIT ライセンス)を土台に、jc303 と dm-Rat に基づく拡張を加えています。</li>
+<li>TB-3PO は <strong>schwung-tb3po</strong> によるもので、Phazerville Hemisphere Suite に由来します。</li>
+<li>ブレイクジェネレーターは mestela 氏の <strong>BB Gen</strong> によるもので、許諾を得て使用しています。</li>
+<li>フォントは Barlow Semi Condensed と Terminus(SIL Open Font License)です。</li>
+</ul>
+<p>M-VAVE と FM-1 はそれぞれの所有者の商標であり、TR-808、TR-909、TB-303 は Roland の商標です。X0X は M-VAVE、Roland、Hügelton Instruments とは関係ありません。</p>
+
+</main>
+<script>
+(() => {
+  const tables = [...document.querySelectorAll(".table")];
+  tables.forEach((t) => {
+    const th = t.querySelector("th");
+    t.setAttribute("aria-label", "Table" + (th ? ": " + th.textContent : ""));
+  });
+  const fit = () => tables.forEach((t) => {
+    if (t.scrollWidth > t.clientWidth + 1) { t.tabIndex = 0; t.setAttribute("role", "region"); }
+    else { t.removeAttribute("tabindex"); t.removeAttribute("role"); }
+  });
+  fit();
+  addEventListener("resize", fit);
+})();
+</script>
+</body>
+</html>
