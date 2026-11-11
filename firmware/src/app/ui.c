@@ -46,13 +46,11 @@ typedef struct {
     uint8_t wpos[NBASS];
     int8_t held_step;
     uint8_t step_edited;
-    uint32_t step_t0;                  /* when the held 303 step went down: a tap toggles, a hold does not */
     uint8_t step_preview;              /* the held step is sounding (only while stopped) */
     uint8_t step_created;              /* the press turned the held step on (its release keeps it) */
     int8_t brk_held;                   /* BREAK: the white key (16th) held, -1 none */
     int8_t hold_step;                  /* a drum machine: the step (white key) held, -1 none */
     uint8_t hold_created, hold_used;   /* drums / BREAK: the press turned the step on; a knob or a slice used it */
-    uint32_t hold_t0;                  /* when it went down (a tap takes an old step off) */
     uint16_t brk_pinkeys;              /* BREAK: black keys used to give a held step its slice (their release is not live) */
     uint8_t gen_stale[NBASS];          /* TB-3PO's knobs changed since the line was written */
     uint32_t btn, keys, btn_used;
@@ -1948,6 +1946,7 @@ static void drum_key(int v, int down)
 }
 
 #define STEP_TAP_MS 300u
+static uint32_t key_tap_ms;                            /* the key event's key: held this long (plat_key_tap_ms) */
 /* a white key: a step. An empty one is on at once; one already on comes off on a tap (a quick
  * release), and stays when held (EDIT: its p-locks) */
 static void drum_step(int white, int down)
@@ -1959,7 +1958,7 @@ static void drum_step(int white, int down)
         return;
     if (!down) {
         if (ui.hold_step == s) {
-            if (!ui.hold_created && !ui.hold_used && plat_ms() - ui.hold_t0 < STEP_TAP_MS) {
+            if (!ui.hold_created && !ui.hold_used && key_tap_ms < STEP_TAP_MS) {
                 sm_flip(bits, s);
                 mark_dirty();
                 sp_step(s, 0);
@@ -1979,7 +1978,6 @@ static void drum_step(int white, int down)
     }
     ui.hold_step = (int8_t)s;
     ui.hold_used = 0;
-    ui.hold_t0 = plat_ms();
     ui.hold_created = !sm_get(bits, s);
     if (ui.hold_created) {
         sm_flip(bits, s);
@@ -2043,7 +2041,6 @@ static void bass_step_key(int white, int down)
     if (down) {                                       /* an empty step is on at once: hold it to edit it */
         ui.held_step = (int8_t)s;
         ui.step_edited = 0;
-        ui.step_t0 = plat_ms();
         ui.step_created = bstep_gate(&bp->step[s]) == G_REST;
         if (ui.step_created) {
             bp->step[s].flags = G_NOTE;
@@ -2054,7 +2051,7 @@ static void bass_step_key(int white, int down)
         if (ui.step_preview)
             engine_bass_on(b, bp->step[s].note + bp->transpose - 24, (bp->step[s].flags & BS_ACCENT) != 0, 0);
     } else if (ui.held_step == s) {
-        if (!ui.step_created && !ui.step_edited && plat_ms() - ui.step_t0 < STEP_TAP_MS) {   /* a tap takes it off */
+        if (!ui.step_created && !ui.step_edited && key_tap_ms < STEP_TAP_MS) {   /* a tap takes it off */
             bp->step[s].flags = G_REST;
             mark_dirty();
             sp_step(s, 0);
@@ -2119,6 +2116,7 @@ static void mute_track(int km, int v)                /* one drum track on / off 
 
 static void key_event(int k, int down)
 {
+    key_tap_ms = plat_key_tap_ms(k);
     int w = KEY_WHITE[k], bl = KEY_BLACK[k], wp = w >= 0 ? ui.pbank * 16 + w : -1;   /* wp: a white key's pattern */
     if (ui.overlay == O_ASK || ui.view == V_PERF || perf_testing())
         return;
@@ -2242,14 +2240,13 @@ static void key_event(int k, int down)
         else if (w >= 0 && down) {                     /* as the drums: empty on at once, a tap takes it off */
             ui.brk_held = (int8_t)w;
             ui.hold_used = 0;
-            ui.hold_t0 = plat_ms();
             ui.hold_created = !((bp->steps >> w) & 1u);
             if (ui.hold_created) {
                 bp->steps |= 1u << w;
                 mark_dirty();
             }
         } else if (w >= 0 && ui.brk_held == w) {
-            if (!ui.hold_created && !ui.hold_used && plat_ms() - ui.hold_t0 < STEP_TAP_MS) {
+            if (!ui.hold_created && !ui.hold_used && key_tap_ms < STEP_TAP_MS) {
                 bp->steps &= ~(1u << w);
                 mark_dirty();
             }

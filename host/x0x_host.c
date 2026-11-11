@@ -10,6 +10,7 @@
  *   wait MS                      run the device for MS milliseconds
  *   press BTN | release BTN | tap BTN     (BTN: FX SEL ENV LFO EDIT GLO HOME SAVE ARP SEQ PLAY REC OCT- OCT+)
  *   key K down|up | tapkey K     (K: 0..26 = F3..G5, or w0..w15 white keys, b0..b10 black keys)
+ *   slowtap K                    a 60 ms tap of key K whose release the UI sees 400 ms late (a long frame)
  *   turn ENC N [MS]              (ENC: SELECT ALGO PRESET K1 K2 K3 K4; N detents, signed, MS apart, 80 = slow)
  *   spin ENC N                   N detents at once (1 ms), exactly N (no knob acceleration)
  *   master N                     MASTER pot 0..4096
@@ -95,6 +96,25 @@ static uint32_t lit_btn, lit_keys, dim_keys;
 uint32_t plat_ms(void) { return now_ms; }
 uint32_t plat_buttons(void) { return held_btn; }
 uint32_t plat_keys(void) { return held_keys; }
+static uint32_t key_dn[NKEYS], key_len[NKEYS];   /* the keys' press and release times, as the FM-1's scan stamps them */
+static void set_keys(uint32_t keys)
+{
+    uint32_t ch = keys ^ held_keys;
+    for (int k = 0; k < NKEYS; k++)
+        if (ch >> k & 1u) {
+            if (keys >> k & 1u)
+                key_dn[k] = now_ms;
+            else
+                key_len[k] = now_ms - key_dn[k];
+        }
+    held_keys = keys;
+}
+uint32_t plat_key_tap_ms(int k)
+{
+    if (k < 0 || k >= NKEYS)
+        return 0xFFFFu;
+    return held_keys >> k & 1u ? now_ms - key_dn[k] : key_len[k];
+}
 int32_t plat_enc(int role)
 {
     int32_t v = enc_acc[role];
@@ -1050,18 +1070,26 @@ int main(int argc, char **argv)
             if (cmd[0] != 'p')
                 held_btn &= ~(1u << i);
             run_ms(cmd[0] == 't' ? 40 : 2);
-        } else if (!strcmp(cmd, "key") || !strcmp(cmd, "tapkey")) {
+        } else if (!strcmp(cmd, "key") || !strcmp(cmd, "tapkey") || !strcmp(cmd, "slowtap")) {
             int k = key_of(a);
             if (cmd[0] == 't') {
-                held_keys |= 1u << k;
+                set_keys(held_keys | 1u << k);
                 run_ms(60);
-                held_keys &= ~(1u << k);
+                set_keys(held_keys & ~(1u << k));
+                run_ms(30);
+            } else if (cmd[0] == 's') {                  /* a 60 ms tap whose release the UI sees 400 ms late (a long
+                                                           * frame or a flash write between) */
+                set_keys(held_keys | 1u << k);
+                run_ms(2);
+                now_ms += 60;
+                set_keys(held_keys & ~(1u << k));
+                now_ms += 400;
                 run_ms(30);
             } else {
                 if (!strcmp(b, "down"))
-                    held_keys |= 1u << k;
+                    set_keys(held_keys | 1u << k);
                 else
-                    held_keys &= ~(1u << k);
+                    set_keys(held_keys & ~(1u << k));
                 run_ms(2);
             }
         } else if (!strcmp(cmd, "turn")) {

@@ -15,6 +15,31 @@ uint32_t plat_buttons(void)
 
 uint32_t plat_keys(void) { return fm1_in.notes & ((1u << NKEYS) - 1u); }
 
+/* each key's press and release, stamped by the timer ISR right after the scan (key_stamp): a tap is told from a
+ * hold by the keys' own times, not by when the main loop got round to them (fm1-x0x#47: a step that would not come
+ * off, its quick tap read as a hold after a long frame) */
+static uint32_t key_was;
+static uint16_t key_dn[NKEYS], key_len[NKEYS];  /* (16 bits of milliseconds, for RAM: a hold wraps round at 65.5 s,
+                                                 * so one let go just then would read as a tap) */
+static void key_stamp(uint32_t now)
+{
+    uint32_t keys = fm1_in.notes & ((1u << NKEYS) - 1u), ch = keys ^ key_was;
+    key_was = keys;
+    for (int k = 0; ch; k++, ch >>= 1)
+        if (ch & 1u) {
+            if (keys >> k & 1u)
+                key_dn[k] = (uint16_t)now;
+            else
+                key_len[k] = (uint16_t)((uint16_t)now - key_dn[k]);
+        }
+}
+uint32_t plat_key_tap_ms(int k)
+{
+    if (k < 0 || k >= NKEYS)
+        return 0xFFFFu;
+    return key_was >> k & 1u ? (uint16_t)((uint16_t)fm1_ms - key_dn[k]) : key_len[k];
+}
+
 int32_t plat_enc(int role)
 {
     if (role < 0 || role >= NE)

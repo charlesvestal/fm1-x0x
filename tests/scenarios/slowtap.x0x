@@ -1,0 +1,22 @@
+# a quick tap on a step that is on takes it off even when the UI sees its release late (a long frame or a flash
+# write between the press and the release): a tap is timed by the key scan, not by the main loop (fm1-x0x#47)
+wait 300
+expect part 0
+tapkey w2
+expect hit0.0.2 1
+slowtap w2
+expect hit0.0.2 0
+# held long, its release seen late too: a hold, the step stays
+tapkey w2
+key w2 down
+wait 600
+key w2 up
+expect hit0.0.2 1
+# a 303 step
+turn ALGO 2
+expect part 2
+tap SEQ
+tapkey w0
+expect gate0.0 1
+slowtap w0
+expect gate0.0 0
