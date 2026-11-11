@@ -736,6 +736,47 @@ static void test_ext_cue_together(void)
     printf("  external clock: parts switching pattern with the 909 stay on its tick: checked\n");
 }
 
+/* fm1-x0x#51: a jittery external clock (USB MIDI's: +-1 ms a clock) moves the measured tempo clock by clock, but the
+ * effects' tempo (seq_tempo_steady) holds still, and a real tempo change reaches it within two beats */
+static void test_ext_tempo_steady(void)
+{
+    int i, moves = 0, jl = 0;
+    float first = 0.0f, prev = 0.0f, lo = 1e9f, hi = 0.0f;
+    uint32_t rng = 12345u, per_tick = 882;                     /* 125 BPM */
+    reset();
+    seq_start(&S);
+    for (i = 0; i < 24 * 16; i++) {                          /* four bars */
+        int j;
+        rng = rng * 1664525u + 1013904223u;
+        j = (int)(rng >> 16) % 89 - 44;                       /* each clock +-44 samples (+-1 ms) off its grid time */
+        seq_ext_clock(&S);
+        run((uint32_t)((int)per_tick + j - jl));
+        jl = j;
+        if (i >= 48) {                                       /* (after the first beats) */
+            float t = seq_tempo_steady(&S);
+            if (i == 48)
+                first = prev = t;
+            moves += t != prev;
+            prev = t;
+            lo = S.ext_bpm < lo ? S.ext_bpm : lo;
+            hi = S.ext_bpm > hi ? S.ext_bpm : hi;
+        }
+    }
+    CHECK(first > 124.4f && first < 125.6f, "the steady tempo %.2f, want 125", (double)first);
+    CHECK(moves == 0, "a jittery clock (the tick-by-tick tempo %.1f..%.1f): the steady tempo moved %d times",
+          (double)lo, (double)hi, moves);
+    per_tick = 848;                                           /* 130 BPM: 44100*60/130/24 */
+    for (i = 0; i < 48; i++) {
+        seq_ext_clock(&S);
+        run(per_tick);
+    }
+    CHECK(seq_tempo_steady(&S) > 129.4f && seq_tempo_steady(&S) < 130.6f, "a change to 130: the steady tempo %.2f two beats on",
+          (double)seq_tempo_steady(&S));
+    run(44100);                                               /* clock gone: the internal tempo */
+    CHECK(S.ext == 0 && seq_tempo_steady(&S) == S.bpm, "internal again: the steady tempo is the internal one");
+    printf("  external clock: a steady tempo for the effects (the clock's tempo %.1f..%.1f): checked\n", (double)lo, (double)hi);
+}
+
 static void test_break_clock(void)
 {
     int i, k;
@@ -824,6 +865,7 @@ int main(void)
     test_song();
     test_ext_clock_and_midi_out();
     test_ext_cue_together();
+    test_ext_tempo_steady();
     test_break_clock();
 #ifdef REF_TB3PO
     test_tb3po_matches_reference();

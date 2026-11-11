@@ -142,6 +142,9 @@ typedef struct {
     volatile uint8_t accent_q7;       /* drum velocity of a non-accented hit, of 127 */
     float bpm;                        /* internal tempo (UI writes; read per step) */
     float ext_bpm;                    /* tempo measured from the external clock */
+    float ext_bpm_steady;             /* the same over whole beats, moved only past 0.4 %: the effects' (0 = none yet) */
+    uint32_t ext_beat;                /* samples in the beat being measured, and its clocks so far */
+    uint8_t ext_nbeat;
     seq_track_t t[NTRACKS];           /* TRK_DRUM, TRK_BASS0.., TRK_BRK */
     uint32_t clk_to_next;             /* internal: samples to the next MIDI clock, Q8 */
     uint32_t ext_since;               /* samples since the last external clock (tempo estimate) */
@@ -172,5 +175,6 @@ int seq_part_muted(const seq_t *s, int part);
 /* steps of one part's rate, in samples Q8 (no swing) at the current tempo */
 uint32_t seq_step_q8(const seq_t *s, int rate);
 float seq_tempo(const seq_t *s);      /* the tempo in effect (internal or measured) */
+float seq_tempo_steady(const seq_t *s);   /* the same, held steady on an external clock: for the delay's time */
 int seq_part_len(const seq_t *s, int t);         /* steps in part t's pattern */
 int seq_next_step(seq_t *s, int t, int p);       /* the step after p (direction; no commit) */

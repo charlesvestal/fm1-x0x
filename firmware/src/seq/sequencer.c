@@ -38,6 +38,11 @@ void seq_init(seq_t *s, pattern_t *patterns)
 }
 
 float seq_tempo(const seq_t *s) { return s->ext ? s->ext_bpm : s->bpm; }
+/* An external clock's tempo, tick by tick, wanders with the clock's jitter (USB MIDI's especially), and a delay whose
+ * time followed it bent its echoes' pitch (fm1-x0x#51). The effects take it measured over whole beats (24 clocks: the
+ * jitter of the two ends only), moved only when a beat is more than 0.4 % off: a steady clock leaves it alone, a
+ * tempo change reaches it within a beat */
+float seq_tempo_steady(const seq_t *s) { return s->ext && s->ext_bpm_steady > 0.0f ? s->ext_bpm_steady : seq_tempo(s); }
 
 uint32_t seq_step_q8(const seq_t *s, int rate)
 {
@@ -513,6 +518,21 @@ static void ext_ticks(seq_t *s)
             s->ext_period = s->ext_period ? s->ext_period - (s->ext_period >> 3) + (q >> 3) : q;
             s->ext_bpm = (float)FS * 60.0f * 256.0f / (24.0f * (float)s->ext_period);
         }
+        if (s->ext_since < FS) {                      /* the beat's tempo (seq_tempo_steady; two clocks in one block:
+                                                       * the second's 0 samples still count as a clock) */
+            s->ext_beat += s->ext_since;
+            if (++s->ext_nbeat >= 24) {
+                float b = s->ext_beat ? (float)FS * 60.0f / (float)s->ext_beat : 0.0f, d = b - s->ext_bpm_steady;
+                if (b > 20.0f && (s->ext_bpm_steady <= 0.0f || d > s->ext_bpm_steady * 0.004f ||
+                                  -d > s->ext_bpm_steady * 0.004f))
+                    s->ext_bpm_steady = b;
+                s->ext_beat = 0;
+                s->ext_nbeat = 0;
+            }
+        } else {                                      /* (a gap: the beat measured again from here) */
+            s->ext_beat = 0;
+            s->ext_nbeat = 0;
+        }
         s->ext_since = 0;
         if (!s->playing)
             continue;
@@ -560,6 +580,9 @@ void seq_advance(seq_t *s, uint32_t k, const seq_sink_t *o)
         s->ext = 1;
     else if (s->ext && s->ext_since > FS / 2u) {    /* clock gone for 0.5 s: back to internal */
         s->ext = 0;
+        s->ext_bpm_steady = 0.0f;                   /* (the next clock is measured afresh) */
+        s->ext_beat = 0;
+        s->ext_nbeat = 0;
         for (t = 0; t < NTRACKS; t++)
             if (s->playing && s->t[t].to_next == NEVER) {
                 s->t[t].to_next = 0;

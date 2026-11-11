@@ -1001,7 +1001,7 @@ void engine_render(int32_t *out_lr, uint32_t n)
         drain();
         if (mot_on)
             motion_tick(&mot, n);
-        fxbus_set_bpm(&fx, seq_tempo(&seq));
+        fxbus_set_bpm(&fx, seq_tempo_steady(&seq));   /* (an external clock's, held steady: #51) */
         seq_advance(&seq, 0, &SINK);
         PROF_ADD(7, pt);
     }
