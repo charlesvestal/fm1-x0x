@@ -700,6 +700,42 @@ static void test_ext_clock_and_midi_out(void)
     printf("  external clock follow + tempo, MIDI clock out: checked\n");
 }
 
+/* fm1-x0x#26: on the external clock, the parts that switch pattern with the 909 play their step 1 on the 909's tick,
+ * not a tick later (restart() had cancelled the step the tick had just armed) */
+static void test_ext_cue_together(void)
+{
+    int i, j, k, n909 = 0, late = 0;
+    uint32_t per_tick = 882;                                  /* 125 BPM: 44100*60/125/24 */
+    reset();
+    for (i = 0; i < 2; i++) {
+        P[i].drum[0].hit[0][0] = 0x1111u;                     /* the 909's and the 808's kicks on 1, 5, 9, 13 */
+        P[i].drum[1].hit[0][0] = 0x1111u;
+    }
+    for (i = 0; i < 2; i++) {
+        seq_ext_clock(&S);
+        run(per_tick);
+    }
+    seq_start(&S);
+    for (i = 0; i < 24 * 4 * 3; i++) {                       /* three bars; pattern 2 cued in the first */
+        if (i == 24)
+            seq_cue(&S, 1);
+        seq_ext_clock(&S);
+        run(per_tick);
+    }
+    CHECK(S.ppat[0] == 1 && S.ppat[1] == 1, "both kits on pattern 2");
+    for (i = 0; (i = find(E_DRUM, 0, i)) >= 0; i++, n909++) {
+        for (j = 0, k = -1; (j = find(E_DRUM, 100, j)) >= 0; j++)
+            if (evs[j].t >= evs[i].t) {
+                k = j;
+                break;
+            }
+        if (k < 0 || evs[k].t != evs[i].t)
+            late++;
+    }
+    CHECK(n909 == 12 && late == 0, "ext clock, a pattern change: the 808's kicks with the 909's (%d of %d late)", late, n909);
+    printf("  external clock: parts switching pattern with the 909 stay on its tick: checked\n");
+}
+
 static void test_break_clock(void)
 {
     int i, k;
@@ -787,6 +823,7 @@ int main(void)
     test_part_cue();
     test_song();
     test_ext_clock_and_midi_out();
+    test_ext_cue_together();
     test_break_clock();
 #ifdef REF_TB3PO
     test_tb3po_matches_reference();

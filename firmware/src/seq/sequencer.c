@@ -376,9 +376,9 @@ static void restart(seq_t *s, uint32_t parts)  /* parts whose pattern switched: 
         if (!(parts >> t & 1u))
             continue;
         s->t[t].started = 0;
-        s->t[t].to_next = s->ext ? NEVER : 0;
-        s->t[t].swing_delay = 0;
-        s->t[t].ext_ticks = (uint8_t)(TICKS_PER_STEP[part_rate(s, t)] - 1);
+        s->t[t].to_next = 0;                         /* at once, on the clock too: this tick is their step 1 (a */
+        s->t[t].swing_delay = 0;                     /* NEVER here cancelled the step the tick had armed, and they */
+        s->t[t].ext_ticks = 0;                       /* played a tick after the 909 from then on: fm1-x0x#26) */
         s->t[t].bars = 0;
         s->t[t].pp_dir = 1;
     }
