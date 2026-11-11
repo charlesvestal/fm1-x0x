@@ -851,6 +851,28 @@ static void test_tb3po_matches_reference(void)
 }
 #endif
 
+/* A host seek can deliver Stop and Continue before the next audio update. */
+static void test_transport_batch(void)
+{
+    reset();
+    seq_start(&S); seq_advance(&S, 0, &SINK);
+    seq_stop(&S); seq_continue(&S); seq_advance(&S, 0, &SINK);
+    CHECK(S.playing, "Continue after Stop in one batch must survive Stop cleanup");
+    seq_continue(&S); seq_stop(&S); seq_advance(&S, 0, &SINK);
+    CHECK(!S.playing, "Stop after Continue in one batch must stop");
+    seq_stop(&S); seq_start(&S); seq_advance(&S, 0, &SINK);
+    CHECK(S.playing, "Start after Stop in one batch must survive Stop cleanup");
+    seq_start(&S); seq_stop(&S); seq_advance(&S, 0, &SINK);
+    CHECK(!S.playing, "Stop after Start in one batch must stop");
+    seq_continue(&S); seq_stop(&S); seq_continue(&S); seq_advance(&S, 0, &SINK);
+    CHECK(S.playing, "The latest Continue must survive an intervening Stop");
+    seq_stop(&S); seq_advance(&S, 0, &SINK);
+    CHECK(!S.playing, "Standalone Stop must stop");
+    seq_continue(&S); seq_advance(&S, 0, &SINK);
+    CHECK(S.playing, "Continue after a processed Stop must resume");
+    printf("  batched transport ordering: checked\n");
+}
+
 int main(void)
 {
     test_drum_timing();
@@ -867,6 +889,7 @@ int main(void)
     test_ext_cue_together();
     test_ext_tempo_steady();
     test_break_clock();
+    test_transport_batch();
 #ifdef REF_TB3PO
     test_tb3po_matches_reference();
 #endif
