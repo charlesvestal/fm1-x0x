@@ -130,6 +130,34 @@ static void s303(const char *name, int wave, int drv, int lite, int blk, int swe
     result(name, h, total);
 }
 
+/* every Volume with the drive off: a note on both voices (saw, square) at each, the drive type cycling Off, Soft,
+ * RAT at Drive 0 (a bypass, so the same as Off) */
+static void s303_vol(const char *name)
+{
+    static float out[2][NB];
+    uint64_t h = 0xCBF29CE484222325ull;
+    int vol, v, k;
+    ins0 = instr_now();
+    for (v = 0; v < 2; v++) {
+        bass303_init(&b3[v]);
+        bass303_set(&b3[v], BASS303_WAVE, v);
+        bass303_set(&b3[v], BASS303_DRIVE, 0);
+    }
+    for (vol = 0; vol <= 127; vol++) {
+        for (v = 0; v < 2; v++) {
+            bass303_set(&b3[v], BASS303_VOLUME, vol);
+            bass303_set(&b3[v], BASS303_DRVTYPE, vol % 3);
+            bass303_note_on(&b3[v], 36 + vol % 24 + 12 * v, vol & 1, 0);
+        }
+        for (k = 0; k < 8; k++)
+            for (v = 0; v < 2; v++) {
+                bass303_render(&b3[v], out[v], NB);
+                h = fnv(h, out[v], NB);
+            }
+    }
+    result(name, h, 128 * 8 * NB);
+}
+
 /* ---- drums ---- */
 static drum909_t d9;
 static drum808_t d8;
@@ -226,6 +254,7 @@ static void scenarios(void)
     s303("303_lite", 0, BASS303_DRV_OFF, 1, 0, 1, 6);
     s303("303_lite_sqr_rat", 1, BASS303_DRV_RAT, 1, 0, 1, 6);
     s303("303_lite_switch", 0, BASS303_DRV_SOFT, 2, 0, 1, 8);
+    s303_vol("303_volume");
     sdrum("909_default", 1, 0, 0, 0, 10);
     sdrum("909_pots", 1, 1, 0, 0, 20);
     sdrum("909_pots_st", 1, 1, 1, 0, 20);

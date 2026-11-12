@@ -158,11 +158,12 @@ static double rms(const float *x, int n)
     return sqrt(s / n);
 }
 
+#define LAG_MAX 48
 static int best_lag(const float *a, const float *b, int n)    /* b[i + lag] ~ a[i] */
 {
     int lag, i, best = 0;
     double bc = -1e300;
-    for (lag = -48; lag <= 48; lag++) {
+    for (lag = -LAG_MAX; lag <= LAG_MAX; lag++) {
         double c = 0;
         for (i = 64; i < n - 64; i++)
             c += (double)a[i] * (double)b[i + lag];
@@ -258,6 +259,13 @@ static int cmp_d(const void *a, const void *b)
 {
     double x = *(const double *)a, y = *(const double *)b;
     return x < y ? -1 : x > y;
+}
+
+/* a buffer compare() may read LAG_MAX samples beyond, either end (its second: shifted by the lag) */
+static float *lag_buf(int len)
+{
+    float *m = calloc((size_t)(len + 2 * LAG_MAX), sizeof(float));
+    return m ? m + LAG_MAX : 0;
 }
 
 /* glide time from 10 % to 80 % of the (log-frequency) way from note a to note b */
@@ -381,14 +389,21 @@ static double alias_db(const float *x, double f0)
 }
 
 /* ---- settings ---- */
-typedef struct { const char *name; int pots[BASS303_NPARAMS]; int check; } setting_t;
+typedef struct {
+    const char *name;
+    int pots[BASS303_NPARAMS];
+    int check;                        /* 1: against Open303 and ctrl 4 vs 1; 2: ctrl 4 vs 1 only (the port
+                                       * against itself); 0: reported */
+} setting_t;
 #define DEF 64, 64, 64, 64, 64, 0, 64, 96, 0, 1, 21, 7          /* the power-on pots */
 static const setting_t settings[] = {
     { "default", { DEF }, 1 },
     { "reso+envmod", { 40, 120, 120, 90, 64, 0, 64, 102, 0, 1, 21, 7 }, 1 },
     { "square+accent", { 64, 80, 80, 64, 127, 1, 64, 102, 0, 1, 21, 7 }, 1 },
-    { "drive soft", { 64, 64, 64, 64, 64, 0, 64, 90, 80, 1, 21, 7 }, 0 },
-    { "drive RAT", { 64, 64, 64, 64, 64, 0, 64, 90, 80, 2, 21, 7 }, 0 },
+    /* (X0X rescales drive.h's drive: Volume after it, makeup, the RAT's taper and tone; so these
+     * differ from the reference by design, and only their ctrl 4 vs 1 rows are checked) */
+    { "drive soft", { 64, 64, 64, 64, 64, 0, 64, 90, 80, 1, 21, 7 }, 2 },
+    { "drive RAT", { 64, 64, 64, 64, 64, 0, 64, 90, 80, 2, 21, 7 }, 2 },
 };
 #define NSET ((int)(sizeof(settings) / sizeof(settings[0])))
 
@@ -450,6 +465,8 @@ static double now_s(void)
 #define CTRL_ENV_DB 0.5
 #define CTRL_CEN 0.01
 #define CTRL_GLIDE 5.0
+#define CTRL_CEN_DRIVE 0.02           /* driven (check 2): the RAT's gain magnifies the control rate's
+                                       * small differences (measured up to 1.5%) */
 
 int main(int argc, char **argv)
 {
@@ -457,7 +474,7 @@ int main(int argc, char **argv)
     static bass303_t port, pa, pb, pa2, pb2;
     const char *wavdir = 0, *dumpdir = 0;
     int nev, len = step_t(NSTEP, 0) + TAIL, s, fails = 0, i, verbose = 0, info = 0;
-    float *ref_out = malloc(sizeof(float) * (size_t)len), *port_out = malloc(sizeof(float) * (size_t)len);
+    float *ref_out = malloc(sizeof(float) * (size_t)len), *port_out = lag_buf(len);
     float *demo = 0, *demo_ref = 0;
     int demo_len = 0;
 
@@ -510,7 +527,9 @@ int main(int argc, char **argv)
         printf("  %-14s %4d  %6.2f / %-8.2f %5.1f%% / %-7.1f%% %8.1f    %8.0f      %.3f / %.3f %s\n",
                settings[s].name, r.lag, r.env_max, r.env_med, 100 * r.cen_max, 100 * r.cen_med,
                r.glide_max_cents, r.glide_dt_max_ms, r.peak_ref, r.peak_port,
-               settings[s].check ? (ok ? "ok" : "FAIL") : "(info)");
+               settings[s].check == 1 ? (ok ? "ok" : "FAIL") : "(info)");
+        if (settings[s].check != 1)
+            ok = 1;                                      /* (only the ctrl rows below count) */
         {
             eng_t ek;
             float *k1 = malloc(sizeof(float) * (size_t)len);
@@ -531,7 +550,8 @@ int main(int argc, char **argv)
                 if ((f = fopen(path, "wb"))) { fwrite(k1, sizeof(float), (size_t)len, f); fclose(f); }
             }
             {
-                int kok = rk.env_max <= CTRL_ENV_DB && rk.cen_max <= CTRL_CEN && rk.glide_max_cents <= CTRL_GLIDE;
+                int kok = rk.env_max <= CTRL_ENV_DB && rk.glide_max_cents <= CTRL_GLIDE &&
+                          rk.cen_max <= (settings[s].check == 2 ? CTRL_CEN_DRIVE : CTRL_CEN);
                 printf("    ctrl %d vs 1 %4d  %6.2f / %-8.2f %5.1f%% / %-7.1f%% %8.1f    %8.0f      %s"
                        "  (waveform residual %.1f dB, worst frame %.1f)\n",
                        BASS303_CTRL, rk.lag, rk.env_max, rk.env_med, 100 * rk.cen_max, 100 * rk.cen_med,
@@ -586,7 +606,7 @@ int main(int argc, char **argv)
     {
         static ev_t ev2[4 * NSTEP];
         int off2 = step_t(NSTEP, 0) + FS, len2 = off2 + step_t(NSTEP, 0) + TAIL, n2;
-        float *r2 = malloc(sizeof(float) * (size_t)len2), *p2 = malloc(sizeof(float) * (size_t)len2);
+        float *r2 = malloc(sizeof(float) * (size_t)len2), *p2 = lag_buf(len2);
         n2 = build_events(ev2, 0, 0);
         n2 += build_events(ev2 + n2, off2, 0);
         printf("  after 1 s of silence (second pass; its first note starts from idle):\n");
@@ -607,7 +627,7 @@ int main(int argc, char **argv)
             ref_destroy(ref);
         }
         free(r2);
-        free(p2);
+        free(p2 - LAG_MAX);
     }
 
     /* two instances interleaved block by block == each alone */
