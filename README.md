@@ -85,3 +85,5 @@ drum pack) aren't part of this fork.
 M-VAVE and FM-1 are trademarks of their owners. TR-808, TR-909 and TB-303 are Roland trademarks,
 used here only to describe what the parts are modelled on. X0X isn't affiliated with or endorsed
 by M-VAVE, Roland or Hügelton Instruments.
+
+You can also try X0X in the browser, no flashing needed, in the free community [FM-1 Emulator](https://fm1-emulator.atst.tools/).
