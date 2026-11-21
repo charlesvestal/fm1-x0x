@@ -25,7 +25,9 @@ FM-1-transporter, docs/PROTOCOL.md), which were verified on hardware:
   2. the chip key must be 980F and the flash 856014 (Puya P25Q80) or B36014 (UC25HQ80, the newer
      units'), both 1 MiB, or nothing is done;
   3. the whole flash is read and saved as a backup before anything else;
-  4. the package whose head [0, 0x4000) equals the FM-1's is chosen (none: nothing is written);
+  4. the package whose head [0, 0x4000) equals the FM-1's is chosen (none: nothing is written); a head that
+     differs only in the contents of isd_config.ini (the chip's settings, rewritten by tools such as M-VAVE's
+     Open workbench) and in that file's two CRCs, both right, counts as that package's (fm1-x0x#55);
   5. only 4 KiB sectors in [0x4000, end of its app area) that differ from it are written (V15's area
      ends at 0x93000, V16's at 0xA9000; the bootloader below 0x4000 and the device data above the area
      are never touched), each erased, written and read back;
@@ -118,6 +120,41 @@ def package_flash_image(raw):
                 raise Fail("package flash entry: bad CRC")
             return data
     raise Fail("package has no flash entry")
+
+
+def head_entries(flash):
+    """The flash head's file entries {name: (raw offset of the entry, decoded entry)}: a 0x20-byte header, then
+    0x20-byte entries, each ENC'd: u16 entry CRC (of bytes 2..31), u16 data CRC, u32 offset, u32 size, u8 attr,
+    u8, u16 index, name[16]."""
+    out = {}
+    for at in range(0x20, 0x200, 0x20):
+        e = bytearray(flash[at:at + 0x20])
+        enc(e)
+        if struct.unpack_from("<H", e, 0)[0] != crc16(e[2:]):
+            break
+        out[bytes(e[16:]).split(b"\0")[0]] = (at, bytes(e))
+    return out
+
+
+def isd_changed(image, now):
+    """A head that is IMAGE's except for isd_config.ini's contents (the chip's settings, which tools such as M-VAVE's
+    Open workbench rewrite) and that file's two CRCs in its entry, written consistently (both CRCs right, offset,
+    size and name unchanged): the number of its bytes that differ, else 0 (another head, or a damaged one)."""
+    ours, theirs = head_entries(image), head_entries(now)
+    if ours.keys() != theirs.keys() or b"isd_config.ini" not in ours:
+        return 0
+    at, e = ours[b"isd_config.ini"]
+    at2, f = theirs[b"isd_config.ini"]
+    off, size = struct.unpack_from("<II", e, 4)
+    if at2 != at or f[4:] != e[4:] or not (0x20 < off and off + size <= WRITE_MIN):
+        return 0
+    if struct.unpack_from("<H", f, 2)[0] != crc16(now[off:off + size]):
+        return 0
+    allowed = set(range(at, at + 4)) | set(range(off, off + size))
+    diff = [i for i in range(WRITE_MIN) if image[i] != now[i]]
+    if not diff or any(i not in allowed for i in diff):
+        return 0
+    return sum(1 for i in range(off, off + size) if image[i] != now[i])
 
 
 # -------------------------------------------------------------- transport ---
@@ -261,13 +298,18 @@ def rescue(dev, packages, loader, write, backup_dir, say=print, confirm=None):
     with open(path, "wb") as f:
         f.write(now)
     say(f"  backup saved: {path} ({time.time() - t0:.1f} s)")
-    match = [(n, im) for n, im in packages if im[:WRITE_MIN] == now[:WRITE_MIN]]
+    match = [(n, im, None) for n, im in packages if im[:WRITE_MIN] == now[:WRITE_MIN]]
+    match += [(n, im, d) for n, im in packages for d in [isd_changed(im, now)] if d]
     if not match:
         raise Fail("the protected head of the flash is not " + " or ".join(n for n, _ in packages)
                    + "'s: not writing; send this output and the backup")
-    name, image = match[0]
+    name, image, changed = match[0]
     end = len(image)
     say(f"  the FM-1's bootloader is {name}'s")
+    if changed:
+        say(f"  its settings file (isd_config.ini) is not {name}'s: {changed} of its bytes were changed by another")
+        say("  tool, which wrote them properly (its checksums are right); the bootloader itself is unchanged.")
+        say("  That file is left as it is: only the firmware above it is written.")
     diff = [a for a in range(WRITE_MIN, end, SECTOR) if image[a:a + SECTOR] != now[a:a + SECTOR]]
     say(f"  {len(diff)} of {end // SECTOR} firmware sectors differ from {name}")
     if not write and confirm is not None:
@@ -288,7 +330,7 @@ def rescue(dev, packages, loader, write, backup_dir, say=print, confirm=None):
         say(f"\r  writing {i + 1}/{len(diff)}", end="")
     say("")
     say("  final read ...")
-    expect = image + now[end:]
+    expect = now[:WRITE_MIN] + image[WRITE_MIN:] + now[end:]
     final = dev.read(0, FLASH_SIZE)
     if final != expect:
         bad = [a for a in range(0, FLASH_SIZE, SECTOR) if final[a:a + SECTOR] != expect[a:a + SECTOR]]
