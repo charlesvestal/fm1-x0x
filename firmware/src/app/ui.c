@@ -2024,24 +2024,80 @@ static void bass_write(int b, int note, int gate)
     mark_dirty();
 }
 
+/* live recording (REC, playing): the note a key holds lasts as long as the key, as ties on the steps
+ * the playhead reaches while it is down; a key played while another is held slides into it (the
+ * held note's last step slides, as on SEQ). Stopped, a key played over another slides from the
+ * step written before it. */
+static struct {
+    bpart_t *bp;                                      /* the line being written (none: 0) */
+    uint8_t first, last;                              /* the note's step, its last tie so far */
+} kbd_rec[NBASS];
+
+static void kbd_rec_end(int b)
+{
+    bpart_t *bp = kbd_rec[b].bp;
+    int len, s;
+    if (!bp)
+        return;
+    len = bp->len ? bp->len : 16;                     /* the old ties after the new end: rests */
+    for (s = (kbd_rec[b].last + 1) % len; s != kbd_rec[b].first && bstep_gate(&bp->step[s]) == G_TIE;
+         s = (s + 1) % len)
+        bp->step[s].flags = G_REST;
+    kbd_rec[b].bp = 0;
+}
+
+static void kbd_rec_tick(void)                         /* each pass of the main loop */
+{
+    int b;
+    for (b = 0; b < NBASS; b++) {
+        bpart_t *bp = kbd_rec[b].bp;
+        int s, len;
+        if (!bp)
+            continue;
+        if (!ui.rec || !seq.playing || !kbd_held_note[b] || bp != &pat_of(PART_303A + b)->bass[b]) {
+            kbd_rec_end(b);
+            continue;
+        }
+        len = bp->len ? bp->len : 16;
+        s = rec_step(TRK_BASS0 + b) % len;
+        if (s == kbd_rec[b].last || s == kbd_rec[b].first)
+            continue;                                 /* (held round the whole line: it stops at its start) */
+        bp->step[s].flags = G_TIE;
+        kbd_rec[b].last = (uint8_t)s;
+        mark_dirty();
+    }
+}
+
 static void bass_kbd(int key, int down)
 {
-    int b = bidx(), n = kbd_note(key);
+    int b = bidx(), n = kbd_note(key), legato = kbd_held_note[b] != 0;
     if (down) {
-        engine_bass_on(b, n, (ui.btn & (1u << B_ENV)) != 0, kbd_held_note[b] != 0);
+        engine_bass_on(b, n, (ui.btn & (1u << B_ENV)) != 0, legato);
         kbd_held_note[b] = (uint8_t)n;
         if (ui.rec && !seq.playing) {
+            bpart_t *bp = &cur_pat()->bass[b];
+            int len = bp->len ? bp->len : 16, p = (ui.wpos[b] % len + len - 1) % len;
+            if (legato && bstep_gate(&bp->step[p]) != G_REST)
+                bp->step[p].flags |= BS_SLIDE;        /* the step written before slides into this one */
             bass_write(b, n, G_NOTE);
         } else if (ui.rec && seq.playing) {
             bpart_t *bp = &cur_pat()->bass[b];
-            int s = rec_step(TRK_BASS0 + b);
+            int len = bp->len ? bp->len : 16, s = rec_step(TRK_BASS0 + b) % len, p = (s + len - 1) % len;
+            if (kbd_rec[b].bp == bp && kbd_rec[b].last == s && kbd_rec[b].first != s)
+                kbd_rec[b].last = (uint8_t)p;         /* (its tie on this step: this note's now) */
+            if (legato && kbd_rec[b].bp == bp && kbd_rec[b].last == p)
+                bp->step[p].flags |= BS_SLIDE;        /* the held note glides into this one */
+            kbd_rec_end(b);
             bp->step[s].note = (uint8_t)n;
             bp->step[s].flags = (uint8_t)(G_NOTE | ((ui.btn & (1u << B_ENV)) ? BS_ACCENT : 0));
+            kbd_rec[b].bp = bp;
+            kbd_rec[b].first = kbd_rec[b].last = (uint8_t)s;
             mark_dirty();
         }
     } else if (kbd_held_note[b] == n) {
         engine_bass_off(b);
         kbd_held_note[b] = 0;
+        kbd_rec_end(b);
     }
 }
 
@@ -2633,6 +2689,7 @@ static void input(void)
     uint32_t btn = plat_buttons(), keys = plat_keys(), ch, i;
     int e;
     cc_in_drain();                                     /* MIDI in's CCs: as their knobs (midicc.c) */
+    kbd_rec_tick();                                    /* live recording: a held 303 key's ties */
     ch = btn ^ ui.btn;
     for (i = 0; i < NB; i++) {
         uint32_t m = 1u << i;

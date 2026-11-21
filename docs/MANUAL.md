@@ -302,7 +302,8 @@ then SLIDE, which holds the note until the next one and glides into it.
 **Keyboard.** Press REC and all 27 keys become a keyboard, and KEYS shows on the top line. The
 notes you play are written: step by step while the pattern is stopped, and live while it plays.
 OCT- and OCT+ change the octave. Play a key while you still hold another, and the 303 slides
-between them. Press REC again to go back to steps.
+between them, and the slide is written too. While the pattern plays, a note lasts as long as you
+hold its key, written as ties (see Long notes). Press REC again to go back to steps.
 
 **Free play.** To play the 303 without writing anything, press SEQ, turn SELECT to the KEYS page
 and set FREE PLAY to ON. Now the keys play the 303 on every 303 screen, stopped or playing, so you

@@ -1,0 +1,55 @@
+# 303 live recording (#39): a key held while the pattern plays lasts as long as it is held (ties on
+# the steps it reaches); a key played over a held one slides into it. Stopped, a key played over
+# another slides from the step written before it.
+wait 300
+turn ALGO 2
+tap SEQ
+expect tempo 125
+tap REC
+tap PLAY
+# 125 BPM: a step every 120 ms; step 1 starts 40 ms after the tap's end (expect playhead0)
+key w0 down
+wait 200
+key w0 up
+expect gate0.0 1
+expect gate0.1 2
+expect gate0.2 2
+expect gate0.3 0
+expect slide0.2 0
+# step 4 held, step 6 played over it, let go at step 7
+wait 260
+key w2 down
+wait 240
+key w4 down
+key w2 up
+wait 120
+key w4 up
+expect gate0.4 1
+expect gate0.5 2
+expect slide0.5 1
+expect gate0.6 1
+expect note0.6 48
+expect gate0.7 2
+expect gate0.8 0
+expect slide0.7 0
+# a shorter note over a long one: the old ties after it rest
+# (step 4 again, a pass later)
+wait 1560
+key w7 down
+wait 30
+key w7 up
+expect gate0.4 1
+expect gate0.5 0
+expect gate0.6 1
+tap PLAY
+expect playing 0
+# stopped: the second key slides from the first
+tap REC
+tap REC
+key w0 down
+key w2 down
+key w0 up
+key w2 up
+expect slide0.0 1
+expect gate0.1 1
+expect slide0.1 0
