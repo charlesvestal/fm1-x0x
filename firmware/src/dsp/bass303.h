@@ -36,6 +36,9 @@
  *    deliberate rise); Soft's input gain is -2 + 32 n^0.75 dB; RAT's knob is linear in its
  *    op-amp's gain in dB, from its minimum at Drive 1, and its tone one-pole (drive.h:
  *    fixed at 936 Hz) opens at low Drive. Drive 0 is a bypass, as in drive.h.
+ *  - Slew: Drive and Volume glide to a new value (10 ms), the drive's coefficients recomputed every 32
+ *    samples as it moves and its gains ramped in between; the bypass and a change of drive type crossfade
+ *    (10 ms) instead of switching. A pot that has not moved renders the same samples as before.
  *
  * Every instance is self-contained (no mutable static state): two can run side by side. */
 #pragma once
@@ -106,6 +109,11 @@ typedef struct bass303 {
     int wave;                /* 0 saw, 1 square */
     int drv_type;
     float drv_makeup;        /* after the drive: makeup gain */
+    /* the pots' moves, smoothed (bass303.c, "slew"): the Drive the drive runs at, its share of the output
+     * (0 = the bypass; a change of type fades out, switches and fades in), the Volume's gain, and the type it
+     * runs */
+    float drv_x, drv_wet, vol_g;
+    int drv_cur;
 
     int lite, lite_cur;      /* X0X overload guard: render without oversampling (bass303_set_lite) */
 

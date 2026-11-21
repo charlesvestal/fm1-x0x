@@ -189,27 +189,27 @@ static void bq_low_shelf(bass303_bq_t *q, float fc, float gain_db, float fs)
 /* Return the gain in dB at Volume v (the voice's level; with the drive on, after it). */
 static float vol_db(int v) { return -60.0f + 60.0f * ((float)v * (1.0f / 127.0f)); }
 
-/* Return Soft's input gain in dB at Drive d, at the drive's fixed input level DRV_REF:
- * -2 + 32 t^0.75 dB, t = d / 127. Even in dB, the knob's first quarter barely distorts; the curve
- * moves more of the change to the bottom, with the same gain at both ends. */
-static float soft_db(int d)
+/* Return Soft's input gain in dB at Drive d (0..127, between the steps too while it slews), at the drive's
+ * fixed input level DRV_REF: -2 + 32 t^0.75 dB, t = d / 127. Even in dB, the knob's first quarter barely
+ * distorts; the curve moves more of the change to the bottom, with the same gain at both ends. */
+static float soft_db(float d)
 {
-    if (d <= 0)
+    if (d <= 0.0f)
         return -2.0f;
-    return -2.0f + 32.0f * c_exp2f(0.75f * c_log2f((float)d * (1.0f / 127.0f)));
+    return -2.0f + 32.0f * c_exp2f(0.75f * c_log2f(d * (1.0f / 127.0f)));
 }
 
 /* Return where Drive d is on the RAT's taper, 0..1 over Drive 1..127. */
-static float rat_t(int d)
+static float rat_t(float d)
 {
-    return fm_clampf((float)(d - 1) * (1.0f / 126.0f), 0.0f, 1.0f);
+    return fm_clampf((d - 1.0f) * (1.0f / 126.0f), 0.0f, 1.0f);
 }
 
 /* Return the RAT's distortion resistance, 0..1 (drive.h's dist), at Drive d. drive.h maps the
  * knob to it linearly, so the op-amp's gain at 1 kHz, 1 + dist * 100k / |Z1| (|Z1| ~ 81 ohm), is
  * already +21 dB at the first step and most of the knob is used up in its first tenth. Here the knob
  * is linear in that gain in dB, up to drive.h's maximum (dist = 1, ~61.8 dB). */
-static float rat_dist(int d)
+static float rat_dist(float d)
 {
     float t = rat_t(d);
     if (t <= 0.0f)
@@ -224,21 +224,25 @@ static float rat_dist(int d)
  * longer, it leaves the op-amp's mid boost unchecked and the voice hollow. */
 static void rat_tone(bass303_t *b)
 {
-    float u = fm_minf(4.0f * rat_t(b->pot[BASS303_DRIVE]), 1.0f);
+    float u = fm_minf(4.0f * rat_t(b->drv_x), 1.0f);
     float fc = RAT_TONE_HZ * c_exp2f((1.0f - u) * 3.6796409f);   /* log2(12000 / RAT_TONE_HZ) */
     b->r_tone_b1 = c_expf(-FM_TWO_PI / BASS303_SR * fc);
 }
 
-/* Set the gain after the drive for the current Drive: the makeup with its rise. */
+/* Set the gain after the drive for the current Drive: the makeup (interpolated between the steps) with its
+ * rise. */
 static void drv_gains(bass303_t *b)
 {
-    int p = b->pot[BASS303_DRIVE], rat = b->drv_type == BASS303_DRV_RAT;
-    float rise = DRV_RISE * (float)p * (1.0f / 127.0f);
-    b->drv_makeup = (rat ? makeup_rat : makeup_soft)[p] * c_db2lin(rise);
+    const float x = b->drv_x, *t = b->drv_cur == BASS303_DRV_RAT ? makeup_rat : makeup_soft;
+    int p = (int)x;
+    float rise = DRV_RISE * x * (1.0f / 127.0f), f = x - (float)p, m = t[p];
+    if (f > 0.0f && p < 127)
+        m += (t[p + 1] - m) * f;
+    b->drv_makeup = m * c_db2lin(rise);
 }
 
 /* Return the gain after the drive: Volume and the makeup (the drive runs at DRV_REF). */
-static float drv_out_gain(const bass303_t *b) { return b->amp_scaler * (1.0f / DRV_REF) * b->drv_makeup; }
+static float drv_out_gain(const bass303_t *b) { return b->vol_g * (1.0f / DRV_REF) * b->drv_makeup; }
 
 /* Return whether the drive is on (a type, and Drive above 0). */
 static int drive_on(const bass303_t *b) { return b->drv_type != BASS303_DRV_OFF && b->pot[BASS303_DRIVE] > 0; }
@@ -363,7 +367,7 @@ static void rat_coeffs(bass303_t *b)
     const float R1 = 100000.0f, C1 = 1e-10f, Z1_B0 = 2.72149e-7f, Z1_B1 = 0.0027354f;
     const float Z1_A0 = 6.27638e-9f, Z1_A1 = 0.0000069f;
     const float t = 1.0f / BASS303_SR, s0 = t * 0.5f, s1 = t * t * 0.25f, s2 = t * t * t * 0.125f;
-    float dist = fm_maxf(rat_dist(b->pot[BASS303_DRIVE]), 0.0001f);
+    float dist = fm_maxf(rat_dist(b->drv_x), 0.0001f);
     float z2_b0 = fm_maxf(dist * R1, 1.0f), z2_a0 = z2_b0 * C1;
     float a0 = Z1_B0 * z2_a0, a1 = Z1_B0 + Z1_B1 * z2_a0, a2 = Z1_B1 + z2_a0;
     float num[4], den[4], nz[4], dz[4], inv;
@@ -400,7 +404,6 @@ static void clear_drive_state(bass303_t *b)
 void bass303_set(bass303_t *b, int i, int v)
 {
     float n;
-    int was_on = drive_on(b);
     if (i < 0 || i >= BASS303_NPARAMS)
         return;
     if (v < 0)
@@ -409,10 +412,6 @@ void bass303_set(bass303_t *b, int i, int v)
         v = params[i].max;
     b->pot[i] = (uint8_t)v;
     n = (float)v * (1.0f / 127.0f);
-    /* the drive coming on (from Drive 0, or from Off): start it fresh, not from the state it was
-     * left in when it went off, which its output gain would bring out as a click */
-    if (!was_on && drive_on(b))
-        clear_drive_state(b);
     switch (i) {
     case BASS303_CUTOFF:
         b->cutoff = 314.0f * c_exp2f(n * 2.930586688f);       /* log2(2394/314) */
@@ -439,27 +438,75 @@ void bass303_set(bass303_t *b, int i, int v)
     case BASS303_TUNE:
         b->tuning = 440.0f + (float)(v - 64) * 0.625f;
         break;
-    case BASS303_VOLUME:
+    case BASS303_VOLUME:                                       /* vol_g slews to it */
         b->amp_scaler = c_db2lin(vol_db(v));
         break;
     case BASS303_SLIDE:                                        /* slew tau = 0.2 * slide time */
         b->slew_c = rc_coeff(0.2f * (2.0f + 358.0f * n), BASS303_SR);
         powers(b->slew_pw, b->slew_c);
         break;
-    case BASS303_DRIVE:
-        b->s_gain = c_db2lin(soft_db(v));
-        b->s_inv = 1.0f / b->s_gain;
-        rat_coeffs(b);
-        rat_tone(b);
-        drv_gains(b);
-        break;
-    case BASS303_DRVTYPE:
-        if (v != b->drv_type)                                  /* drive.h set_model: fresh state */
-            clear_drive_state(b);
+    case BASS303_DRVTYPE:                                      /* (Drive and the type: drive_block, slew) */
         b->drv_type = v;
-        drv_gains(b);
         break;
     }
+}
+
+/* ---- slew: the moves of Drive, Volume and the drive type, smoothed ----------------------------------------
+ * Each step of Drive or Volume is ~0.5 dB, and the drive's gains and filters jumped with it at a block's edge:
+ * a zipper as the knob turns, a click at a jump (tests/host/bass303_slew_test.c). Drive and Volume now glide
+ * (slew_to: one pole, ~10 ms, as the pans' x0x_glide_block), the drive's coefficients recomputed from the glide
+ * every BASS303_DSUB samples and its gains and coefficients ramped linearly over them (drive_block); the bypass
+ * at Drive 0 and a change of type fade (WET_RATE) between the drive's output and the voice without it, the drive
+ * starting fresh from a fade's bottom (drive.h set_model). Every value reaches its pot's exactly, so a pot that
+ * has not moved renders the samples it always did. */
+#define WET_RATE (1.0f / 441.0f)         /* a fade: 10 ms */
+
+/* Move *cur n samples (at most BASS303_SUB) on toward tgt, one pole, ~10 ms, landing on tgt once within snap of
+ * it; return the per-sample step of a linear ramp from where it was. x0x_glide_block's, with the snap the
+ * caller's: its fixed 1e-5 leaves a value far from 1 short of its target by a step too small to add. */
+static float slew_to(float *cur, float tgt, int n, float snap)
+{
+    float c = *cur, e;
+    if (c == tgt)
+        return 0.0f;
+    e = (tgt - c) * ((float)n * (1.0f / 441.0f));
+    if (fm_fabsf(tgt - (c + e)) <= snap)
+        e = tgt - c;
+    *cur = c + e;
+    return e / (float)n;
+}
+
+/* Return whether the drive runs: it is on, or fading out. */
+static int drv_running(const bass303_t *b) { return drive_on(b) || b->drv_wet > 0.0f; }
+
+/* Set the drive's coefficients for its type and drv_x. */
+static void drv_params(bass303_t *b)
+{
+    if (b->drv_cur == BASS303_DRV_SOFT) {
+        b->s_gain = c_db2lin(soft_db(b->drv_x));
+        b->s_inv = 1.0f / b->s_gain;
+    } else if (b->drv_cur == BASS303_DRV_RAT) {
+        rat_coeffs(b);
+        rat_tone(b);
+    }
+    drv_gains(b);
+}
+
+/* Start the drive at its pot's type and Drive, fresh. */
+static void drv_start(bass303_t *b)
+{
+    b->drv_cur = b->drv_type;
+    b->drv_x = (float)b->pot[BASS303_DRIVE];
+    clear_drive_state(b);
+    drv_params(b);
+}
+
+/* Jump every slewed value to its pot (init, and a note after idle: nothing sounds to glide from). */
+static void slew_snap(bass303_t *b)
+{
+    drv_start(b);
+    b->drv_wet = drive_on(b) ? 1.0f : 0.0f;
+    b->vol_g = b->amp_scaler;
 }
 
 /* clear everything that only matters while sound is running (Open303::triggerNote after idle) */
@@ -577,6 +624,7 @@ void bass303_init(bass303_t *b)
     b->env_y = 0.0f;
     b->idle = 1;
     b->snap = 1;
+    slew_snap(b);
 }
 
 /* ---- notes ----------------------------------------------------------------------------- */
@@ -610,8 +658,10 @@ void bass303_note_on(bass303_t *b, int note, int accent, int slide)
         b->amp_trig = 1;                 /* ampEnv.noteOn: attack time 0 */
         b->trig = 1;
     }
-    if (b->idle)
+    if (b->idle) {
         b->snap = 1;                     /* no interpolation from the stale control values */
+        slew_snap(b);                    /* nor glides */
+    }
     b->gate = 1;
     b->idle = 0;
     b->quiet = 0;
@@ -738,14 +788,16 @@ static inline float bql_run0(bass303_bql_t *q)                  /* bq_run(q, 0.0
     return y;
 }
 
-/* biquad q (state z) over x[0..n) in place, times g */
-static void bq_pass(const bass303_bq_t *q, bass303_bqz_t *z, float *x, int n, float g)
+/* biquad q (state z) over x[0..n) in place, times g (rising by dg a sample: the slew) */
+static void bq_pass(const bass303_bq_t *q, bass303_bqz_t *z, float *x, int n, float g, float dg)
 {
     bass303_bql_t l;
     int i;
     bq_get(&l, q, z);
-    for (i = 0; i < n; i++)
+    for (i = 0; i < n; i++) {
         x[i] = bql_run(&l, x[i]) * g;
+        g += dg;
+    }
     bq_put(&l, z);
 }
 
@@ -762,8 +814,8 @@ static void up_pass(bass303_t *b, const float *x, float *u, int n)
     bq_put(&l, &b->up_lp);
 }
 
-/* the 2x downsampler: u[2i], u[2i + 1] through down_lp, the second kept, times g */
-static void down_pass(bass303_t *b, const float *u, float *y, int n, float g)
+/* the 2x downsampler: u[2i], u[2i + 1] through down_lp, the second kept, times g (+ dg a sample) */
+static void down_pass(bass303_t *b, const float *u, float *y, int n, float g, float dg)
 {
     bass303_bql_t l;
     int i;
@@ -771,12 +823,13 @@ static void down_pass(bass303_t *b, const float *u, float *y, int n, float g)
     for (i = 0; i < n; i++) {
         bql_run(&l, u[2 * i]);
         y[i] = bql_run(&l, u[2 * i + 1]) * g;
+        g += dg;
     }
     bq_put(&l, &b->down_lp);
 }
 
-/* the DC blocker (0.9996) in place, times g */
-static void dcb_pass(bass303_t *b, float *x, int n, float g)
+/* the DC blocker (0.9996) in place, times g (+ dg a sample) */
+static void dcb_pass(bass303_t *b, float *x, int n, float g, float dg)
 {
     float x1 = b->dcb_x1, y1 = b->dcb_y1;
     int i;
@@ -785,38 +838,43 @@ static void dcb_pass(bass303_t *b, float *x, int n, float g)
         x1 = y;
         y1 = yh;
         x[i] = g * yh;
+        g += dg;
     }
     b->dcb_x1 = x1;
     b->dcb_y1 = y1;
 }
 
 /* Soft: pre shelf x gain, 2x up, tanh(u + 0.15) - its value at 0, 2x down, x 1/gain, post shelf, DC blocker,
- * x wg */
-static BASS303_PASS void drive_soft(bass303_t *b, float *out, int n, float wg)
+ * x wg; each gain from g[k] rising by g[k + 1] a sample (the slew: g, dg for the gain, its inverse, wg) */
+static BASS303_PASS void drive_soft(bass303_t *b, float *out, int n, const float *g)
 {
     float u[2 * BASS303_DSUB];
     int i;
-    bq_pass(&bass303_k.s_pre, &b->s_pre, out, n, b->s_gain);
+    bq_pass(&bass303_k.s_pre, &b->s_pre, out, n, g[0], g[1]);
     up_pass(b, out, u, n);
     for (i = 0; i < 2 * n; i++)
         u[i] = fm_tanhf(u[i] + 0.15f) - 0.14888503f;
-    down_pass(b, u, out, n, b->s_inv);
-    bq_pass(&bass303_k.s_post, &b->s_post, out, n, 1.0f);
-    dcb_pass(b, out, n, wg);
+    down_pass(b, u, out, n, g[2], g[3]);
+    bq_pass(&bass303_k.s_post, &b->s_post, out, n, 1.0f, 0.0f);
+    dcb_pass(b, out, n, g[4], g[5]);
 }
 
-/* RAT: op-amp (3rd-order TDF-II), the correction one-pole x 1.877, 2x up, the clipper, 2x down x 0.3204805,
- * the tone one-pole, DC blocker, x wg */
-static BASS303_PASS void drive_rat(bass303_t *b, float *out, int n, float wg)
+/* The RAT's op-amp and correction one-pole while Drive glides: each coefficient interpolated linearly from c0
+ * (its value at the sub-block's start: b0..b3, a1..a3, the correction's b1) to its value now */
+static BASS303_PASS void rat_glide(bass303_t *b, float *out, int n, const float *c0)
 {
-    float u[2 * BASS303_DSUB];
+    const float r = 1.0f / (float)n;
     int i;
     {
-        const float b0 = b->r_b[0], b1 = b->r_b[1], b2 = b->r_b[2], b3 = b->r_b[3];
-        const float a1 = b->r_a[1], a2 = b->r_a[2], a3 = b->r_a[3];
+        float b0 = c0[0], b1 = c0[1], b2 = c0[2], b3 = c0[3], a1 = c0[4], a2 = c0[5], a3 = c0[6];
+        const float db0 = (b->r_b[0] - b0) * r, db1 = (b->r_b[1] - b1) * r, db2 = (b->r_b[2] - b2) * r;
+        const float db3 = (b->r_b[3] - b3) * r, da1 = (b->r_a[1] - a1) * r, da2 = (b->r_a[2] - a2) * r;
+        const float da3 = (b->r_a[3] - a3) * r;
         float z0 = b->r_z[0], z1 = b->r_z[1], z2 = b->r_z[2];
         for (i = 0; i < n; i++) {
-            float x = out[i], y = x * b0 + z0;
+            float x = out[i], y;
+            b0 += db0, b1 += db1, b2 += db2, b3 += db3, a1 += da1, a2 += da2, a3 += da3;
+            y = x * b0 + z0;
             z0 = x * b1 - y * a1 + z1;
             z1 = x * b2 - y * a2 + z2;
             z2 = x * b3 - y * a3;
@@ -825,21 +883,66 @@ static BASS303_PASS void drive_rat(bass303_t *b, float *out, int n, float wg)
         b->r_z[0] = z0, b->r_z[1] = z1, b->r_z[2] = z2;
     }
     {
-        const float cb1 = b->r_corr_b1, cb0 = 1.0f - cb1;
-        float z = b->r_corr_z;
+        float cb1 = c0[7], z = b->r_corr_z;
+        const float dcb = (b->r_corr_b1 - cb1) * r;
         for (i = 0; i < n; i++) {
-            z = out[i] * cb0 + z * cb1;
+            cb1 += dcb;
+            z = out[i] * (1.0f - cb1) + z * cb1;
             out[i] = z * 1.877f;
         }
         b->r_corr_z = z;
+    }
+}
+
+/* RAT: op-amp (3rd-order TDF-II), the correction one-pole x 1.877, 2x up, the clipper, 2x down x 0.3204805,
+ * the tone one-pole, DC blocker, x wg (g as drive_soft's); c0: the coefficients at the sub-block's start while
+ * Drive glides (rat_glide; the tone's b1 at c0[8]), else 0 */
+static BASS303_PASS void drive_rat(bass303_t *b, float *out, int n, const float *g, const float *c0)
+{
+    float u[2 * BASS303_DSUB];
+    int i;
+    if (c0) {
+        rat_glide(b, out, n, c0);
+    } else {
+        {
+            const float b0 = b->r_b[0], b1 = b->r_b[1], b2 = b->r_b[2], b3 = b->r_b[3];
+            const float a1 = b->r_a[1], a2 = b->r_a[2], a3 = b->r_a[3];
+            float z0 = b->r_z[0], z1 = b->r_z[1], z2 = b->r_z[2];
+            for (i = 0; i < n; i++) {
+                float x = out[i], y = x * b0 + z0;
+                z0 = x * b1 - y * a1 + z1;
+                z1 = x * b2 - y * a2 + z2;
+                z2 = x * b3 - y * a3;
+                out[i] = y;
+            }
+            b->r_z[0] = z0, b->r_z[1] = z1, b->r_z[2] = z2;
+        }
+        {
+            const float cb1 = b->r_corr_b1, cb0 = 1.0f - cb1;
+            float z = b->r_corr_z;
+            for (i = 0; i < n; i++) {
+                z = out[i] * cb0 + z * cb1;
+                out[i] = z * 1.877f;
+            }
+            b->r_corr_z = z;
+        }
     }
     up_pass(b, out, u, n);
     for (i = 0; i < 2 * n; i++) {   /* x / (1 + x^4)^(1/4) = x s t, s = y^(-1/2), t = s^(-1/2) = y^(1/4): no divide */
         float x = u[i], x2 = x * x, s = fm_rsqrtf(1.0f + x2 * x2);
         u[i] = x * (s * fm_rsqrtf(s));
     }
-    down_pass(b, u, out, n, 0.3204805f);
-    {
+    down_pass(b, u, out, n, 0.3204805f, 0.0f);
+    if (c0) {
+        float tb1 = c0[8], z = b->r_tone_z;
+        const float dtb = (b->r_tone_b1 - tb1) / (float)n;
+        for (i = 0; i < n; i++) {
+            tb1 += dtb;
+            z = out[i] * (1.0f - tb1) + z * tb1;
+            out[i] = z;
+        }
+        b->r_tone_z = z;
+    } else {
         const float tb1 = b->r_tone_b1, tb0 = 1.0f - tb1;
         float z = b->r_tone_z;
         for (i = 0; i < n; i++) {
@@ -848,19 +951,66 @@ static BASS303_PASS void drive_rat(bass303_t *b, float *out, int n, float wg)
         }
         b->r_tone_z = z;
     }
-    dcb_pass(b, out, n, wg);
+    dcb_pass(b, out, n, g[4], g[5]);
 }
 
+/* The drive over a block (at DRV_REF: run_amp), by sub-blocks: each moves the slewed values on (slew, above),
+ * ramps the gains from their values at its start to those at its end, and fades with the voice without the
+ * drive (Volume's gain, the voice at DRV_REF times vol_g / DRV_REF) while drv_wet is below 1. */
 static void drive_block(bass303_t *b, float *out, int n)
 {
-    const float wg = drv_out_gain(b);
-    int i, ns;
+    float dry[BASS303_DSUB];
+    int i, j, ns;
     for (i = 0; i < n; i += ns) {
+        float *o = out + i, g[6], c0[9], w0, w1, v0, r;
+        int on, glide = 0;
         ns = n - i < BASS303_DSUB ? n - i : BASS303_DSUB;
-        if (b->drv_type == BASS303_DRV_SOFT)
-            drive_soft(b, out + i, ns, wg);
+        if (b->drv_wet <= 0.0f)                                /* from the bypass: fresh, at the pot */
+            drv_start(b);
+        on = drive_on(b) && b->drv_cur == b->drv_type;         /* (another type: fade out first) */
+        w0 = b->drv_wet;
+        v0 = b->vol_g;
+        if (!on && w0 <= 0.0f) {                               /* off, faded out: the voice alone */
+            float a = v0 * (1.0f / DRV_REF), da;
+            da = slew_to(&b->vol_g, b->amp_scaler, ns, b->amp_scaler * 1e-4f) * (1.0f / DRV_REF);
+            for (j = 0; j < ns; j++, a += da)
+                o[j] *= a;
+            continue;
+        }
+        g[0] = b->s_gain;
+        g[2] = b->s_inv;
+        g[4] = drv_out_gain(b);
+        if (on && b->drv_x != (float)b->pot[BASS303_DRIVE]) {  /* Drive glides */
+            if (b->drv_cur == BASS303_DRV_RAT) {               /* (its coefficients glide too: rat_glide) */
+                for (j = 0; j < 4; j++)
+                    c0[j] = b->r_b[j];
+                c0[4] = b->r_a[1], c0[5] = b->r_a[2], c0[6] = b->r_a[3];
+                c0[7] = b->r_corr_b1, c0[8] = b->r_tone_b1;
+                glide = 1;
+            }
+            slew_to(&b->drv_x, (float)b->pot[BASS303_DRIVE], ns, 0.02f);
+            drv_params(b);
+        }
+        slew_to(&b->vol_g, b->amp_scaler, ns, b->amp_scaler * 1e-4f);
+        w1 = on ? fm_minf(w0 + (float)ns * WET_RATE, 1.0f) : fm_maxf(w0 - (float)ns * WET_RATE, 0.0f);
+        b->drv_wet = w1;
+        r = 1.0f / (float)ns;
+        g[1] = (b->s_gain - g[0]) * r;
+        g[3] = (b->s_inv - g[2]) * r;
+        g[5] = (drv_out_gain(b) - g[4]) * r;
+        if (w0 < 1.0f || w1 < 1.0f)
+            for (j = 0; j < ns; j++)
+                dry[j] = o[j];
+        if (b->drv_cur == BASS303_DRV_SOFT)
+            drive_soft(b, o, ns, g);
         else
-            drive_rat(b, out + i, ns, wg);
+            drive_rat(b, o, ns, g, glide ? c0 : 0);
+        if (w0 < 1.0f || w1 < 1.0f) {                         /* the fade: dry (1 - w) vol_g / DRV_REF + wet w */
+            float a = (1.0f - w0) * v0 * (1.0f / DRV_REF), w = w0;
+            float da = ((1.0f - w1) * b->vol_g * (1.0f / DRV_REF) - a) * r, dw = (w1 - w0) * r;
+            for (j = 0; j < ns; j++, a += da, w += dw)
+                o[j] = dry[j] * a + o[j] * w;
+        }
     }
 }
 
@@ -1071,17 +1221,30 @@ static void run_voice(bass303_t *b, float *ab, float *osb, int n, int nos)
 static BASS303_PASS void run_amp(bass303_t *b, float *ab, int n)
 {
     const float b0 = bass303_k.dc_b0, b1 = bass303_k.dc_b1, a1 = bass303_k.dc_a1, a2 = bass303_k.dc_a2;
-    const float g = drive_on(b) ? DRV_REF : b->amp_scaler;
+    const int drv = drv_running(b);
+    float g = drv ? DRV_REF : b->vol_g;
     float x1 = b->dc.x1, x2 = b->dc.x2, y1 = b->dc.y1, y2 = b->dc.y2;
     int i;
-    BASS303_UNROLL2                            /* (no register moves for the state between samples) */
-    for (i = 0; i < n; i++) {
-        float x = ab[i], y = b0 * (x + x2) + b1 * x1 + a1 * y1 + a2 * y2;
-        x2 = x1;
-        x1 = x;
-        y2 = y1;
-        y1 = y;
-        ab[i] = y * g;
+    if (!drv && g != b->amp_scaler) {          /* Volume glides (slew) */
+        const float dg = slew_to(&b->vol_g, b->amp_scaler, n, b->amp_scaler * 1e-4f);
+        for (i = 0; i < n; i++, g += dg) {
+            float x = ab[i], y = b0 * (x + x2) + b1 * x1 + a1 * y1 + a2 * y2;
+            x2 = x1;
+            x1 = x;
+            y2 = y1;
+            y1 = y;
+            ab[i] = y * g;
+        }
+    } else {
+        BASS303_UNROLL2                        /* (no register moves for the state between samples) */
+        for (i = 0; i < n; i++) {
+            float x = ab[i], y = b0 * (x + x2) + b1 * x1 + a1 * y1 + a2 * y2;
+            x2 = x1;
+            x1 = x;
+            y2 = y1;
+            y1 = y;
+            ab[i] = y * g;
+        }
     }
     b->dc.x1 = x1;
     b->dc.x2 = x2;
@@ -1196,7 +1359,7 @@ void bass303_render(bass303_t *b, float *out, int n)
     }
     run(b, out, n);
 
-    if (drive_on(b))
+    if (drv_running(b))
         drive_block(b, out, n);
 
     /* states that decay toward zero while the engine still runs (the idle hold-off, where the
