@@ -923,6 +923,15 @@ static int expect(const char *what, const char *val)
         got = help_fits();
     else if (!strcmp(what, "rec"))
         got = ui.rec;
+    else if (!strcmp(what, "liststale")) {        /* the open list's rows for a drum track not the one picked */
+        int i, t = ui.part == PART_808 ? T_808 : T_909;
+        got = 0;
+        for (i = 0; ui.overlay == O_LIST && i < ui.list_n; i++)
+            if (list_rows[i].kind == R_ENG && list_rows[i].a == t && list_rows[i].b < NDRUM &&
+                list_rows[i].b != ui.sel[ui.part])
+                got++;
+    } else if (!strcmp(what, "listsel"))          /* the open list's selected row, -1 no list */
+        got = ui.overlay == O_LIST ? ui.list_sel : -1;
     else if (!strcmp(what, "sel"))                  /* the selected track of the part on screen */
         got = ui.sel[ui.part];
     else if (!strncmp(what, "knobdef", 7)) {        /* knobdefK: knob K (1-4) on this page at its power-on value */

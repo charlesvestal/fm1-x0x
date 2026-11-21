@@ -997,6 +997,20 @@ static void open_list_of_pages(void)
     ui.overlay = ui.list_n ? O_LIST : O_NONE;
 }
 
+/* a black key picked another track with a list open: its rows name the old track's pots, so the
+ * list is made again for the new one, at the same place (#54) */
+static void refresh_list(void)
+{
+    uint8_t s = ui.list_sel, t = ui.list_top;
+    if (ui.overlay != O_LIST || ui.view == V_GLO)
+        return;
+    open_list_of_pages();
+    if (ui.overlay == O_LIST && s < ui.list_n && !list_skip(s)) {
+        ui.list_sel = s;
+        ui.list_top = t;
+    }
+}
+
 static void open_global(void)
 {
     ui.list_n = 0;
@@ -1929,6 +1943,7 @@ static void drum_key(int v, int down)
         return;
     ui.sel[k] = (uint8_t)v;
     build_pages();
+    refresh_list();
     /* KEY SOUND STOPPED (the default): while the pattern plays a black key only selects its track,
      * so choosing one to edit does not add a hit to the groove; stopped, it plays it, and with REC
      * on it always does (that is how drums are recorded) */
@@ -2182,6 +2197,7 @@ static void key_event(int k, int down)
         if (down && bl < NPARTS) {
             ui.mixsel = (uint8_t)bl;
             build_pages();
+            refresh_list();
         }
         return;
     }
@@ -2192,6 +2208,7 @@ static void key_event(int k, int down)
             if (proj.set.keysound || !seq.playing)
                 engine_drum(km, bl, 0.75f);
             build_pages();
+            refresh_list();
         }
         return;
     }

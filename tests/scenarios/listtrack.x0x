@@ -1,0 +1,22 @@
+# A black key picks another drum track while SEL's list is open: the list is made again for that
+# track (its DRIVE and DIST rows were the old track's, #54), and stays at the same row.
+wait 300
+tap EDIT
+turn ALGO 1
+expect part 1
+tapkey b0
+tap SEL
+expect liststale 0
+turn SELECT 3
+expect listsel 4
+tapkey b6
+expect sel 6
+expect liststale 0
+expect listsel 4
+# the mixer's 808 page: the same
+tap HOME
+tap LFO
+turn SELECT 2
+tap SEL
+tapkey b2
+expect liststale 0
