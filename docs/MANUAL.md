@@ -283,7 +283,7 @@ There are two identical 303s, and each has its own sound and its own line.
 
 **Steps.** Press a white key to turn that step on, and tap it again to turn it off. To edit a
 step, press SEQ, hold the step's key and turn the knobs. KNOB 1 sets the note, KNOB 2 the gate
-(REST, NOTE or TIE), KNOB 3 the accent and KNOB 4 the slide. OCT- and OCT+ move the held note an
+(REST, NOTE, a length or TIE: see Long notes below), KNOB 3 the accent and KNOB 4 the slide. OCT- and OCT+ move the held note an
 octave. An empty step turns on as soon as you press it, so you can press, hold and set its note in
 one go. A slide glides from this step's note into the next one. Holding a step on EDIT gives it a
 sound of its own instead (see P-locks in section 11).
@@ -291,6 +291,13 @@ sound of its own instead (see P-locks in section 11).
 A **tie** holds the note before it through the step, so the note doesn't play again. On the
 screen, a tied note joins the note it holds in one long bar. Turn KNOB 1 on a tie to make it a
 note of its own.
+
+**Long notes.** To make a note last several steps, press SEQ, hold the note's step key and press
+a later step key. The note now lasts up to and including that step, the steps between become ties,
+and the screen shows LEN and the number of steps. To make it one step again, hold its step key and
+press its last step key again. A note only grows forward, within the pattern's length. KNOB 2 does
+the same one step at a time: after NOTE it offers LEN 2, LEN 3 and so on up to the next note, and
+then SLIDE, which holds the note until the next one and glides into it.
 
 **Keyboard.** Press REC and all 27 keys become a keyboard, and KEYS shows on the top line. The
 notes you play are written: step by step while the pattern is stopped, and live while it plays.

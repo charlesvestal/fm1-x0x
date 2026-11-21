@@ -989,6 +989,10 @@ static int expect(const char *what, const char *val)
         int b, s;
         sscanf(what, "gate%d.%d", &b, &s);
         got = bstep_gate(&proj.pat[seq.ppat[PART_303A + b]].bass[b].step[s]);
+    } else if (!strncmp(what, "slide", 5)) {       /* slideB.S: 303 B step S slides into the next */
+        int b, s;
+        sscanf(what, "slide%d.%d", &b, &s);
+        got = (proj.pat[seq.ppat[PART_303A + b]].bass[b].step[s].flags & BS_SLIDE) != 0;
     } else if (!strncmp(what, "note", 4)) {
         int b, s;
         sscanf(what, "note%d.%d", &b, &s);

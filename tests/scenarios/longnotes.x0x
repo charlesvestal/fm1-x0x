@@ -1,0 +1,48 @@
+# 303 long notes on SEQ (#33): hold a step and press a later one, and the note lasts to it (ties
+# between); its last step again: one step. KNOB 2 (a step a turn) walks NOTE, LEN 2, LEN 3 ... and SLIDE into the
+# next note.
+wait 300
+turn ALGO 2
+tap SEQ
+key w2 down
+tapkey w5
+key w2 up
+expect gate0.2 1
+expect gate0.3 2
+expect gate0.4 2
+expect gate0.5 2
+expect gate0.6 0
+# shorter: the ties after it rest
+key w2 down
+tapkey w3
+key w2 up
+expect gate0.3 2
+expect gate0.4 0
+expect gate0.5 0
+# its last step again: one step
+key w2 down
+tapkey w3
+key w2 up
+expect gate0.2 1
+expect gate0.3 0
+# KNOB 2 with a note at step 8: LEN 2 ... LEN 6, then SLIDE (ties to step 7, which slides into 8)
+tapkey w8
+key w2 down
+spin K2 1
+expect gate0.3 2
+expect gate0.4 0
+spin K2 1
+spin K2 1
+spin K2 1
+spin K2 1
+expect gate0.7 2
+expect slide0.7 0
+spin K2 1
+expect gate0.7 2
+expect slide0.7 1
+# back a step: LEN 6, the slide gone
+spin K2 -1
+expect slide0.7 0
+expect gate0.7 2
+key w2 up
+expect gate0.8 1
