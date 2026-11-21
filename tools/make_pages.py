@@ -11,6 +11,7 @@
                               x0x_breaks.js inlined; Chrome or Edge, Web MIDI)
   backup/index.html           the project to a file and back (web/backup/index.html; Chrome or Edge, Web MIDI)
   manual/index.html, img/     the manual (tools/manual_html.py, from docs/MANUAL.md)
+  manual-ja/index.html        its Japanese translation (docs/manual-ja.html; the manual's img/)
   new/index.html, img/new/    what's new in each version (the same, from docs/NEW.md)
   firmware/x0x-VERSION.fwsc   the package the installer writes; also the download
 
@@ -137,6 +138,10 @@ def main(pkg, version, out):
     subprocess.run([sys.executable, str(SRC / "tools" / "manual_html.py"), str(SRC / "docs" / "MANUAL.md"),
                     str(out / "manual" / "index.html")], check=True, capture_output=True)
     shutil.copytree(SRC / "docs" / "img", out / "manual" / "img")
+    # the Japanese translation (a complete page, kept by hand): the English manual's pictures
+    (out / "manual-ja").mkdir(exist_ok=True)
+    ja = (SRC / "docs" / "manual-ja.html").read_text(encoding="utf-8")
+    (out / "manual-ja" / "index.html").write_text(ja.replace('src="img/', 'src="../manual/img/'), encoding="utf-8")
     # what's new (the same converter; its pictures beside it)
     subprocess.run([sys.executable, str(SRC / "tools" / "manual_html.py"), str(SRC / "docs" / "NEW.md"),
                     str(out / "new" / "index.html")], check=True, capture_output=True)

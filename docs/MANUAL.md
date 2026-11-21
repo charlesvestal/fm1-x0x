@@ -7,6 +7,8 @@ own.
 
 To see what changed in this version, read [What's new](https://charlesvestal.github.io/fm1-x0x/new/).
 
+This manual is also in Japanese: [日本語版](https://charlesvestal.github.io/fm1-x0x/manual-ja/).
+
 ![A drawing of the FM-1 running X0X. On the left the knobs MASTER (volume), SELECT (page), PRESETS (pattern) and ALGORITHM (part), with OCT- and OCT+ below them (16 steps back and forward); the screen in the middle; on the right KNOB1 to KNOB4 (the page's four values) above two rows of buttons: FX (effects), SEL (list all), ENV (hold: accent), LFO (mixer), EDIT (sound), GLO (settings), then HOME (pattern, song), SAVE (save; hold: copy), ARP (TB-3PO), SEQ (steps), PLAY/STOP and REC (record). Below, the black keys (drum tracks, break slices, part mutes, mixer channels) and the white keys (steps; on HOME, patterns). Section 3 lists each control.](img/fm1-panel.svg "The FM-1 (a drawing), running X0X, each control labeled")
 
 ---
