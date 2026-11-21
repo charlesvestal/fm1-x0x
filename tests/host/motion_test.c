@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-only */
 /* X0X motion lanes (firmware/src/seq/motion.c): record a sweep, play it back, ramp between steps,
  * a gap filled, a single touch, the knob winning while it moves and for a pass, a pattern
- * change, stop, and a reused slot. */
+ * change, stop, a reused slot, and two patterns' lanes on one knob. */
 #include <stdio.h>
 #include <string.h>
 #include "../../firmware/src/seq/motion.h"
@@ -124,6 +124,26 @@ int main(void)
             break;
     CHECK(v == NLANE - 2 && motion_alloc(L, 3, 1, 1, 0, 0) == -1, "pool of %d: full after %d more", NLANE, v);
     CHECK(motion_find(L, 3, 1, 0, 2, 1) >= 0 && motion_find(L, 4, 1, 0, 2, 1) < 0, "find keys on the pattern");
+
+    /* two patterns' lanes on one knob, the new pattern's first in the list: switching to it plays its lane,
+     * not the knob the old lane hands back (a fresh pool: the one above is full) */
+    memset(L, 0, sizeof L);
+    motion_init(&M, L);
+    M.base = base;
+    M.apply = apply;
+    eng = knob = 0;
+    k2 = motion_alloc(L, 6, 0, 2, 0, 0);               /* pattern 6's lane first in the list, */
+    k = motion_alloc(L, 5, 0, 2, 0, 0);                /* then pattern 5's */
+    for (v = 0; v < 16; v++) {
+        L[k].val[v] = 100;
+        L[k2].val[v] = 110;
+    }
+    motion_step(&M, 0, 5, 0, 1, 16);
+    CHECK(eng == 100, "pattern 5's lane plays (%d)", eng);
+    motion_step(&M, 0, 6, 0, 1, 16);
+    CHECK(eng == 110, "switched to pattern 6: its lane plays, not the knob handed back (%d)", eng);
+    motion_step(&M, 0, 6, 1, 2, 16);
+    CHECK(eng == 110, "... and keeps playing (%d)", eng);
     printf("motion: %s\n", fails ? "FAIL" : "ok");
     return fails != 0;
 }
