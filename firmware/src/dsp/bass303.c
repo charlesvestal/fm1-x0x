@@ -61,6 +61,54 @@ static const x0x_param_t params[BASS303_NPARAMS] = {
     { "AccDec", 127, 7, 0 },         /* 30 .. 3000 ms (Devilfish); 7 = 194 ms, stock is 200 */
 };
 
+/* ---- drive scaling (X0X; not in drive.h) ------------------------------------------------
+ * The drive always sees the voice at one level, DRV_REF, and Volume is applied after it, so
+ * Volume no longer sets how hard the drive is hit. A makeup gain per Drive value keeps the
+ * loudness level with Drive 0 (K-weighted, ITU-R BS.1770, measured on tools/drive_line.h's
+ * acid line, patch 0), and a deliberate rise on top of it, linear in dB, reaches +3 dB at full
+ * Drive. Drive 0 is still a bypass. tools/measure_drive_makeup.py measures the tables;
+ * re-measure them after changing what the drive does to the level. */
+#define DRV_REF 0.18620871f              /* -14.6 dB: about Volume 96's level (-14.65 dB) */
+#define DRV_RISE 3.0f
+#define RAT_TONE_HZ 936.48098f           /* the stock tone: 1 / (2 pi (0.5 * 100k + 1.5k) 3.3n) */
+
+static const float makeup_soft[128] = {
+    1.0000f, 1.0294f, 1.0329f, 1.0366f, 1.0403f, 1.0444f, 1.0485f, 1.0531f,
+    1.0576f, 1.0627f, 1.0678f, 1.0734f, 1.0790f, 1.0854f, 1.0919f, 1.0983f,
+    1.1049f, 1.1124f, 1.1200f, 1.1277f, 1.1354f, 1.1442f, 1.1530f, 1.1619f,
+    1.1708f, 1.1813f, 1.1918f, 1.2024f, 1.2131f, 1.2238f, 1.2347f, 1.2457f,
+    1.2568f, 1.2698f, 1.2829f, 1.2961f, 1.3095f, 1.3230f, 1.3366f, 1.3504f,
+    1.3643f, 1.3802f, 1.3962f, 1.4123f, 1.4287f, 1.4453f, 1.4620f, 1.4790f,
+    1.4961f, 1.5152f, 1.5345f, 1.5541f, 1.5739f, 1.5940f, 1.6143f, 1.6349f,
+    1.6558f, 1.6787f, 1.7019f, 1.7254f, 1.7492f, 1.7734f, 1.7979f, 1.8228f,
+    1.8480f, 1.8752f, 1.9029f, 1.9311f, 1.9596f, 1.9885f, 2.0179f, 2.0477f,
+    2.0780f, 2.1104f, 2.1433f, 2.1768f, 2.2107f, 2.2452f, 2.2803f, 2.3159f,
+    2.3520f, 2.3904f, 2.4294f, 2.4691f, 2.5094f, 2.5504f, 2.5920f, 2.6343f,
+    2.6773f, 2.7227f, 2.7688f, 2.8157f, 2.8633f, 2.9118f, 2.9611f, 3.0113f,
+    3.0623f, 3.1157f, 3.1701f, 3.2253f, 3.2816f, 3.3389f, 3.3971f, 3.4564f,
+    3.5166f, 3.5794f, 3.6434f, 3.7084f, 3.7746f, 3.8420f, 3.9107f, 3.9805f,
+    4.0516f, 4.1252f, 4.2002f, 4.2766f, 4.3543f, 4.4334f, 4.5140f, 4.5961f,
+    4.6796f, 4.7657f, 4.8534f, 4.9427f, 5.0337f, 5.1263f, 5.2206f, 5.3166f,
+};
+static const float makeup_rat[128] = {
+    1.0000f, 1.6276f, 1.6302f, 1.6332f, 1.5906f, 1.5451f, 1.5002f, 1.4562f,
+    1.4136f, 1.3730f, 1.3335f, 1.2973f, 1.2621f, 1.2332f, 1.2050f, 1.1775f,
+    1.1506f, 1.1342f, 1.1181f, 1.1022f, 1.0865f, 1.0826f, 1.0788f, 1.0750f,
+    1.0712f, 1.0785f, 1.0859f, 1.0934f, 1.1009f, 1.1171f, 1.1335f, 1.1502f,
+    1.1671f, 1.1631f, 1.1350f, 1.1077f, 1.0810f, 1.0554f, 1.0304f, 1.0059f,
+    0.9821f, 0.9603f, 0.9389f, 0.9180f, 0.8976f, 0.8776f, 0.8581f, 0.8390f,
+    0.8204f, 0.8041f, 0.7882f, 0.7726f, 0.7573f, 0.7423f, 0.7276f, 0.7132f,
+    0.6990f, 0.6868f, 0.6747f, 0.6629f, 0.6512f, 0.6398f, 0.6286f, 0.6176f,
+    0.6067f, 0.5972f, 0.5878f, 0.5785f, 0.5694f, 0.5604f, 0.5516f, 0.5429f,
+    0.5344f, 0.5269f, 0.5196f, 0.5123f, 0.5052f, 0.4981f, 0.4912f, 0.4843f,
+    0.4776f, 0.4717f, 0.4660f, 0.4603f, 0.4547f, 0.4492f, 0.4437f, 0.4383f,
+    0.4330f, 0.4284f, 0.4239f, 0.4195f, 0.4151f, 0.4107f, 0.4064f, 0.4021f,
+    0.3979f, 0.3945f, 0.3912f, 0.3880f, 0.3847f, 0.3815f, 0.3783f, 0.3751f,
+    0.3720f, 0.3696f, 0.3672f, 0.3648f, 0.3624f, 0.3600f, 0.3576f, 0.3553f,
+    0.3530f, 0.3508f, 0.3487f, 0.3466f, 0.3446f, 0.3425f, 0.3404f, 0.3384f,
+    0.3363f, 0.3340f, 0.3318f, 0.3295f, 0.3272f, 0.3250f, 0.3228f, 0.3206f,
+};
+
 int bass303_nparams(void) { return BASS303_NPARAMS; }
 
 const x0x_param_t *bass303_param(int i)
@@ -138,13 +186,184 @@ static void bq_low_shelf(bass303_bq_t *q, float fc, float gain_db, float fs)
     q->a2 = ((A + 1.0f) + (A - 1.0f) * cs - s2) / a0;
 }
 
+/* Return the gain in dB at Volume v (the voice's level; with the drive on, after it). */
+static float vol_db(int v) { return -60.0f + 60.0f * ((float)v * (1.0f / 127.0f)); }
+
+/* Return Soft's input gain in dB at Drive d, at the drive's fixed input level DRV_REF:
+ * -2 + 32 t^0.75 dB, t = d / 127. Even in dB, the knob's first quarter barely distorts; the curve
+ * moves more of the change to the bottom, with the same gain at both ends. */
+static float soft_db(int d)
+{
+    if (d <= 0)
+        return -2.0f;
+    return -2.0f + 32.0f * c_exp2f(0.75f * c_log2f((float)d * (1.0f / 127.0f)));
+}
+
+/* Return where Drive d is on the RAT's taper, 0..1 over Drive 1..127. */
+static float rat_t(int d)
+{
+    return fm_clampf((float)(d - 1) * (1.0f / 126.0f), 0.0f, 1.0f);
+}
+
+/* Return the RAT's distortion resistance, 0..1 (drive.h's dist), at Drive d. drive.h maps the
+ * knob to it linearly, so the op-amp's gain at 1 kHz, 1 + dist * 100k / |Z1| (|Z1| ~ 81 ohm), is
+ * already +21 dB at the first step and most of the knob is used up in its first tenth. Here the knob
+ * is linear in that gain in dB, up to drive.h's maximum (dist = 1, ~61.8 dB). */
+static float rat_dist(int d)
+{
+    float t = rat_t(d);
+    if (t <= 0.0f)
+        return 0.0f;
+    return fm_minf((c_db2lin(61.8f * t) - 1.0f) * 81e-5f, 1.0f);
+}
+
+/* Set the RAT's tone one-pole (drive.h: fixed at the stock 936 Hz) for the current Drive: open to
+ * 12 kHz at the bottom of the taper, closing, log-interpolated, to the stock tone a quarter of the
+ * way up (Drive ~33), about where the distortion's harmonics make up for it. So low Drive brightens
+ * the voice, as the distortion would, instead of dulling it before the distortion arrives; open for
+ * longer, it leaves the op-amp's mid boost unchecked and the voice hollow. */
+static void rat_tone(bass303_t *b)
+{
+    float u = fm_minf(4.0f * rat_t(b->pot[BASS303_DRIVE]), 1.0f);
+    float fc = RAT_TONE_HZ * c_exp2f((1.0f - u) * 3.6796409f);   /* log2(12000 / RAT_TONE_HZ) */
+    b->r_tone_b1 = c_expf(-FM_TWO_PI / BASS303_SR * fc);
+}
+
+/* Set the gain after the drive for the current Drive: the makeup with its rise. */
+static void drv_gains(bass303_t *b)
+{
+    int p = b->pot[BASS303_DRIVE], rat = b->drv_type == BASS303_DRV_RAT;
+    float rise = DRV_RISE * (float)p * (1.0f / 127.0f);
+    b->drv_makeup = (rat ? makeup_rat : makeup_soft)[p] * c_db2lin(rise);
+}
+
+/* Return the gain after the drive: Volume and the makeup (the drive runs at DRV_REF). */
+static float drv_out_gain(const bass303_t *b) { return b->amp_scaler * (1.0f / DRV_REF) * b->drv_makeup; }
+
+/* Return whether the drive is on (a type, and Drive above 0). */
+static int drive_on(const bass303_t *b) { return b->drv_type != BASS303_DRV_OFF && b->pot[BASS303_DRIVE] > 0; }
+
+/* The migration of a project saved before the drive was rescaled (project.c, sound revision 7):
+ * the new Drive and Volume that sound as an old setting did.
+ *
+ * Soft: the same level into its shaper, to the nearest Drive value, so its output is the old one
+ * times the makeup, which the Volume takes back out. Past the new range's top (old Volume above
+ * about 106, with Drive high) the new maximum saturates less than the old setting did; the Volume
+ * still matches the level, to within about 1 dB. (tools/fit_drive_migration.py --check measures
+ * both types.)
+ *
+ * RAT: drive.h's dist sets the op-amp's tone as well as its gain, so no rule in its gain matches
+ * the sound. tools/fit_drive_migration.py measures it instead: for each old (Volume, Drive), the
+ * new Drive closest in spectral shape and the Volume that matches its loudness, at a grid of
+ * nodes (Volume every 8; Drive denser low down, where the old gain rose fastest), interpolated
+ * between them. The Drive table is monotone, so a lane sweeping either pot moves it one way, and
+ * smooth: where the old knob hardly changed the sound, nor does the mapping. */
+/* tools/fit_drive_migration.py, from here to the end of rat_mig_volume */
+#define RAT_MIG_NV 17
+#define RAT_MIG_ND 20
+static const uint8_t rat_mig_vn[RAT_MIG_NV] = {0, 8, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 127};
+static const uint8_t rat_mig_dn[RAT_MIG_ND] = {1, 2, 4, 8, 12, 16, 24, 32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 127};
+static const uint8_t rat_mig_drive[RAT_MIG_NV][RAT_MIG_ND] = {
+    { 45,  45,  45,  45,  45,  46,  50,  58,  77,  85,  94, 103, 109, 114, 118, 121, 123, 124, 125, 126},
+    { 45,  45,  45,  45,  45,  46,  50,  58,  77,  85,  94, 103, 109, 114, 118, 121, 123, 124, 125, 126},
+    { 45,  45,  45,  45,  45,  46,  51,  59,  77,  85,  95, 104, 110, 114, 118, 121, 123, 124, 125, 126},
+    { 45,  45,  45,  45,  45,  47,  53,  63,  77,  85,  95, 105, 111, 115, 119, 121, 123, 124, 125, 126},
+    { 45,  45,  45,  45,  45,  48,  56,  69,  78,  86,  96, 106, 112, 116, 119, 121, 123, 124, 125, 126},
+    { 45,  45,  45,  45,  48,  52,  62,  74,  83,  92, 100, 107, 112, 116, 119, 121, 123, 124, 125, 126},
+    { 45,  45,  45,  45,  49,  55,  69,  80,  89,  97, 103, 109, 113, 116, 119, 121, 123, 124, 125, 126},
+    { 45,  45,  45,  49,  55,  62,  76,  86,  94, 101, 106, 111, 114, 117, 119, 121, 123, 124, 125, 126},
+    { 47,  47,  47,  55,  63,  70,  82,  91,  98, 104, 108, 112, 115, 117, 119, 121, 123, 124, 125, 126},
+    { 50,  50,  52,  63,  71,  78,  88,  95, 101, 106, 110, 113, 116, 118, 120, 122, 123, 124, 125, 126},
+    { 54,  54,  59,  70,  78,  84,  93,  99, 104, 108, 111, 114, 116, 118, 120, 122, 123, 124, 125, 126},
+    { 60,  60,  67,  77,  84,  89,  96, 102, 106, 109, 112, 115, 117, 119, 121, 122, 123, 124, 125, 126},
+    { 66,  67,  74,  83,  88,  93,  99, 103, 107, 110, 113, 115, 117, 119, 121, 122, 123, 124, 125, 126},
+    { 72,  74,  80,  87,  92,  96, 101, 105, 108, 111, 113, 115, 117, 119, 121, 122, 123, 124, 125, 126},
+    { 78,  80,  85,  91,  95,  98, 102, 105, 108, 111, 113, 115, 117, 119, 121, 122, 123, 124, 125, 126},
+    { 83,  85,  89,  94,  97,  99, 103, 106, 109, 111, 113, 115, 117, 119, 121, 122, 123, 124, 125, 126},
+    { 86,  87,  91,  95,  98, 100, 103, 106, 109, 111, 113, 115, 117, 119, 121, 122, 123, 124, 125, 126},
+};
+static const uint8_t rat_mig_volume[RAT_MIG_NV][RAT_MIG_ND] = {
+    { 12,  23,  35,  47,  53,  58,  64,  67,  68,  69,  70,  71,  72,  73,  74,  75,  76,  77,  78,  79},
+    { 20,  31,  43,  55,  61,  65,  71,  74,  75,  76,  77,  78,  79,  80,  81,  82,  83,  84,  85,  85},
+    { 28,  39,  51,  62,  68,  72,  78,  81,  81,  82,  83,  84,  85,  86,  87,  88,  88,  89,  90,  91},
+    { 36,  47,  58,  69,  75,  79,  84,  86,  87,  88,  88,  89,  90,  91,  92,  93,  93,  94,  95,  96},
+    { 44,  55,  66,  76,  81,  85,  89,  90,  91,  92,  93,  93,  94,  95,  96,  97,  98,  98,  99, 100},
+    { 51,  62,  73,  82,  87,  90,  93,  94,  95,  96,  97,  97,  98,  99, 100, 100, 101, 102, 102, 103},
+    { 59,  69,  79,  87,  91,  94,  96,  97,  98,  99, 100, 101, 101, 102, 103, 103, 104, 105, 105, 105},
+    { 66,  76,  85,  92,  95,  97,  99, 100, 101, 102, 103, 103, 104, 105, 105, 106, 106, 107, 107, 107},
+    { 73,  82,  90,  95,  98,  99, 101, 103, 104, 104, 105, 106, 106, 107, 107, 108, 108, 108, 108, 109},
+    { 79,  87,  94,  98, 100, 102, 104, 105, 106, 107, 107, 108, 108, 108, 109, 109, 109, 109, 109, 110},
+    { 85,  92,  97, 101, 103, 104, 106, 107, 108, 108, 108, 109, 109, 109, 109, 110, 110, 110, 110, 110},
+    { 90,  95,  99, 103, 105, 106, 107, 108, 109, 109, 109, 109, 110, 110, 110, 110, 110, 110, 110, 111},
+    { 93,  98, 101, 105, 106, 107, 108, 109, 109, 109, 110, 110, 110, 110, 110, 110, 110, 111, 111, 111},
+    { 96, 100, 104, 106, 107, 108, 109, 109, 110, 110, 110, 110, 110, 110, 110, 110, 111, 111, 111, 111},
+    { 99, 102, 105, 107, 108, 109, 110, 110, 110, 110, 110, 110, 110, 110, 110, 111, 111, 111, 111, 111},
+    {102, 105, 107, 108, 109, 109, 110, 110, 110, 110, 110, 110, 110, 110, 111, 111, 111, 111, 111, 111},
+    {103, 106, 108, 109, 109, 110, 110, 110, 110, 110, 110, 110, 110, 110, 111, 111, 111, 111, 111, 111},
+};
+
+/* Return the index of the node at or below x (the last but one at most), and in *off and *w how far
+ * x is from it and the distance to the next node. */
+static int mig_node(const uint8_t *nodes, int n, int x, int *off, int *w)
+{
+    int i = 0;
+    while (i < n - 2 && x >= nodes[i + 1])
+        i++;
+    *off = x - nodes[i];
+    *w = nodes[i + 1] - nodes[i];
+    return i;
+}
+
+/* Return table t at old (Volume, Drive), interpolated between its nodes and rounded to the nearest
+ * whole value. In integers, so that a table monotone in either pot interpolates monotone: in floats
+ * a value on a half can round up at one setting and down at the next. */
+static int mig_lookup(const uint8_t t[RAT_MIG_NV][RAT_MIG_ND], int volume, int drive)
+{
+    int fv, wv, fd, wd;
+    int a = mig_node(rat_mig_vn, RAT_MIG_NV, volume, &fv, &wv);
+    int b = mig_node(rat_mig_dn, RAT_MIG_ND, drive, &fd, &wd);
+    int x = (t[a][b] * (wd - fd) + t[a][b + 1] * fd) * (wv - fv)
+            + (t[a + 1][b] * (wd - fd) + t[a + 1][b + 1] * fd) * fv;      /* the value x (wv wd) */
+    return (2 * x + wv * wd) / (2 * wv * wd);
+}
+
+void bass303_pre_rescale(int type, int volume, int drive, int *new_drive, int *new_volume)
+{
+    const float DB = 6.02059991f;                              /* 20 log10(2): dB from log2 */
+    const float OLD_SOFT_DB = 24.0f;                           /* drive.h's Soft: 24 n dB, at the Volume's level */
+    float vdb = vol_db(volume), want, over, mk, r;
+    int p;
+    *new_drive = drive;
+    *new_volume = volume;
+    if (drive <= 0 || type == BASS303_DRV_OFF)                 /* 0: a bypass, then and now */
+        return;
+    if (type == BASS303_DRV_RAT) {
+        *new_drive = mig_lookup(rat_mig_drive, volume, drive);
+        *new_volume = mig_lookup(rat_mig_volume, volume, drive);
+        return;
+    }
+    /* Soft: the gain the old shaper had, as one at the drive's level now (DRV_REF), and the Drive
+     * that gives it: soft_db's inverse, then whichever neighbouring value is nearer in dB */
+    want = OLD_SOFT_DB * (float)drive * (1.0f / 127.0f) + vdb - DB * c_log2f(DRV_REF);
+    r = fm_clampf((want - soft_db(0)) / (soft_db(127) - soft_db(0)), 1e-6f, 1.0f);
+    p = (int)fm_clampf(127.0f * c_exp2f(1.33333333f * c_log2f(r)), 1.0f, 127.0f);
+    if (p < 127 && soft_db(p + 1) - want < want - soft_db(p))
+        p++;
+    /* past the new range's top the shaper is hit less hard than it was; deep in saturation its
+     * output goes as 1 / its input gain, so the old one was quieter by the gain the new one lacks */
+    over = fm_maxf(want - soft_db(127), 0.0f);
+    mk = DB * c_log2f(makeup_soft[p]) + DRV_RISE * (float)p * (1.0f / 127.0f);
+    *new_drive = p;
+    *new_volume = (int)fm_clampf((vdb - mk - over + 60.0f) * (127.0f / 60.0f) + 0.5f, 0.0f, 127.0f);
+}
+
 /* RAT op-amp: drive.h rat::State::update_op_amp_coeffs + the correction one-pole cutoff */
 static void rat_coeffs(bass303_t *b)
 {
     const float R1 = 100000.0f, C1 = 1e-10f, Z1_B0 = 2.72149e-7f, Z1_B1 = 0.0027354f;
     const float Z1_A0 = 6.27638e-9f, Z1_A1 = 0.0000069f;
     const float t = 1.0f / BASS303_SR, s0 = t * 0.5f, s1 = t * t * 0.25f, s2 = t * t * t * 0.125f;
-    float dist = fm_maxf(b->drv_amt, 0.001f);
+    float dist = fm_maxf(rat_dist(b->pot[BASS303_DRIVE]), 0.0001f);
     float z2_b0 = fm_maxf(dist * R1, 1.0f), z2_a0 = z2_b0 * C1;
     float a0 = Z1_B0 * z2_a0, a1 = Z1_B0 + Z1_B1 * z2_a0, a2 = Z1_B1 + z2_a0;
     float num[4], den[4], nz[4], dz[4], inv;
@@ -169,9 +388,19 @@ static void rat_coeffs(bass303_t *b)
     b->r_corr_b1 = c_expf(-FM_TWO_PI / BASS303_SR * 1119360.558f / (dist * 2306.231003f + 1.0f));
 }
 
+/* Clear the drive's filter and DC-blocker state: a fresh start (drive.h set_model). */
+static void clear_drive_state(bass303_t *b)
+{
+    b->s_pre.z1 = b->s_pre.z2 = b->s_post.z1 = b->s_post.z2 = 0.0f;
+    b->up_lp.z1 = b->up_lp.z2 = b->down_lp.z1 = b->down_lp.z2 = 0.0f;
+    b->r_z[0] = b->r_z[1] = b->r_z[2] = b->r_corr_z = b->r_tone_z = 0.0f;
+    b->dcb_x1 = b->dcb_y1 = 0.0f;
+}
+
 void bass303_set(bass303_t *b, int i, int v)
 {
     float n;
+    int was_on = drive_on(b);
     if (i < 0 || i >= BASS303_NPARAMS)
         return;
     if (v < 0)
@@ -180,6 +409,10 @@ void bass303_set(bass303_t *b, int i, int v)
         v = params[i].max;
     b->pot[i] = (uint8_t)v;
     n = (float)v * (1.0f / 127.0f);
+    /* the drive coming on (from Drive 0, or from Off): start it fresh, not from the state it was
+     * left in when it went off, which its output gain would bring out as a click */
+    if (!was_on && drive_on(b))
+        clear_drive_state(b);
     switch (i) {
     case BASS303_CUTOFF:
         b->cutoff = 314.0f * c_exp2f(n * 2.930586688f);       /* log2(2394/314) */
@@ -207,26 +440,24 @@ void bass303_set(bass303_t *b, int i, int v)
         b->tuning = 440.0f + (float)(v - 64) * 0.625f;
         break;
     case BASS303_VOLUME:
-        b->amp_scaler = c_db2lin(-60.0f + 60.0f * n);
+        b->amp_scaler = c_db2lin(vol_db(v));
         break;
     case BASS303_SLIDE:                                        /* slew tau = 0.2 * slide time */
         b->slew_c = rc_coeff(0.2f * (2.0f + 358.0f * n), BASS303_SR);
         powers(b->slew_pw, b->slew_c);
         break;
     case BASS303_DRIVE:
-        b->drv_amt = n;
-        b->s_gain = c_db2lin(24.0f * n);
+        b->s_gain = c_db2lin(soft_db(v));
         b->s_inv = 1.0f / b->s_gain;
         rat_coeffs(b);
+        rat_tone(b);
+        drv_gains(b);
         break;
     case BASS303_DRVTYPE:
-        if (v != b->drv_type) {                                /* drive.h set_model: fresh state */
-            b->s_pre.z1 = b->s_pre.z2 = b->s_post.z1 = b->s_post.z2 = 0.0f;
-            b->up_lp.z1 = b->up_lp.z2 = b->down_lp.z1 = b->down_lp.z2 = 0.0f;
-            b->r_z[0] = b->r_z[1] = b->r_z[2] = b->r_corr_z = b->r_tone_z = 0.0f;
-            b->dcb_x1 = b->dcb_y1 = 0.0f;
-        }
+        if (v != b->drv_type)                                  /* drive.h set_model: fresh state */
+            clear_drive_state(b);
         b->drv_type = v;
+        drv_gains(b);
         break;
     }
 }
@@ -234,7 +465,9 @@ void bass303_set(bass303_t *b, int i, int v)
 /* clear everything that only matters while sound is running (Open303::triggerNote after idle) */
 static void clear_audio_state(bass303_t *b)
 {
+#if BASS303_OS >= 2
     int i;
+#endif
     b->dc.x1 = b->dc.x2 = b->dc.y1 = b->dc.y2 = 0.0f;
     b->hp1_x1 = b->hp1_y1 = 0.0f;
     b->f_y1 = b->f_y2 = b->f_y3 = b->f_y4 = b->fb_x1 = b->fb_y1 = 0.0f;
@@ -248,12 +481,7 @@ static void clear_audio_state(bass303_t *b)
 #endif
     b->ap_x1 = b->ap_y1 = b->hp2_x1 = b->hp2_y1 = 0.0f;
     b->nt.x1 = b->nt.x2 = b->nt.y1 = b->nt.y2 = 0.0f;
-    b->s_pre.z1 = b->s_pre.z2 = b->s_post.z1 = b->s_post.z2 = 0.0f;
-    b->up_lp.z1 = b->up_lp.z2 = b->down_lp.z1 = b->down_lp.z2 = 0.0f;
-    for (i = 0; i < 3; i++)
-        b->r_z[i] = 0.0f;
-    b->r_corr_z = b->r_tone_z = 0.0f;
-    b->dcb_x1 = b->dcb_y1 = 0.0f;
+    clear_drive_state(b);
     b->amp_y = 0.0f;
 }
 
@@ -325,8 +553,7 @@ static void fixed_init(void)
     bq_low_shelf(&bass303_k.s_post, 400.0f, -6.0f, BASS303_SR);
     bq_lowpass(&bass303_k.up_lp, 19000.0f, 2.0f * BASS303_SR);
     bq_lowpass(&bass303_k.down_lp, 19000.0f, 2.0f * BASS303_SR);
-    /* tone fixed at 0.5: 1 / (2 pi (0.5 * 100k + 1.5k) 3.3n) */
-    bass303_k.r_tone_b1 = c_expf(-FM_TWO_PI / BASS303_SR / (FM_TWO_PI * 51500.0f * 3.3e-9f));
+    /* (the RAT's tone: rat_tone, with Drive) */
     bass303_k.ready = 1;
 }
 
@@ -548,8 +775,8 @@ static void down_pass(bass303_t *b, const float *u, float *y, int n, float g)
     bq_put(&l, &b->down_lp);
 }
 
-/* the DC blocker (0.9996) in place */
-static void dcb_pass(bass303_t *b, float *x, int n)
+/* the DC blocker (0.9996) in place, times g */
+static void dcb_pass(bass303_t *b, float *x, int n, float g)
 {
     float x1 = b->dcb_x1, y1 = b->dcb_y1;
     int i;
@@ -557,14 +784,15 @@ static void dcb_pass(bass303_t *b, float *x, int n)
         float y = x[i], yh = y - x1 + 0.9996f * y1;
         x1 = y;
         y1 = yh;
-        x[i] = yh;
+        x[i] = g * yh;
     }
     b->dcb_x1 = x1;
     b->dcb_y1 = y1;
 }
 
-/* Soft: pre shelf x gain, 2x up, tanh(u + 0.15) - its value at 0, 2x down, x 1/gain, post shelf, DC blocker */
-static BASS303_PASS void drive_soft(bass303_t *b, float *out, int n)
+/* Soft: pre shelf x gain, 2x up, tanh(u + 0.15) - its value at 0, 2x down, x 1/gain, post shelf, DC blocker,
+ * x wg */
+static BASS303_PASS void drive_soft(bass303_t *b, float *out, int n, float wg)
 {
     float u[2 * BASS303_DSUB];
     int i;
@@ -574,12 +802,12 @@ static BASS303_PASS void drive_soft(bass303_t *b, float *out, int n)
         u[i] = fm_tanhf(u[i] + 0.15f) - 0.14888503f;
     down_pass(b, u, out, n, b->s_inv);
     bq_pass(&bass303_k.s_post, &b->s_post, out, n, 1.0f);
-    dcb_pass(b, out, n);
+    dcb_pass(b, out, n, wg);
 }
 
 /* RAT: op-amp (3rd-order TDF-II), the correction one-pole x 1.877, 2x up, the clipper, 2x down x 0.3204805,
- * the tone one-pole, DC blocker */
-static BASS303_PASS void drive_rat(bass303_t *b, float *out, int n)
+ * the tone one-pole, DC blocker, x wg */
+static BASS303_PASS void drive_rat(bass303_t *b, float *out, int n, float wg)
 {
     float u[2 * BASS303_DSUB];
     int i;
@@ -612,7 +840,7 @@ static BASS303_PASS void drive_rat(bass303_t *b, float *out, int n)
     }
     down_pass(b, u, out, n, 0.3204805f);
     {
-        const float tb1 = bass303_k.r_tone_b1, tb0 = 1.0f - tb1;
+        const float tb1 = b->r_tone_b1, tb0 = 1.0f - tb1;
         float z = b->r_tone_z;
         for (i = 0; i < n; i++) {
             z = out[i] * tb0 + z * tb1;
@@ -620,18 +848,19 @@ static BASS303_PASS void drive_rat(bass303_t *b, float *out, int n)
         }
         b->r_tone_z = z;
     }
-    dcb_pass(b, out, n);
+    dcb_pass(b, out, n, wg);
 }
 
 static void drive_block(bass303_t *b, float *out, int n)
 {
+    const float wg = drv_out_gain(b);
     int i, ns;
     for (i = 0; i < n; i += ns) {
         ns = n - i < BASS303_DSUB ? n - i : BASS303_DSUB;
         if (b->drv_type == BASS303_DRV_SOFT)
-            drive_soft(b, out + i, ns);
+            drive_soft(b, out + i, ns, wg);
         else
-            drive_rat(b, out + i, ns);
+            drive_rat(b, out + i, ns, wg);
     }
 }
 
@@ -837,10 +1066,12 @@ static void run_voice(bass303_t *b, float *ab, float *osb, int n, int nos)
     }
 }
 
-/* pass 2: the amp de-clicked (200 Hz Butterworth), times the volume, in place */
+/* pass 2: the amp de-clicked (200 Hz Butterworth), times the volume (driven: the drive's level, the volume after
+ * it), in place */
 static BASS303_PASS void run_amp(bass303_t *b, float *ab, int n)
 {
-    const float b0 = bass303_k.dc_b0, b1 = bass303_k.dc_b1, a1 = bass303_k.dc_a1, a2 = bass303_k.dc_a2, g = b->amp_scaler;
+    const float b0 = bass303_k.dc_b0, b1 = bass303_k.dc_b1, a1 = bass303_k.dc_a1, a2 = bass303_k.dc_a2;
+    const float g = drive_on(b) ? DRV_REF : b->amp_scaler;
     float x1 = b->dc.x1, x2 = b->dc.x2, y1 = b->dc.y1, y2 = b->dc.y2;
     int i;
     BASS303_UNROLL2                            /* (no register moves for the state between samples) */
@@ -965,7 +1196,7 @@ void bass303_render(bass303_t *b, float *out, int n)
     }
     run(b, out, n);
 
-    if (b->drv_type != BASS303_DRV_OFF && b->drv_amt > 0.0f)
+    if (drive_on(b))
         drive_block(b, out, n);
 
     /* states that decay toward zero while the engine still runs (the idle hold-off, where the
@@ -991,9 +1222,10 @@ void bass303_render(bass303_t *b, float *out, int n)
     b->dcb_y1 = fm_flush(b->dcb_y1);
 
     /* idle: gate off, amp envelope and de-clicker below -120 dB and the drive's DC blocker
-     * settled, for BASS303_IDLE_HOLD samples in a row (see bass303.h) */
+     * settled (below -120 dB at the output: its state is at DRV_REF, scaled after it), for
+     * BASS303_IDLE_HOLD samples in a row (see bass303.h) */
     if (!b->gate && b->amp_y < 1e-6f && fm_fabsf(b->dc.y1) < 1e-6f && fm_fabsf(b->dc.y2) < 1e-6f
-        && fm_fabsf(b->dcb_y1) < 1e-6f) {
+        && fm_fabsf(b->dcb_y1) * drv_out_gain(b) < 1e-6f) {
         b->quiet += n;
         if (b->quiet >= BASS303_IDLE_HOLD) {
             clear_audio_state(b);
